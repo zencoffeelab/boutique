@@ -189,6 +189,16 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .ui-textarea, .field textarea { min-height: 9rem; resize: vertical; }
 .form-message { padding: 1rem; border-left: 3px solid var(--green); background: #e9efe6; }
 .form-error { border-color: #a43831; color: #84221c; }
+.account-message { width: min(100% - 2rem, 820px); margin: -4rem auto 2rem; }
+.mfa-panel { width: min(100% - 2rem, 820px); margin: 0 auto clamp(4rem, 9vw, 7rem); padding: clamp(1.5rem, 4vw, 3.5rem); border: 1px solid var(--line); background: var(--paper); }
+.mfa-panel h2 { margin: .35rem 0 1rem; font-size: clamp(2rem, 5vw, 4rem); }
+.mfa-status { display: inline-flex; margin: .5rem 0 1.5rem; padding: .55rem .8rem; border-radius: 999px; font-size: .78rem; font-weight: 700; }
+.mfa-status--success { background: #e1eadc; color: var(--green-deep); }
+.mfa-enrollment { display: grid; gap: 1rem; }
+.mfa-qr { width: 240px; height: 240px; padding: .65rem; border: 1px solid var(--line); background: white; }
+.mfa-secret { display: inline-block; max-width: 100%; overflow-wrap: anywhere; padding: .35rem .5rem; background: var(--cream-dark); font-size: .85rem; user-select: all; }
+.mfa-code-form { display: grid; grid-template-columns: minmax(12rem, 1fr) auto; align-items: end; gap: .75rem; }
+.mfa-code-form .field input { letter-spacing: .35em; font-variant-numeric: tabular-nums; }
 
 .cart-layout, .checkout-layout { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: clamp(2rem, 7vw, 7rem); width: var(--page); margin: 0 auto; padding-bottom: 8rem; }
 .cart-lines { border-top: 1px solid var(--line); }
@@ -313,7 +323,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
   .origin-grid { grid-template-columns: 1fr; }
   .editorial-copy { grid-template-columns: 1fr; gap: 1rem; }
   .taste-notes { flex-wrap: wrap; }
-  .form-grid { grid-template-columns: 1fr; }
+  .form-grid, .mfa-code-form { grid-template-columns: 1fr; }
   .field--wide { grid-column: auto; }
   .cart-line { grid-template-columns: 80px 1fr; }
   .cart-line img { width: 80px; }

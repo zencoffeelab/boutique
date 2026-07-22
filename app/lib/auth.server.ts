@@ -20,12 +20,15 @@ export async function requireAdmin(request: Request) {
     return { id: "demo-admin", role: "admin" as const, demo: true };
   }
   const viewer = await getViewer(request);
+  const url = new URL(request.url);
+  const next = `${url.pathname}${url.search}`;
+  const accountPath = url.pathname.startsWith("/en/") ? "/en/my-account" : "/mon-compte";
   if (!viewer?.profile || viewer.profile.role !== "admin") {
-    throw redirect("/mon-compte?next=/admin");
+    throw redirect(`${accountPath}?next=${encodeURIComponent(next)}`, { headers: viewer?.responseHeaders });
   }
   const aal = await createRequestSupabase(request)?.client.auth.mfa.getAuthenticatorAssuranceLevel();
   if (aal?.data?.currentLevel !== "aal2") {
-    throw new Response("Administrator MFA is required.", { status: 403 });
+    throw redirect(`${accountPath}?mfa=1&next=${encodeURIComponent(next)}`, { headers: viewer.responseHeaders });
   }
   return { id: viewer.user.id, role: "admin" as const, demo: false };
 }
