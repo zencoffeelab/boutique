@@ -41,13 +41,12 @@ function fromAddress() {
   return { name: config.SHIP_FROM_NAME, company: config.SHIP_FROM_COMPANY, street1: config.SHIP_FROM_STREET1, street2: config.SHIP_FROM_STREET2 ?? "", city: config.SHIP_FROM_CITY, zip: config.SHIP_FROM_POSTAL_CODE, country: config.SHIP_FROM_COUNTRY, phone: config.SHIP_FROM_PHONE, email: config.SHIP_FROM_EMAIL };
 }
 
-function customsDeclaration(parcel: PackedParcel, lines: ResolvedCartLine[]) {
-  const config = env();
+export function buildCustomsDeclaration(parcel: PackedParcel, lines: ResolvedCartLine[], signer: string) {
   const items = parcel.lines.map((parcelLine) => {
     const line = lines.find((candidate) => candidate.variantId === parcelLine.variantId)!;
     return { description: `${line.productName} roasted coffee`, quantity: parcelLine.quantity, net_weight: String(parcelLine.quantity * parcelLine.unitWeightGrams), mass_unit: "g", value_amount: ((line.unitPriceCents * parcelLine.quantity) / 100).toFixed(2), value_currency: "EUR", tariff_number: line.hsCode, origin_country: line.customsOriginCountry };
   });
-  return { certify: true, certifier: config.SHIP_FROM_NAME, contents_type: "MERCHANDISE", non_delivery_option: "RETURN", incoterm: "DDU", eel_pfc: "NOEEI_30_37_a", items };
+  return { certify: true, certify_signer: signer, contents_type: "MERCHANDISE", non_delivery_option: "RETURN", incoterm: "DDU", items };
 }
 
 type ShippoRate = { object_id: string; amount: string; currency: string; provider: string; estimated_days?: number; servicelevel?: { name?: string; token?: string } };
@@ -63,7 +62,7 @@ async function shippoRates(parcels: PackedParcel[], address: QuoteAddress, lines
       async: false,
     };
     if (pickupPoint) payload.extra = { location_external_id: pickupPoint.id };
-    if (address.countryCode === "GB") payload.customs_declaration = customsDeclaration(parcel, lines);
+    if (address.countryCode === "GB") payload.customs_declaration = buildCustomsDeclaration(parcel, lines, config.SHIP_FROM_NAME);
     const response = await fetch("https://api.goshippo.com/shipments/", { method: "POST", headers: { authorization: `ShippoToken ${config.SHIPPO_API_TOKEN}`, "content-type": "application/json", "shippo-api-version": "2018-02-08" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(12_000) });
     if (!response.ok) throw new Error(`Shippo rate request failed (${response.status}).`);
     const data = await response.json() as { rates?: ShippoRate[] };
