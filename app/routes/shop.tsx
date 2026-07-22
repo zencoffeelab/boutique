@@ -19,13 +19,10 @@ export default function Shop() {
   const { locale, products } = useLoaderData<typeof loader>();
   const english = locale === "en-GB";
   return <>
-    <header className="shop-title-band"><h1>{english ? "The shop" : "La boutique"}</h1></header>
-    <figure className="shop-banner">
-      <img src="/media/shop-banner.jpg" alt={english ? "Coffee being prepared at Zen Coffee Lab" : "Préparation du café chez Zen Coffee Lab"} width="1300" height="650" fetchPriority="high" />
-    </figure>
-    <section className="page-shell shop-catalog" aria-label={english ? "Coffee catalogue" : "Catalogue de cafés"}>
+    <header className="page-hero"><p className="eyebrow">Zen Coffee Lab</p><h1>{english ? "The coffee shop" : "La boutique café"}</h1><p className="lede">{english ? "Bright, traceable coffees roasted to order. Choose your origin, then your format." : "Des cafés lumineux et traçables, torréfiés à la demande. Choisissez votre origine, puis votre format."}</p></header>
+    <section className="page-shell section" aria-label={english ? "Coffee catalogue" : "Catalogue de cafés"}>
       <div className="filter-bar"><span>{products.length} {english ? "coffees" : "cafés"}</span><span>{english ? "Roasted every week in Tours" : "Torréfiés chaque semaine à Tours"}</span></div>
-      <div className="product-grid product-grid--shop">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} />)}</div>
+      <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} />)}</div>
     </section>
   </>;
 }

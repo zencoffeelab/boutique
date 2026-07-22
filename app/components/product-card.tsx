@@ -15,12 +15,15 @@ export function ProductCard({ product, locale, audience }: { product: Product; l
     <article className="product-card">
       <Link to={href} className="product-card__image" aria-label={translation.name}>
         <img src={product.media[0]?.url} alt={product.media[0]?.alt[locale] ?? translation.name} width={640} height={640} loading="lazy" />
-        <span className="product-card__hover-label">{dictionary[locale].discover}<ArrowUpRight aria-hidden="true" /></span>
+        <span>{dictionary[locale].discover}<ArrowUpRight aria-hidden="true" /></span>
       </Link>
       <div className="product-card__body">
-        <div><h3><Link to={href}>{translation.name}</Link></h3><p className="product-card__category">{locale === "fr-FR" ? "Cafés" : "Coffee"}</p></div>
-        <Link className="product-card__price" to={href}>{locale === "fr-FR" ? "Ajouter au panier" : "Add to basket"} — {dictionary[locale].from.toLocaleLowerCase()} {formatMoney(fromPrice, locale)}</Link>
+        <div><p className="eyebrow">{translation.region}</p><h3><Link to={href}>{translation.name}</Link></h3></div>
+        <p>{dictionary[locale].from} {formatMoney(fromPrice, locale)}</p>
       </div>
+      <ul className="taste-list" aria-label={dictionary[locale].tasting}>
+        {translation.tastingNotes.map((note) => <li key={note}>{note}</li>)}
+      </ul>
     </article>
   );
 }

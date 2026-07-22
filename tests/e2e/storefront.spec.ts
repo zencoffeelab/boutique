@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("French guest can add a coffee and reach checkout", async ({ page }) => {
   const consoleErrors: string[] = []; page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); }); page.on("pageerror", (error) => consoleErrors.push(error.message));
   await page.goto("/boutique");
-  await expect(page.getByRole("heading", { name: "La boutique" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "La boutique café" })).toBeVisible();
   await page.locator(".product-card h3 a").first().click();
   await page.getByRole("button", { name: /Ajouter au panier/ }).click();
   await page.getByRole("link", { name: /Panier \(1\)/ }).click();
@@ -30,7 +30,7 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
 test("English URLs, language switch and professional form are accessible", async ({ page }) => {
   const consoleErrors: string[] = []; page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); }); page.on("pageerror", (error) => consoleErrors.push(error.message));
   await page.goto("/en");
-  await expect(page.getByRole("link", { name: "Discover our specialty coffees" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Coffee with clarity/ })).toBeVisible();
   const menu = page.getByRole("button", { name: "Menu" }); if (await menu.isVisible()) await menu.click();
   await page.getByRole("navigation", { name: "Primary navigation" }).getByRole("link", { name: "Professionals" }).click();
   await expect(page.getByLabel("Company name")).toBeVisible();
