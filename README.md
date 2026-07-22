@@ -51,7 +51,7 @@ La finalisation d’une vente intervient uniquement dans `finalize_paid_order`, 
 ## Configuration externe
 
 - Stripe : webhook `/api/webhooks/stripe`, événements `checkout.session.completed`, `checkout.session.expired` et `charge.refunded`.
-- Shippo : webhook `/api/webhooks/shippo?secret=<SHIPPO_WEBHOOK_SECRET>`, événements de transaction et de suivi. L’admin achète les étiquettes après paiement.
+- Shippo : webhook `/api/webhooks/shippo?secret=<SHIPPO_WEBHOOK_SECRET>`, événements de transaction et de suivi. L’admin achète les étiquettes après paiement et peut demander, colis par colis, le remboursement d’une étiquette inutilisée. Le suivi idempotent est conservé côté serveur et reste distinct d’un remboursement Stripe client.
 - Points relais : `COLISSIMO_PICKUP_API_KEY` active la recherche officielle Colissimo. `COLISSIMO_PICKUP_PARTNER_CLIENT_CODE` est facultatif et réservé aux comptes partenaires. Le relais est revalidé côté serveur puis figé avec la commande.
 - Franco : `FREE_SHIPPING_FR_CENTS=7500` et `FREE_SHIPPING_EU_UK_CENTS=15000`, distincts par environnement.
 - Resend : domaine d’envoi validé et `RESEND_FROM_EMAIL` ; toute communication passe par l’outbox.

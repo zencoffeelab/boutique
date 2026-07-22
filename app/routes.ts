@@ -56,6 +56,7 @@ export default [
   route("api/webhooks/shippo", "routes/api.webhook-shippo.ts"),
   route("api/admin/pro-applications/:id/decision", "routes/api.admin-pro-decision.ts"),
   route("api/admin/orders/:id/label", "routes/api.admin-order-label.ts"),
+  route("api/admin/orders/:orderId/shipments/:shipmentId/refund-label", "routes/api.admin-shipment-label-refund.ts"),
   route("api/admin/orders/:id/refund", "routes/api.admin-order-refund.ts"),
   route("api/cron/commerce", "routes/api.cron-commerce.ts"),
   route("media/:asset", "routes/media.ts"),
