@@ -11,7 +11,7 @@ type WpProduct = {
   status?: string; images?: Array<{ id?: number; src: string; alt?: string }>;
   prices?: { price?: string; regular_price?: string; currency_minor_unit?: number; price_range?: { min_amount?: string; max_amount?: string } | null };
   price?: string; attributes?: Array<{ name: string; options?: string[] }>;
-  variations?: number[] | Array<{ id: number; attributes?: Array<{ name: string; value: string }> }>;
+  variations?: number[] | Array<{ id: number; attributes?: Array<{ name: string; value: string | null }> }>;
   meta_data?: Array<{ key: string; value: unknown }>;
   categories?: Array<{ id?: number; name: string; slug: string }>;
 };
@@ -28,12 +28,32 @@ const reportPath = reportArg?.split("=")[1] ?? "migration-report.json";
 const report: Report = { source, startedAt: new Date().toISOString(), mode: commit ? "commit" : "dry-run", products: 0, pages: 0, advice: 0, faq: 0, archived: 0, media: 0, warnings: [], errors: [], imported: [] };
 
 function decodeHtml(value = "") {
-  return value.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<!--([\s\S]*?)-->/g, " ").replace(/<br\s*\/?\s*>/gi, "\n").replace(/<\/p>/gi, "\n\n").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, "\"").replace(/&#039;|&apos;/g, "'").replace(/&eacute;/g, "é").replace(/&agrave;/g, "à").replace(/[ \t]+/g, " ").replace(/\n\s+/g, "\n").trim();
+  return value.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<!--([\s\S]*?)-->/g, " ").replace(/<br\s*\/?\s*>/gi, "\n").replace(/<\/p>/gi, "\n\n").replace(/<[^>]+>/g, " ").replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCodePoint(Number.parseInt(code, 16))).replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code))).replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, "\"").replace(/&apos;/g, "'").replace(/&eacute;/g, "é").replace(/&agrave;/g, "à").replace(/[ \t]+/g, " ").replace(/\n\s+/g, "\n").trim();
 }
 
 function structuredBlocks(html = "") {
   const text = decodeHtml(html);
   return text.split(/\n{2,}/).map((content) => content.trim()).filter(Boolean).map((content) => ({ type: "paragraph", content }));
+}
+
+function cleanProductBody(html = "") {
+  return decodeHtml(html.replace(/<h[1-6][^>]*>\s*(?:Nos autres cafés|Our other coffees)[\s\S]*$/i, ""));
+}
+
+function productDetails(product: WpProduct) {
+  const items = [...(product.short_description ?? "").matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((match) => decodeHtml(match[1]));
+  const field = (labels: string) => items.find((item) => new RegExp(`^(?:${labels})\\s*:`, "i").test(item))?.replace(new RegExp(`^(?:${labels})\\s*:\\s*`, "i"), "").trim() ?? "";
+  const altitudeText = field("Altitude");
+  const notesMatch = product.description?.match(/(?:Notes de dégustation|Tasting notes)[\s\S]*?<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i);
+  const tastingNotes = notesMatch ? decodeHtml(notesMatch[1]).split(/\s*[—–]\s*/).map((note) => note.trim()).filter(Boolean) : [];
+  return {
+    producer: field("Producteur|Producer"),
+    region: field("Région|Region"),
+    variety: field("Variété|Variety"),
+    process: field("Traitement|Process|Treatment"),
+    altitudeMeters: Number(altitudeText.match(/\d+/)?.[0] ?? 0),
+    tastingNotes,
+  };
 }
 
 async function getJson<T>(url: string): Promise<T> {
@@ -55,8 +75,29 @@ async function fetchProducts(locale: Locale) {
 }
 
 async function fetchVariations(product: WpProduct) {
-  const auth = wooAuth(); if (!auth) return [];
-  return getJson<WpVariation[]>(`${source}/wp-json/wc/v3/products/${product.id}/variations?per_page=100&${auth}`).catch((error) => { report.warnings.push(`Variantes ${product.slug}: ${String(error)}`); return []; });
+  const auth = wooAuth();
+  if (auth) return getJson<WpVariation[]>(`${source}/wp-json/wc/v3/products/${product.id}/variations?per_page=100&${auth}`).catch((error) => { report.warnings.push(`Variantes ${product.slug}: ${String(error)}`); return []; });
+
+  const publicVariations = (product.variations ?? []).filter((variation): variation is Exclude<typeof variation, number> => typeof variation !== "number" && Boolean(variation.attributes?.some((attribute) => attribute.value)));
+  const fetched: Array<WpVariation | null> = await Promise.all(publicVariations.map(async (variation): Promise<WpVariation | null> => {
+    try {
+      const item = await getJson<WpProduct>(`${source}/wp-json/wc/store/v1/products/${variation.id}`);
+      const minorUnit = item.prices?.currency_minor_unit ?? 2;
+      const price = Number(item.prices?.price ?? 0) / (10 ** minorUnit);
+      return {
+        id: variation.id,
+        price: String(price),
+        regular_price: String(price),
+        stock_quantity: 0,
+        manage_stock: false,
+        attributes: (variation.attributes ?? []).filter((attribute) => attribute.value).map((attribute) => ({ name: attribute.name, option: String(attribute.value) })),
+      };
+    } catch (error) {
+      report.warnings.push(`Variante ${variation.id} de ${product.slug}: ${String(error)}`);
+      return null;
+    }
+  }));
+  return fetched.filter((variation): variation is WpVariation => variation !== null);
 }
 
 async function fetchPages(locale: Locale) {
@@ -69,11 +110,11 @@ async function fetchAdvice(locale: Locale) {
   return getJson<WpPage[]>(`${source}/wp-json/wp/v2/posts?per_page=100&lang=${lang}&_fields=id,slug,date,title,content,excerpt,yoast_head_json`).catch((error) => { report.warnings.push(`Conseils ${locale}: ${String(error)}`); return []; });
 }
 
-const canonicalPageKey = (slug: string) => ({ home: "accueil", "about-us": "a-propos", professional: "professionnel", "general-terms-and-conditions-of-sale": "cgv", "legal-notice": "mentions-legales", "privacy-policy": "politique-de-confidentialite" } as Record<string, string>)[slug] ?? slug;
+const canonicalPageKey = (slug: string) => ({ home: "accueil", "about-us": "a-propos", professional: "professionnel", "faq-page": "faq", "general-terms-and-conditions-of-sale": "cgv", "legal-notice": "mentions-legales", "privacy-policy": "politique-de-confidentialite" } as Record<string, string>)[slug] ?? slug;
 
 function extractFaq(html = "") {
-  const questions = [...html.matchAll(/class=["'][^"']*elementor-tab-title[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/gi)].map((match) => decodeHtml(match[1]));
-  const answers = [...html.matchAll(/class=["'][^"']*elementor-tab-content[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi)].map((match) => decodeHtml(match[1]));
+  const questions = [...html.matchAll(/class=["'][^"']*(?:elementor-tab-title|qodef-tab-title)[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/gi)].map((match) => decodeHtml(match[1]));
+  const answers = [...html.matchAll(/class=["'][^"']*(?:elementor-tab-content|qodef-accordion-content-inner)[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi)].map((match) => decodeHtml(match[1]));
   return questions.map((question, index) => ({ question, answer: answers[index] ?? "" })).filter((item) => item.question && item.answer);
 }
 
@@ -96,21 +137,26 @@ function priceCents(product: WpProduct) {
 }
 
 async function importProduct(client: SupabaseClient | null, fr: WpProduct, en: WpProduct | undefined) {
-  const variations = await fetchVariations(fr); const english = en ?? fr; const productWarnings: string[] = []; const archived = fr.categories?.some((category) => /archive/i.test(`${category.slug} ${category.name}`)) ?? false; if (archived) report.archived += 1;
+  const variations = await fetchVariations(fr); const english = en ?? fr; const frDetails = productDetails(fr); const enDetails = productDetails(english); const productWarnings: string[] = []; const archived = fr.categories?.some((category) => /archive/i.test(`${category.slug} ${category.name}`)) ?? false; if (archived) report.archived += 1;
   if (!en) productWarnings.push("traduction anglaise absente");
   if (variations.length === 0) productWarnings.push("variantes 200 g / 1 kg à vérifier (API WooCommerce authentifiée non fournie)");
+  else if (!wooAuth()) productWarnings.push("stocks initialisés à 0 (non exposés par l’API publique WooCommerce)");
   if (!fr.images?.length) productWarnings.push("image absente");
+  const altitudeMentions = [...decodeHtml(`${fr.short_description ?? ""} ${fr.description ?? ""}`).matchAll(/(\d{3,4})\s*m(?:ètres?)?\b/gi)].map((match) => Number(match[1]));
+  const conflictingAltitudes = [...new Set(altitudeMentions.filter((altitude) => altitude !== frDetails.altitudeMeters))];
+  if (frDetails.altitudeMeters && conflictingAltitudes.length) productWarnings.push(`altitude ${frDetails.altitudeMeters} m dans les caractéristiques, mais ${conflictingAltitudes.join("/")} m dans le texte`);
   if (productWarnings.length) report.warnings.push(`${fr.slug}: ${productWarnings.join("; ")}`);
   if (!commit || !client) { report.imported.push(`[simulation] ${fr.slug}`); return; }
-  const { data: product, error } = await client.from("products").upsert({ slug: fr.slug, status: archived ? "archived" : "draft", altitude_meters: 0 }, { onConflict: "slug" }).select("id").single(); if (error) throw error;
+  const { data: product, error } = await client.from("products").upsert({ slug: fr.slug, status: archived ? "archived" : "draft", altitude_meters: frDetails.altitudeMeters }, { onConflict: "slug" }).select("id").single(); if (error) throw error;
   for (const [locale, item] of [["fr-FR", fr], ["en-GB", english]] as const) {
-    const body = decodeHtml(item.description); const short = decodeHtml(item.short_description) || body.slice(0, 300);
-    await client.from("product_translations").upsert({ product_id: product.id, locale, name: decodeHtml(item.name), short_description: short, body, producer: "À compléter", region: "À compléter", variety: "À compléter", process: "À compléter", tasting_notes: [], seo_title: decodeHtml(item.name), seo_description: short.slice(0, 160) }, { onConflict: "product_id,locale" });
+    const details = locale === "fr-FR" ? frDetails : enDetails; const body = cleanProductBody(item.description); const short = decodeHtml(item.short_description) || body.slice(0, 300);
+    await client.from("product_translations").upsert({ product_id: product.id, locale, name: decodeHtml(item.name), short_description: short, body, producer: details.producer || frDetails.producer || "À compléter", region: details.region || frDetails.region || "À compléter", variety: details.variety || frDetails.variety || "À compléter", process: details.process || frDetails.process || "À compléter", tasting_notes: details.tastingNotes.length ? details.tastingNotes : frDetails.tastingNotes, seo_title: decodeHtml(item.name), seo_description: short.slice(0, 160) }, { onConflict: "product_id,locale" });
   }
-  for (const [index, image] of (fr.images ?? []).entries()) { const uploaded = await copyMedia(client, fr.slug, image, "fr-FR"); await client.from("product_media").upsert({ product_id: product.id, storage_path: uploaded.path, public_url: uploaded.url, alt_fr: image.alt || `Paquet ${fr.name}`, alt_en: en?.images?.[index]?.alt || `${english.name} coffee bag`, width: 1600, height: 1600, position: index }); }
+  const { error: mediaDeleteError } = await client.from("product_media").delete().eq("product_id", product.id); if (mediaDeleteError) throw mediaDeleteError;
+  for (const [index, image] of (fr.images ?? []).entries()) { const uploaded = await copyMedia(client, fr.slug, image, "fr-FR"); await client.from("product_media").insert({ product_id: product.id, storage_path: uploaded.path, public_url: uploaded.url, alt_fr: image.alt || `Paquet ${decodeHtml(fr.name)}`, alt_en: en?.images?.[index]?.alt || `${decodeHtml(english.name)} coffee bag`, width: 1600, height: 1600, position: index }); }
   const variantSource = variations.length ? variations : [{ id: fr.id, sku: `${fr.slug}-200`, price: String(priceCents(fr) / 100), stock_quantity: 0, attributes: [{ name: "Poids", option: "200 g" }] }];
   for (const variation of variantSource) {
-    const label = variation.attributes?.find((attribute) => /poids|weight/i.test(attribute.name))?.option ?? "À vérifier"; const grams = label.match(/1\s*kg/i) ? 1000 : Number(label.match(/\d+/)?.[0] ?? 200);
+    const label = variation.attributes?.find((attribute) => /poids|weight|quantit/i.test(attribute.name))?.option ?? "À vérifier"; const grams = label.match(/1\s*kg/i) ? 1000 : Number(label.match(/\d+/)?.[0] ?? 200);
     const { data: variant, error: variantError } = await client.from("product_variants").upsert({ product_id: product.id, sku: variation.sku || `${fr.slug}-${variation.id}`, label, weight_grams: grams, internal_cost_cents: 0, stock_on_hand: variation.stock_quantity ?? 0, low_stock_threshold: 5, hs_code: "090121", customs_origin_country: "FR" }, { onConflict: "sku" }).select("id").single(); if (variantError) throw variantError;
     await client.from("variant_offers").upsert({ variant_id: variant.id, audience: "retail", price_cents: Math.round(Number(variation.price || variation.regular_price || 0) * 100), minimum_quantity: 1, active: true }, { onConflict: "variant_id,audience" });
   }
@@ -124,6 +170,9 @@ async function run() {
   const mediaOwners = new Map<string, string[]>();
   for (const product of frProducts) for (const image of product.images ?? []) mediaOwners.set(image.src, [...(mediaOwners.get(image.src) ?? []), product.slug]);
   for (const [url, owners] of mediaOwners) if (owners.length > 1) report.warnings.push(`Média partagé par plusieurs cafés (${owners.join(", ")}): ${url}`);
+  const contentOwners = new Map<string, string[]>();
+  for (const product of frProducts) { const body = cleanProductBody(product.description); if (body) contentOwners.set(body, [...(contentOwners.get(body) ?? []), product.slug]); }
+  for (const owners of contentOwners.values()) if (owners.length > 1) report.warnings.push(`Contenu éditorial identique pour plusieurs cafés: ${owners.join(", ")}`);
   const enBySlug = new Map(enProducts.map((product) => [product.slug, product]));
   const findEnglishProduct = (product: WpProduct) => {
     const exact = enBySlug.get(product.slug); if (exact) return exact;
@@ -145,10 +194,14 @@ async function run() {
   }
   const faqFr = extractFaq(frPages.find((page) => canonicalPageKey(page.slug) === "faq")?.content.rendered); const faqEn = extractFaq(enPages.find((page) => canonicalPageKey(page.slug) === "faq")?.content.rendered); report.faq = faqFr.length;
   if (faqFr.length === 0) report.warnings.push("FAQ: aucune paire question/réponse Elementor détectée; import manuel requis.");
-  if (commit && client) for (const [position, item] of faqFr.entries()) await client.from("faq_items").insert({ position, active: false, question_fr: item.question, answer_fr: item.answer, question_en: faqEn[position]?.question ?? item.question, answer_en: faqEn[position]?.answer ?? item.answer });
+  if (commit && client) {
+    const { error: faqDeleteError } = await client.from("faq_items").delete().gte("position", 0); if (faqDeleteError) throw faqDeleteError;
+    for (const [position, item] of faqFr.entries()) await client.from("faq_items").insert({ position, active: false, question_fr: item.question, answer_fr: item.answer, question_en: faqEn[position]?.question ?? item.question, answer_en: faqEn[position]?.answer ?? item.answer });
+  }
   const enAdviceBySlug = new Map(enAdvice.map((article) => [article.slug, article]));
+  const enAdviceByDate = new Map(enAdvice.filter((article) => article.date).map((article) => [article.date, article]));
   for (const article of frAdvice) {
-    const english = enAdviceBySlug.get(article.slug); if (!english) report.warnings.push(`Conseil ${article.slug}: traduction anglaise à rapprocher manuellement.`); if (!commit || !client) continue;
+    const english = enAdviceBySlug.get(article.slug) ?? (article.date ? enAdviceByDate.get(article.date) : undefined); if (!english) report.warnings.push(`Conseil ${article.slug}: traduction anglaise à rapprocher manuellement.`); if (!commit || !client) continue;
     const { data: stored, error } = await client.from("advice_articles").upsert({ slug: article.slug, status: "draft", published_at: article.date ?? new Date().toISOString() }, { onConflict: "slug" }).select("id").single(); if (error || !stored) { report.errors.push(`Conseil ${article.slug}: ${error?.message ?? "création impossible"}`); continue; }
     for (const [locale, item] of [["fr-FR", article], ["en-GB", english ?? article]] as const) await client.from("advice_translations").upsert({ article_id: stored.id, locale, title: decodeHtml(item.title.rendered), excerpt: decodeHtml(item.excerpt?.rendered), blocks: structuredBlocks(item.content.rendered), seo_title: item.yoast_head_json?.title ?? decodeHtml(item.title.rendered), seo_description: item.yoast_head_json?.description ?? decodeHtml(item.excerpt?.rendered).slice(0, 160) }, { onConflict: "article_id,locale" });
   }
