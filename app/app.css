@@ -1,5 +1,37 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Migra";
+  src: url("/media/migra-regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Migra";
+  src: url("/media/migra-bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Decalotype";
+  src: url("/media/decalotype-regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Decalotype";
+  src: url("/media/decalotype-bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
   --cream: #f5f2ef;
   --cream-dark: #e8e2db;
@@ -11,9 +43,9 @@
   --yellow: #f0d84f;
   --orange: #c85a2c;
   --line: color-mix(in srgb, var(--ink) 20%, transparent);
-  --serif: "Decalotype", "Iowan Old Style", "Baskerville", Georgia, serif;
+  --serif: "Decalotype", Arial, sans-serif;
   --display: "Migra", "Iowan Old Style", Georgia, serif;
-  --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sans: "Decalotype", Arial, sans-serif;
   --page: min(100% - 2rem, 1320px);
   color-scheme: light;
   font-family: var(--sans);
@@ -55,11 +87,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .site-nav, .header-actions { display: flex; align-items: center; gap: clamp(.9rem, 2vw, 1.8rem); }
 .site-nav a, .language-link { font-size: .75rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
 .header-actions { justify-content: end; }
-.logo { display: inline-flex; align-items: center; justify-content: center; gap: .55rem; }
-.logo svg { width: 2.75rem; height: 2.75rem; fill: none; stroke: currentColor; stroke-width: 1.8; }
-.logo > span { display: flex; flex-direction: column; font-family: var(--display); line-height: .8; }
-.logo strong { font-size: 2rem; font-weight: 500; }
-.logo small { margin-top: .3rem; font: 700 .5rem/1 var(--sans); letter-spacing: .24em; text-transform: uppercase; }
+.logo { display: inline-flex; align-items: center; justify-content: center; }
+.logo img { width: 104px; height: 56px; object-fit: contain; }
 .icon-button { display: inline-flex; min-width: 2.5rem; min-height: 2.5rem; align-items: center; justify-content: center; gap: .2rem; border: 0; background: transparent; }
 .cart-button span { min-width: 1.1rem; font-size: .7rem; font-weight: 700; }
 .mobile-menu-button { display: none; }
@@ -185,6 +214,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .steps span { color: var(--orange); font: 500 3rem/1 var(--display); }
 
 .site-footer { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 4rem; padding: clamp(4rem, 7vw, 7rem) max(1rem, calc((100% - 1320px) / 2)) 2rem; background: var(--green-deep); color: var(--cream); }
+.site-footer .logo, .admin-sidebar .logo { justify-content: start; }
+.site-footer .logo img, .admin-sidebar .logo img { filter: invert(1); }
 .footer-intro p { max-width: 24rem; margin: 2rem 0 0; color: #c4c9bd; font-family: var(--serif); }
 .site-footer h2 { margin-bottom: 1.3rem; font: 700 .7rem/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; }
 .site-footer > div:not(.footer-bottom) > a:not(.logo) { display: block; margin: .65rem 0; }
@@ -269,9 +300,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 
 @media (max-width: 700px) {
   h1 { font-size: clamp(3rem, 17vw, 5rem); }
-  .site-header .logo strong { font-size: 1.55rem; }
-  .site-header .logo svg { width: 2rem; height: 2rem; }
-  .site-header .logo small { display: none; }
+  .site-header .logo img { width: auto; height: 32px; }
   .header-actions > .icon-button:not(.cart-button) { display: none; }
   .hero__media { min-height: 82vw; }
   .hero__stamp { width: 7rem; height: 7rem; right: 1rem; bottom: 1rem; font-size: .6rem; }
