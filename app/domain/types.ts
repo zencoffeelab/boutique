@@ -137,11 +137,32 @@ export type PackedParcel = Readonly<{
   }>[];
 }>;
 
+export type PickupPoint = Readonly<{
+  id: string;
+  name: string;
+  address1: string;
+  address2: string;
+  address3: string;
+  postalCode: string;
+  city: string;
+  countryCode: string;
+  type: string;
+  network: string;
+  locationHint: string;
+  distanceMeters: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  accessible: boolean;
+  maxWeightGrams: number | null;
+}>;
+
 export type ShippingRate = Readonly<{
   id: string;
   provider: "shippo" | "mock";
   carrier: string;
   service: string;
+  deliveryMethod: "home" | "pickup";
+  pickupPoint?: PickupPoint;
   amountCents: number;
   currency: "EUR";
   estimatedDays: number | null;

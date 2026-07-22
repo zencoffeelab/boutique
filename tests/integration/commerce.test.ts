@@ -22,4 +22,11 @@ describe("commerce boundaries", () => {
     const response = await shippingQuoteAction({ request, params: {}, context: {} } as never); const data = await response.json();
     expect(response.status).toBe(200); expect(data.parcels[0].shippingWeightGrams).toBe(580); expect(data.rates[0]).not.toHaveProperty("shippoRateIds");
   });
+  it("binds a validated pickup point to a pickup-only quote", async () => {
+    const product = (await getProducts({ status: "published" }))[0]; const variant = product.variants[0];
+    const request = new Request("http://localhost/api/shipping/quote", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cartId: crypto.randomUUID(), locale: "fr-FR", lines: [{ productId: product.id, variantId: variant.id, audience: "retail", quantity: 1 }], pickupPointId: "370000", address: { firstName: "Ada", lastName: "Lovelace", company: "", email: "ada@example.com", phone: "0600000000", line1: "1 rue du Café", line2: "", postalCode: "37000", city: "Tours", countryCode: "FR" } }) });
+    const response = await shippingQuoteAction({ request, params: {}, context: {} } as never); const data = await response.json();
+    expect(response.status).toBe(200); expect(data.rates).toHaveLength(1); expect(data.rates[0]).toMatchObject({ deliveryMethod: "pickup", service: "Point Retrait", pickupPoint: { id: "370000" } });
+    expect(data.rates[0]).not.toHaveProperty("shippoRateIds"); expect(data.rates[0]).not.toHaveProperty("serviceToken");
+  });
 });

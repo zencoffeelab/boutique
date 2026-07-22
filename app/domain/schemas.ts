@@ -26,11 +26,20 @@ export const shippingAddressSchema = z.object({
   ]),
 });
 
+export const pickupPointIdSchema = z.string().trim().min(1).max(38).regex(/^[A-Za-z0-9]+$/);
+
+export const pickupPointSearchSchema = z.object({
+  locale: z.enum(["fr-FR", "en-GB"]),
+  address: shippingAddressSchema.pick({ line1: true, line2: true, postalCode: true, city: true, countryCode: true }),
+  weightGrams: z.coerce.number().int().min(1).max(30_000),
+});
+
 export const shippingQuoteSchema = z.object({
   cartId: z.uuid(),
   locale: z.enum(["fr-FR", "en-GB"]),
   lines: z.array(cartLineSchema).min(1).max(100),
   address: shippingAddressSchema,
+  pickupPointId: pickupPointIdSchema.optional(),
 });
 
 export const checkoutSchema = shippingQuoteSchema.extend({

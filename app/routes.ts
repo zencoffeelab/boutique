@@ -47,6 +47,7 @@ export default [
   route("en/order/confirmation", "routes/confirmation.tsx", { id: "confirmation-en" }),
   route("en/my-account", "routes/account.tsx", { id: "account-en" }),
   route("api/pro-applications", "routes/api.pro-applications.ts"),
+  route("api/shipping/pickup-points", "routes/api.pickup-points.ts"),
   route("api/shipping/quote", "routes/api.shipping-quote.ts"),
   route("api/checkout/payment-intent", "routes/api.checkout.ts"),
   route("api/orders/:id", "routes/api.order.ts"),

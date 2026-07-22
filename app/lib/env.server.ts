@@ -17,6 +17,8 @@ const schema = z.object({
   SHIPPO_API_TOKEN: z.string().optional(),
   SHIPPO_WEBHOOK_SECRET: z.string().optional(),
   SHIPPO_ALLOWED_SERVICE_TOKENS: z.string().optional().default(""),
+  COLISSIMO_PICKUP_API_KEY: z.string().optional(),
+  COLISSIMO_PICKUP_PARTNER_CLIENT_CODE: z.preprocess((value) => value === "" ? undefined : value, z.string().regex(/^\d{6}$/).optional()),
   FREE_SHIPPING_FR_CENTS: z.coerce.number().int().nonnegative().default(7_500),
   FREE_SHIPPING_EU_UK_CENTS: z.coerce.number().int().nonnegative().default(15_000),
   SHIP_FROM_NAME: z.string().default("Zen Coffee Lab"),

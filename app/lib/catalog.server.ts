@@ -114,8 +114,11 @@ export async function getProducts(options: { status?: "published" | "archived"; 
 }
 
 export async function getAdminProducts(): Promise<Product[]> {
-  if (hasSupabaseConfig()) return databaseProducts(true);
-  return getRawProducts();
+  const products = hasSupabaseConfig() ? await databaseProducts(true) : await getRawProducts();
+  return products.map((product) => ({
+    ...product,
+    variants: product.variants.filter((variant) => variant.offers.some((offer) => offer.active)),
+  }));
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {

@@ -11,13 +11,14 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
   if (new Date(quote.expiresAt).getTime() <= Date.now()) throw new Response("Shipping quote has expired.", { status: 409 });
   const rate = quote.rates.find((candidate) => candidate.id === input.shippingRateId);
   if (!rate) throw new Response("Shipping rate is not part of this quote.", { status: 409 });
+  const shippingAddress = rate.deliveryMethod === "pickup" && rate.pickupPoint ? { ...quote.address, pickupPoint: rate.pickupPoint } : quote.address;
   if (config.PAYMENTS_MOCK) {
     const order = `ZCL-DEMO-${randomUUID().slice(0, 8).toUpperCase()}`;
     return { ok: true, confirmationUrl: `${config.VITE_SITE_URL}${quote.locale === "en-GB" ? "/en/order/confirmation" : "/commande/confirmation"}?order=${encodeURIComponent(order)}` };
   }
   if (!config.STRIPE_SECRET_KEY) throw new Error("Stripe is not configured.");
   const supabase = createServiceSupabase(); if (!supabase) throw new Error("Supabase service access is required for checkout.");
-  const { data: order, error } = await supabase.rpc("create_checkout_order", { p_cart_id: quote.cartId, p_quote_id: quote.id, p_audience: quote.audience, p_locale: quote.locale, p_address: quote.address, p_lines: quote.lines, p_shipping_rate: rate, p_reservation_minutes: 30, p_profile_id: input.profileId ?? null });
+  const { data: order, error } = await supabase.rpc("create_checkout_order", { p_cart_id: quote.cartId, p_quote_id: quote.id, p_audience: quote.audience, p_locale: quote.locale, p_address: shippingAddress, p_lines: quote.lines, p_shipping_rate: rate, p_reservation_minutes: 30, p_profile_id: input.profileId ?? null });
   if (error || !order) throw new Response(error?.message ?? "Unable to reserve stock.", { status: 409 });
   const stripe = createStripe(config.STRIPE_SECRET_KEY);
   try {

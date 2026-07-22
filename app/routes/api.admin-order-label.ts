@@ -17,7 +17,27 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const existing = existingByParcel.get(index); if (existing?.shippo_transaction_id) { labels.push({ parcel: index + 1, url: existing.label_url, trackingNumber: existing.tracking_number }); continue; }
     const headers = { authorization: `ShippoToken ${config.SHIPPO_API_TOKEN}`, "content-type": "application/json", "shippo-api-version": "2018-02-08" };
     const [response, rateResponse] = await Promise.all([fetch("https://api.goshippo.com/transactions", { method: "POST", headers, body: JSON.stringify({ rate: shippoRateId, label_file_type: "PDF", async: false, metadata: order.order_number }) }), fetch(`https://api.goshippo.com/rates/${shippoRateId}`, { headers })]); const transaction = await response.json() as any; const purchasedRate = rateResponse.ok ? await rateResponse.json() as any : null;
-    if (!response.ok || transaction.status !== "SUCCESS") return Response.json({ ok: false, message: `Label purchase failed for parcel ${index + 1}.` }, { status: 502 });
+    if (!response.ok || transaction.status !== "SUCCESS") {
+      const shippoMessages = Array.isArray(transaction.messages)
+        ? transaction.messages
+          .map((item: unknown) => typeof item === "object" && item !== null && "text" in item && typeof item.text === "string" ? item.text.trim() : "")
+          .filter(Boolean)
+        : [];
+      const detail = shippoMessages.join(" · ");
+      console.error("shippo_label_purchase_failed", {
+        orderNumber: order.order_number,
+        parcel: index + 1,
+        httpStatus: response.status,
+        transactionStatus: transaction.status,
+        messages: shippoMessages,
+      });
+      return Response.json({
+        ok: false,
+        message: detail
+          ? `Échec de l’achat de l’étiquette pour le colis ${index + 1} : ${detail}`
+          : `Échec de l’achat de l’étiquette pour le colis ${index + 1}.`,
+      }, { status: 502 });
+    }
     await client.from("shipments").upsert({ order_id: order.id, parcel_index: index, shippo_rate_id: shippoRateId, shippo_transaction_id: transaction.object_id, carrier: transaction.provider ?? rate.carrier, service: rate.service, label_url: transaction.label_url, commercial_invoice_url: transaction.commercial_invoice_url, tracking_number: transaction.tracking_number, tracking_url: transaction.tracking_url_provider, status: transaction.tracking_status ?? "PRE_TRANSIT", actual_cost_cents: Math.round(Number(purchasedRate?.amount ?? 0) * 100) }, { onConflict: "order_id,parcel_index" });
     labels.push({ parcel: index + 1, url: transaction.label_url, trackingNumber: transaction.tracking_number });
   }

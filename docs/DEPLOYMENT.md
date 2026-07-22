@@ -6,6 +6,8 @@ Créer deux projets Supabase : Preview/Staging et Production. Dans Vercel, limit
 
 Les flags `ALLOW_DEMO_DATA`, `PAYMENTS_MOCK`, `SHIPPO_MOCK` et `DEMO_ADMIN` doivent être `false` en Production ; le démarrage échoue volontairement sinon.
 
+Pour proposer Colissimo Point Retrait, ajouter `COLISSIMO_PICKUP_API_KEY` comme secret serveur. La clé se génère dans le profil Colissimo Box, section « Clés de connexion aux Web Services ». Sans cette variable, le checkout conserve uniquement les livraisons à domicile et ne propose jamais un tarif relais inutilisable.
+
 ## Promotion
 
 1. Créer une branche et vérifier son Preview Vercel avec Supabase/Stripe/Shippo de test.

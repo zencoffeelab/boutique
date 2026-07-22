@@ -214,8 +214,20 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .empty-state { max-width: 620px; margin: 0 auto; padding: 8rem 1rem; text-align: center; }
 .checkout-section { margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid var(--line); }
 .checkout-section h2 { font-size: 2rem; }
+.delivery-methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.delivery-method { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: .75rem; padding: 1rem; border: 1px solid var(--line); background: white; cursor: pointer; }
+.delivery-method.is-selected, .pickup-option.is-selected { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
+.delivery-method span, .pickup-option span { display: grid; gap: .25rem; }
+.delivery-method small, .pickup-option small { color: var(--muted); line-height: 1.45; }
+.pickup-search { display: grid; gap: 1rem; margin-top: 1rem; }
+.pickup-search > .button { justify-self: start; border-color: var(--green); }
+.pickup-list { display: grid; gap: .65rem; min-width: 0; margin: 0; padding: 0; border: 0; }
+.pickup-list legend { margin-bottom: .75rem; font-family: var(--serif); font-size: 1.2rem; }
+.pickup-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: .8rem; padding: 1rem; border: 1px solid var(--line); background: white; cursor: pointer; }
+.pickup-distance { color: var(--green); font-size: .72rem; font-weight: 750; white-space: nowrap; }
 .rate-list { display: grid; gap: .65rem; }
 .rate-option { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .8rem; padding: .9rem; border: 1px solid var(--line); background: white; }
+.shipping-rates { margin-top: 2rem; }
 
 .professional-banner { padding: 5rem 1rem; background: var(--green-deep); color: white; text-align: center; }
 .professional-banner h2 { margin-bottom: 1rem; }
@@ -304,6 +316,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
   .origin-grid { grid-template-columns: repeat(2, 1fr); }
   .origin-grid div { border-bottom: 1px solid var(--line); }
   .cart-layout, .checkout-layout { grid-template-columns: 1fr; }
+  .delivery-methods { grid-template-columns: 1fr; }
   .summary-card { position: static; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .admin-grid { grid-template-columns: 1fr; }
@@ -324,6 +337,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
   .editorial-copy { grid-template-columns: 1fr; gap: 1rem; }
   .taste-notes { flex-wrap: wrap; }
   .form-grid, .mfa-code-form { grid-template-columns: 1fr; }
+  .pickup-option { grid-template-columns: auto minmax(0, 1fr); }
+  .pickup-distance { grid-column: 2; }
   .field--wide { grid-column: auto; }
   .cart-line { grid-template-columns: 80px 1fr; }
   .cart-line img { width: 80px; }
