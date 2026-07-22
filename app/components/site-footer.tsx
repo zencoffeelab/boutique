@@ -7,7 +7,7 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="footer-intro">
-        <Logo home={english ? "/en" : "/"} />
+        <Logo home={english ? "/en" : "/"} variant="light" />
         <p>{english ? "Lightly roasted specialty coffee, with clarity and intention." : "Des cafés de spécialité torréfiés avec légèreté, clarté et intention."}</p>
       </div>
       <div>

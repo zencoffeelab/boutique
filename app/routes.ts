@@ -57,6 +57,7 @@ export default [
   route("api/admin/orders/:id/label", "routes/api.admin-order-label.ts"),
   route("api/admin/orders/:id/refund", "routes/api.admin-order-refund.ts"),
   route("api/cron/commerce", "routes/api.cron-commerce.ts"),
+  route("media/:asset", "routes/media.ts"),
   route("sitemap.xml", "routes/sitemap.ts"),
   route("robots.txt", "routes/robots.ts"),
   route("*", "routes/not-found.tsx"),
