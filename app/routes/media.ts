@@ -1,31 +1,27 @@
 import type { LoaderFunctionArgs } from "react-router";
+import { env } from "~/lib/env.server";
 
-const wordpressMedia = "https://www.zencoffeelab.com/wp-content/uploads/2026/03";
-
-const assets: Record<string, { filename: string; contentType: string }> = {
-  "logo-black.svg": { filename: "zen-coffee-lab-logo-black.svg", contentType: "image/svg+xml" },
-  "migra-regular.woff2": { filename: "Migra-Regular.woff2", contentType: "font/woff2" },
-  "migra-bold.woff2": { filename: "Migra-Bold.woff2", contentType: "font/woff2" },
-  "decalotype-regular.woff2": { filename: "Decalotype-Regular.woff2", contentType: "font/woff2" },
-  "decalotype-bold.woff2": { filename: "Decalotype-Bold.woff2", contentType: "font/woff2" },
-};
+const assets = new Set([
+  "logo-black.svg",
+  "migra-regular.woff2",
+  "migra-bold.woff2",
+  "decalotype-regular.woff2",
+  "decalotype-bold.woff2",
+]);
 
 export async function loader({ params }: LoaderFunctionArgs) {
-  const asset = params.asset ? assets[params.asset] : undefined;
-  if (!asset) throw new Response("Media not found", { status: 404 });
+  const asset = params.asset;
+  if (!asset || !assets.has(asset)) throw new Response("Media not found", { status: 404 });
 
-  const upstream = await fetch(`${wordpressMedia}/${asset.filename}`, {
-    headers: { Accept: asset.contentType },
-  });
-  if (!upstream.ok || !upstream.body) {
-    throw new Response("Source media is temporarily unavailable", { status: 502 });
-  }
+  const supabaseUrl = env().VITE_SUPABASE_URL;
+  if (!supabaseUrl) throw new Response("Media storage is not configured", { status: 503 });
 
-  return new Response(upstream.body, {
+  const publicUrl = `${supabaseUrl}/storage/v1/object/public/product-media/brand/${encodeURIComponent(asset)}`;
+  return new Response(null, {
+    status: 302,
     headers: {
       "Cache-Control": "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800",
-      "Content-Type": asset.contentType,
-      "X-Content-Type-Options": "nosniff",
+      Location: publicUrl,
     },
   });
 }

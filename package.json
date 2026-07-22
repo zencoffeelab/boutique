@@ -8,6 +8,10 @@
   "scripts": {
     "dev": "react-router dev",
     "build": "react-router build",
+    "build:cloudflare": "CLOUDFLARE_BUILD=1 react-router build",
+    "deploy": "npm run build:cloudflare && wrangler deploy",
+    "preview:cloudflare": "npm run build:cloudflare && wrangler dev",
+    "cf-typegen": "wrangler types",
     "typecheck": "react-router typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -34,6 +38,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
+    "@cloudflare/vite-plugin": "^1.46.0",
     "@playwright/test": "^1.61.1",
     "@react-router/dev": "^7.18.0",
     "@react-router/node": "^7.18.0",
@@ -50,6 +55,7 @@
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vite": "^8.1.5",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.0",
+    "wrangler": "^4.113.0"
   }
 }
