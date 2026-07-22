@@ -105,7 +105,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 
 .hero { display: grid; grid-template-columns: 1.05fr .95fr; min-height: min(780px, calc(100vh - 120px)); border-bottom: 1px solid var(--line); }
 .hero__copy { display: flex; flex-direction: column; justify-content: center; padding: clamp(3rem, 7vw, 8rem) max(1rem, calc((100vw - 1320px) / 2)); padding-right: clamp(2rem, 6vw, 7rem); }
-.hero h1 { max-width: 8ch; margin: 0 0 2rem; }
+.hero h1 { max-width: 8ch; margin: 0 0 2rem; font-size: clamp(2.75rem, 6.5vw, 6.5rem); }
 .hero h1 em { color: var(--orange); font-weight: inherit; }
 .hero__copy > p:not(.eyebrow) { max-width: 34rem; font-family: var(--serif); font-size: 1.25rem; }
 .hero__actions { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1.4rem; }
@@ -132,8 +132,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .value-card b { display: block; margin-bottom: 2rem; color: var(--orange); font: 400 3rem/1 var(--display); }
 .value-card h3 { margin-bottom: 1rem; }
 
-.page-hero { padding: clamp(4rem, 10vw, 10rem) 1rem clamp(3rem, 7vw, 7rem); text-align: center; }
-.page-hero h1 { max-width: 1050px; margin: 0 auto 2rem; }
+.page-hero { padding: clamp(2.5rem, 6vw, 5.5rem) 1rem clamp(2rem, 4vw, 4rem); text-align: center; }
+.page-hero h1 { max-width: 1050px; margin: 0 auto 1.25rem; }
 .page-hero p { max-width: 42rem; margin-inline: auto; }
 .filter-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; margin-bottom: 2rem; padding-block: 1rem; border-block: 1px solid var(--line); }
 .filter-bar span { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
@@ -251,7 +251,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .admin-sidebar { position: sticky; top: 0; height: 100vh; padding: 1.5rem; background: var(--green-deep); color: white; }
 .admin-sidebar .logo { justify-content: start; margin-bottom: 3rem; }
 .admin-sidebar nav { display: grid; gap: .4rem; }
-.admin-sidebar nav a { padding: .65rem .8rem; border-radius: .3rem; color: #d7ddd3; font-size: .85rem; }
+.admin-sidebar nav a { display: flex; align-items: center; gap: .65rem; padding: .65rem .8rem; border-radius: .3rem; color: #d7ddd3; font-size: .85rem; }
 .admin-sidebar nav a[aria-current="page"], .admin-sidebar nav a:hover { background: #ffffff16; color: white; }
 .admin-main { min-width: 0; padding: clamp(1.5rem, 4vw, 4rem); }
 .admin-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
@@ -303,6 +303,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .label-refund-status--requesting, .label-refund-status--queued, .label-refund-status--pending { background: #fff0b8; color: #6b5100; }
 .admin-content-list { display: grid; gap: .8rem; }
 .admin-content-page > form { padding: 1.5rem; border-top: 1px solid #e7e9e3; }
+.admin-content-page > .admin-delete-form { justify-content: flex-end; padding-top: 0; border-top: 0; }
 .admin-content-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
 .admin-content-columns fieldset { padding: 1rem; border: 1px solid #dfe2db; }
 .admin-content-columns textarea { min-height: 8rem; }

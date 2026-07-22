@@ -1,8 +1,8 @@
 import { PackagePlus } from "lucide-react";
 import { z } from "zod";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
-import { Form, Link, useActionData, useLoaderData } from "react-router";
-import { Logo } from "~/components/logo";
+import { Form, useActionData, useLoaderData } from "react-router";
+import { AdminShell } from "~/components/admin-shell";
 import { requireAdmin } from "~/lib/auth.server";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
@@ -46,5 +46,5 @@ function PresetForm({ preset, demo }: { preset?: any; demo: boolean }) {
 
 export default function AdminShipping() {
   const { demo, presets, thresholds } = useLoaderData<typeof loader>(); const result = useActionData<typeof action>();
-  return <div className="admin-shell"><aside className="admin-sidebar"><Logo /><nav><Link to="/admin">Tableau de bord</Link><Link to="/admin/commandes">Commandes</Link><Link aria-current="page" to="/admin/expedition">Expédition</Link><Link to="/admin/contenus">Contenus</Link></nav></aside><main className="admin-main"><header className="admin-heading"><div><p className="eyebrow">Shippo</p><h1>Emballages & franco</h1></div></header>{demo ? <p className="admin-notice">Connectez Supabase pour modifier les emballages.</p> : null}{result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"}>{result.message}</p> : null}<section className="ui-card admin-editor"><h2>Seuils de livraison gratuite</h2><p>France : <strong>{thresholds.fr / 100} €</strong> · UE et Royaume-Uni : <strong>{thresholds.euUk / 100} €</strong></p><p><small>Ces seuils sont configurés par environnement avec <code>FREE_SHIPPING_FR_CENTS</code> et <code>FREE_SHIPPING_EU_UK_CENTS</code>.</small></p></section><section className="admin-content-list" aria-label="Emballages">{presets.map((preset) => <details className="ui-card admin-content-page" key={preset.id}><summary><strong>{preset.name}</strong><span className="ui-badge">{preset.active ? "actif" : "inactif"}</span></summary><PresetForm preset={preset} demo={demo} /></details>)}</section><section className="ui-card admin-editor"><h2>Nouvel emballage</h2><PresetForm demo={demo} /></section></main></div>;
+  return <AdminShell active="shipping"><header className="admin-heading"><div><p className="eyebrow">Shippo</p><h1>Emballages & franco</h1></div></header>{demo ? <p className="admin-notice">Connectez Supabase pour modifier les emballages.</p> : null}{result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"}>{result.message}</p> : null}<section className="ui-card admin-editor"><h2>Seuils de livraison gratuite</h2><p>France : <strong>{thresholds.fr / 100} €</strong> · UE et Royaume-Uni : <strong>{thresholds.euUk / 100} €</strong></p><p><small>Ces seuils sont configurés par environnement avec <code>FREE_SHIPPING_FR_CENTS</code> et <code>FREE_SHIPPING_EU_UK_CENTS</code>.</small></p></section><section className="admin-content-list" aria-label="Emballages">{presets.map((preset) => <details className="ui-card admin-content-page" key={preset.id}><summary><strong>{preset.name}</strong><span className="ui-badge">{preset.active ? "actif" : "inactif"}</span></summary><PresetForm preset={preset} demo={demo} /></details>)}</section><section className="ui-card admin-editor"><h2>Nouvel emballage</h2><PresetForm demo={demo} /></section></AdminShell>;
 }

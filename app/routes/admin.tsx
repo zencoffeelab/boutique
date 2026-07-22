@@ -1,10 +1,8 @@
-import {
-  Archive, Boxes, FileText, LayoutDashboard, LogOut, Package, ShoppingCart, Store, Users,
-} from "lucide-react";
+import { LogOut, Store } from "lucide-react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Form, Link, useActionData, useFetcher, useLoaderData } from "react-router";
 import { z } from "zod";
-import { Logo } from "~/components/logo";
+import { AdminShell } from "~/components/admin-shell";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
@@ -71,18 +69,6 @@ export const meta: MetaFunction = () => [
   { name: "robots", content: "noindex,nofollow" },
 ];
 
-const nav = [
-  { label: "Tableau de bord", icon: LayoutDashboard, href: "/admin" },
-  { label: "Commandes", icon: ShoppingCart, href: "/admin/commandes" },
-  { label: "Produits", icon: Package, href: "#catalogue" },
-  { label: "Stocks", icon: Boxes, href: "#catalogue" },
-  { label: "Expédition", icon: Boxes, href: "/admin/expedition" },
-  { label: "Demandes pro", icon: Users, href: "#demandes-pro" },
-  { label: "Pages", icon: FileText, href: "/admin/contenus" },
-  { label: "FAQ & Conseils", icon: FileText, href: "/admin/editorial" },
-  { label: "Archives", icon: Archive, href: "#catalogue" },
-];
-
 function ProfessionalDecision({ application }: { application: { id: string; company_name: string; first_name: string; last_name: string; email: string; business_type: string; monthly_volume: string } }) {
   const fetcher = useFetcher<{ ok?: boolean; message?: string }>();
   return <article className="admin-application"><div><strong>{application.company_name}</strong><p>{application.first_name} {application.last_name} · {application.business_type} · {application.monthly_volume}</p><small>{application.email}</small></div><fetcher.Form method="post" action={`/api/admin/pro-applications/${application.id}/decision`}><input type="hidden" name="note" value="" /><button className="ui-button ui-button--default ui-button--sm" name="decision" value="approved" disabled={fetcher.state !== "idle"}>Approuver</button><button className="ui-button ui-button--ghost ui-button--sm" name="decision" value="rejected" disabled={fetcher.state !== "idle"}>Refuser</button></fetcher.Form></article>;
@@ -92,18 +78,7 @@ export default function Admin() {
   const { demo, products, stats, recentOrders, applications } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   return (
-    <div className="admin-shell">
-      <aside className="admin-sidebar">
-        <Logo />
-        <nav aria-label="Administration">
-          {nav.map(({ label, icon: Icon, href }, index) => (
-            <Link to={href} aria-current={index === 0 ? "page" : undefined} key={label}>
-              <Icon aria-hidden="true" /> {label}
-            </Link>
-          ))}
-        </nav>
-      </aside>
-      <div className="admin-main">
+    <AdminShell active="dashboard">
         <header className="admin-heading">
           <div><p className="eyebrow">Zen Coffee Lab</p><h1>Tableau de bord</h1></div>
           <Link className="ui-button ui-button--outline ui-button--sm" to="/"><Store aria-hidden="true" /> Voir la boutique</Link>
@@ -168,7 +143,6 @@ export default function Admin() {
           </div>
         </section>
         <footer style={{ marginTop: "3rem" }}><Link className="text-link" to="/mon-compte"><LogOut aria-hidden="true" /> Quitter l’administration</Link></footer>
-      </div>
-    </div>
+    </AdminShell>
   );
 }
