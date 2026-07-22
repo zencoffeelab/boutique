@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "react-router",
+  "crons": [
+    {
+      "path": "/api/cron/commerce",
+      "schedule": "*/10 * * * *"
+    }
+  ],
+  "redirects": [
+    { "source": "/rooting-boutique", "destination": "/boutique", "permanent": true },
+    { "source": "/faq-page", "destination": "/faq", "permanent": true },
+    { "source": "/rooting-conseils", "destination": "/conseils", "permanent": true },
+    { "source": "/merci", "destination": "/commande/confirmation", "permanent": false },
+    { "source": "/en/shop-2", "destination": "/en/shop", "permanent": true }
+  ]
+}

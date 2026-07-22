@@ -1,0 +1,12 @@
+node_modules/
+build/
+.react-router/
+.vercel/
+.env.local
+.env.*.local
+playwright-report/
+test-results/
+migration-report*.json
+coverage/
+reports/wordpress-import.json
+.DS_Store
