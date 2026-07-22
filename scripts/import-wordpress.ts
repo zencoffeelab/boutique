@@ -17,15 +17,16 @@ type WpProduct = {
 };
 type WpVariation = { id: number; sku?: string; price?: string; regular_price?: string; stock_quantity?: number | null; manage_stock?: boolean; attributes?: Array<{ name: string; option: string }> };
 type WpPage = { id: number; slug: string; date?: string; title: { rendered: string }; content: { rendered: string }; excerpt?: { rendered: string }; yoast_head_json?: { title?: string; description?: string } };
-type Report = { source: string; startedAt: string; mode: "dry-run" | "commit"; products: number; pages: number; advice: number; faq: number; archived: number; media: number; warnings: string[]; errors: string[]; imported: string[] };
+type Report = { source: string; startedAt: string; mode: "dry-run" | "commit"; publish: boolean; products: number; pages: number; advice: number; faq: number; archived: number; media: number; warnings: string[]; errors: string[]; imported: string[] };
 
 const args = new Set(process.argv.slice(2));
 const sourceArg = process.argv.find((value) => value.startsWith("--source="));
 const reportArg = process.argv.find((value) => value.startsWith("--report="));
 const source = (sourceArg?.split("=")[1] ?? "https://www.zencoffeelab.com").replace(/\/$/, "");
 const commit = args.has("--commit");
+const publish = args.has("--publish");
 const reportPath = reportArg?.split("=")[1] ?? "migration-report.json";
-const report: Report = { source, startedAt: new Date().toISOString(), mode: commit ? "commit" : "dry-run", products: 0, pages: 0, advice: 0, faq: 0, archived: 0, media: 0, warnings: [], errors: [], imported: [] };
+const report: Report = { source, startedAt: new Date().toISOString(), mode: commit ? "commit" : "dry-run", publish, products: 0, pages: 0, advice: 0, faq: 0, archived: 0, media: 0, warnings: [], errors: [], imported: [] };
 
 function decodeHtml(value = "") {
   return value.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<!--([\s\S]*?)-->/g, " ").replace(/<br\s*\/?\s*>/gi, "\n").replace(/<\/p>/gi, "\n\n").replace(/<[^>]+>/g, " ").replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCodePoint(Number.parseInt(code, 16))).replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code))).replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, "\"").replace(/&apos;/g, "'").replace(/&eacute;/g, "é").replace(/&agrave;/g, "à").replace(/[ \t]+/g, " ").replace(/\n\s+/g, "\n").trim();
@@ -147,7 +148,7 @@ async function importProduct(client: SupabaseClient | null, fr: WpProduct, en: W
   if (frDetails.altitudeMeters && conflictingAltitudes.length) productWarnings.push(`altitude ${frDetails.altitudeMeters} m dans les caractéristiques, mais ${conflictingAltitudes.join("/")} m dans le texte`);
   if (productWarnings.length) report.warnings.push(`${fr.slug}: ${productWarnings.join("; ")}`);
   if (!commit || !client) { report.imported.push(`[simulation] ${fr.slug}`); return; }
-  const { data: product, error } = await client.from("products").upsert({ slug: fr.slug, status: archived ? "archived" : "draft", altitude_meters: frDetails.altitudeMeters }, { onConflict: "slug" }).select("id").single(); if (error) throw error;
+  const { data: product, error } = await client.from("products").upsert({ slug: fr.slug, status: archived ? "archived" : publish ? "published" : "draft", featured: publish && !archived, altitude_meters: frDetails.altitudeMeters }, { onConflict: "slug" }).select("id").single(); if (error) throw error;
   for (const [locale, item] of [["fr-FR", fr], ["en-GB", english]] as const) {
     const details = locale === "fr-FR" ? frDetails : enDetails; const body = cleanProductBody(item.description); const short = decodeHtml(item.short_description) || body.slice(0, 300);
     await client.from("product_translations").upsert({ product_id: product.id, locale, name: decodeHtml(item.name), short_description: short, body, producer: details.producer || frDetails.producer || "À compléter", region: details.region || frDetails.region || "À compléter", variety: details.variety || frDetails.variety || "À compléter", process: details.process || frDetails.process || "À compléter", tasting_notes: details.tastingNotes.length ? details.tastingNotes : frDetails.tastingNotes, seo_title: decodeHtml(item.name), seo_description: short.slice(0, 160) }, { onConflict: "product_id,locale" });
@@ -185,7 +186,7 @@ async function run() {
   for (const page of frPages.filter((item) => pageKeys.has(canonicalPageKey(item.slug)))) {
     const pageKey = canonicalPageKey(page.slug); const english = enPages.find((item) => canonicalPageKey(item.slug) === pageKey); if (!english) report.warnings.push(`Page ${page.slug}: traduction anglaise à rapprocher manuellement.`);
     if (commit && client) {
-      const { data: stored, error } = await client.from("content_pages").upsert({ page_key: pageKey, status: "draft" }, { onConflict: "page_key" }).select("id").single();
+      const { data: stored, error } = await client.from("content_pages").upsert({ page_key: pageKey, status: publish ? "published" : "draft" }, { onConflict: "page_key" }).select("id").single();
       if (error || !stored) throw error ?? new Error(`Page ${page.slug} could not be created.`);
       for (const [locale, item] of [["fr-FR", page], ["en-GB", english ?? page]] as const) {
         await client.from("content_page_translations").upsert({ page_id: stored.id, locale, title: decodeHtml(item.title.rendered), seo_title: item.yoast_head_json?.title ?? decodeHtml(item.title.rendered), seo_description: item.yoast_head_json?.description ?? decodeHtml(item.excerpt?.rendered).slice(0, 160), blocks: structuredBlocks(item.content.rendered) }, { onConflict: "page_id,locale" });
@@ -196,13 +197,13 @@ async function run() {
   if (faqFr.length === 0) report.warnings.push("FAQ: aucune paire question/réponse Elementor détectée; import manuel requis.");
   if (commit && client) {
     const { error: faqDeleteError } = await client.from("faq_items").delete().gte("position", 0); if (faqDeleteError) throw faqDeleteError;
-    for (const [position, item] of faqFr.entries()) await client.from("faq_items").insert({ position, active: false, question_fr: item.question, answer_fr: item.answer, question_en: faqEn[position]?.question ?? item.question, answer_en: faqEn[position]?.answer ?? item.answer });
+    for (const [position, item] of faqFr.entries()) await client.from("faq_items").insert({ position, active: publish, question_fr: item.question, answer_fr: item.answer, question_en: faqEn[position]?.question ?? item.question, answer_en: faqEn[position]?.answer ?? item.answer });
   }
   const enAdviceBySlug = new Map(enAdvice.map((article) => [article.slug, article]));
   const enAdviceByDate = new Map(enAdvice.filter((article) => article.date).map((article) => [article.date, article]));
   for (const article of frAdvice) {
     const english = enAdviceBySlug.get(article.slug) ?? (article.date ? enAdviceByDate.get(article.date) : undefined); if (!english) report.warnings.push(`Conseil ${article.slug}: traduction anglaise à rapprocher manuellement.`); if (!commit || !client) continue;
-    const { data: stored, error } = await client.from("advice_articles").upsert({ slug: article.slug, status: "draft", published_at: article.date ?? new Date().toISOString() }, { onConflict: "slug" }).select("id").single(); if (error || !stored) { report.errors.push(`Conseil ${article.slug}: ${error?.message ?? "création impossible"}`); continue; }
+    const { data: stored, error } = await client.from("advice_articles").upsert({ slug: article.slug, status: publish ? "published" : "draft", published_at: article.date ?? new Date().toISOString() }, { onConflict: "slug" }).select("id").single(); if (error || !stored) { report.errors.push(`Conseil ${article.slug}: ${error?.message ?? "création impossible"}`); continue; }
     for (const [locale, item] of [["fr-FR", article], ["en-GB", english ?? article]] as const) await client.from("advice_translations").upsert({ article_id: stored.id, locale, title: decodeHtml(item.title.rendered), excerpt: decodeHtml(item.excerpt?.rendered), blocks: structuredBlocks(item.content.rendered), seo_title: item.yoast_head_json?.title ?? decodeHtml(item.title.rendered), seo_description: item.yoast_head_json?.description ?? decodeHtml(item.excerpt?.rendered).slice(0, 160) }, { onConflict: "article_id,locale" });
   }
   if (frProducts.length !== 7) report.warnings.push(`Le plan attend 7 cafés, l’API en retourne ${frProducts.length}.`);
