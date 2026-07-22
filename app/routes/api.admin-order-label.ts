@@ -6,8 +6,8 @@ import { createServiceSupabase } from "~/lib/supabase.server";
 export async function action({ request, params }: ActionFunctionArgs) {
   const admin = await requireAdmin(request); if (request.method !== "POST" || !params.id) return Response.json({ ok: false }, { status: 405 });
   const config = env(); const client = createServiceSupabase(); if (!client) return Response.json({ ok: false, message: "Database unavailable." }, { status: 503 });
-  const { data: order } = await client.from("orders").select("id, order_number, status, shipping_quote_id, shipping_rate_id").eq("id", params.id).maybeSingle();
-  if (!order || !["paid", "preparing", "ready_to_ship"].includes(order.status)) return Response.json({ ok: false, message: "Order is not ready for label purchase." }, { status: 409 });
+  const { data: order } = await client.from("orders").select("id, order_number, status, paid_at, shipping_quote_id, shipping_rate_id").eq("id", params.id).maybeSingle();
+  if (!order || !order.paid_at || !["paid", "preparing", "ready_to_ship"].includes(order.status)) return Response.json({ ok: false, message: "Order is not ready for label purchase." }, { status: 409 });
   const { data: quote } = await client.from("shipping_quotes").select("rates").eq("id", order.shipping_quote_id).single(); const rate = (quote?.rates as any[])?.find((item) => item.id === order.shipping_rate_id); if (!rate) return Response.json({ ok: false, message: "Shipping rate snapshot not found." }, { status: 409 });
   const { data: existingRows } = await client.from("shipments").select("parcel_index,shippo_transaction_id,label_url,tracking_number").eq("order_id", order.id); const existingByParcel = new Map((existingRows ?? []).map((shipment) => [shipment.parcel_index, shipment]));
   if (config.SHIPPO_MOCK) return Response.json({ ok: true, demo: true, labels: rate.shippoRateIds?.map((_: string, index: number) => ({ parcel: index + 1, url: "about:blank" })) ?? [] });
