@@ -84,25 +84,33 @@ async function getRawProducts(): Promise<Product[]> {
   return products;
 }
 
-function safeProductProjection(product: Product, audience: Audience): Product {
+export function hasPurchasableVariant(product: Product, audience: Audience): boolean {
+  return product.variants.some((variant) => {
+    const availableStock = variant.stockOnHand - variant.stockReserved;
+    return variant.offers.some((offer) => offer.audience === audience && offer.active && availableStock >= offer.minimumQuantity);
+  });
+}
+
+function safeProductProjection(product: Product, audience: Audience, availableOnly = false): Product {
   return {
     ...product,
     variants: product.variants
       .map((variant) => ({
         ...variant,
         internalCostCents: 0,
-        offers: variant.offers.filter((offer) => offer.audience === audience),
+        offers: variant.offers.filter((offer) => offer.audience === audience && offer.active),
       }))
-      .filter((variant) => variant.offers.length > 0),
+      .filter((variant) => variant.offers.length > 0 && (!availableOnly || variant.offers.some((offer) => variant.stockOnHand - variant.stockReserved >= offer.minimumQuantity))),
   };
 }
 
-export async function getProducts(options: { status?: "published" | "archived"; audience?: Audience } = {}): Promise<Product[]> {
+export async function getProducts(options: { status?: "published" | "archived"; audience?: Audience; availableOnly?: boolean } = {}): Promise<Product[]> {
   const audience = options.audience ?? "retail";
   const products = await getRawProducts();
   return products
     .filter((product) => options.status ? product.status === options.status : true)
-    .map((product) => safeProductProjection(product, audience));
+    .map((product) => safeProductProjection(product, audience, options.availableOnly))
+    .filter((product) => !options.availableOnly || product.variants.length > 0);
 }
 
 export async function getAdminProducts(): Promise<Product[]> {

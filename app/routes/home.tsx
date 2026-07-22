@@ -10,7 +10,7 @@ import { getContentPage } from "~/lib/content.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request);
-  const [products, articles, content] = await Promise.all([getProducts({ status: "published" }), getArticles(), getContentPage("accueil", locale)]);
+  const [products, articles, content] = await Promise.all([getProducts({ status: "published", availableOnly: true }), getArticles(), getContentPage("accueil", locale)]);
   return { locale, products: products.filter((product) => product.featured).slice(0, 6), articles: articles.slice(0, 2), content };
 }
 
@@ -48,7 +48,7 @@ export default function Home() {
           </div>
         </div>
         <div className="hero__media">
-          <img src={products[0]?.media[0]?.url} alt={english ? "Zen Coffee Lab specialty coffee" : "Café de spécialité Zen Coffee Lab"} width="960" height="1100" fetchPriority="high" />
+          {products[0]?.media[0] ? <img src={products[0].media[0].url} alt={english ? "Zen Coffee Lab specialty coffee" : "Café de spécialité Zen Coffee Lab"} width="960" height="1100" fetchPriority="high" /> : null}
           <span className="hero__stamp">{english ? "Roasted fresh in Tours" : "Torréfié frais à Tours"}</span>
         </div>
       </section>
@@ -58,7 +58,9 @@ export default function Home() {
           <div><p className="eyebrow">{english ? "Current selection" : "Sélection du moment"}</p><h2>{english ? "Coffees in season" : "Cafés de saison"}</h2></div>
           <Link className="text-link" to={english ? "/en/shop" : "/boutique"}>{english ? "View all coffees" : "Voir tous les cafés"}<ArrowRight aria-hidden="true" /></Link>
         </div>
-        <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} />)}</div>
+        {products.length > 0
+          ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} />)}</div>
+          : <div className="empty-state"><p>{english ? "Our next coffees are being prepared." : "Nos prochains cafés sont en préparation."}</p></div>}
       </section>
 
       <section className="statement">

@@ -7,7 +7,7 @@ import { pageMeta } from "~/lib/seo";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request);
-  return { locale, products: await getProducts({ status: "published" }) };
+  return { locale, products: await getProducts({ status: "published", availableOnly: true }) };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
@@ -22,7 +22,9 @@ export default function Shop() {
     <header className="page-hero"><p className="eyebrow">Zen Coffee Lab</p><h1>{english ? "The coffee shop" : "La boutique café"}</h1><p className="lede">{english ? "Bright, traceable coffees roasted to order. Choose your origin, then your format." : "Des cafés lumineux et traçables, torréfiés à la demande. Choisissez votre origine, puis votre format."}</p></header>
     <section className="page-shell section" aria-label={english ? "Coffee catalogue" : "Catalogue de cafés"}>
       <div className="filter-bar"><span>{products.length} {english ? "coffees" : "cafés"}</span><span>{english ? "Roasted every week in Tours" : "Torréfiés chaque semaine à Tours"}</span></div>
-      <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} />)}</div>
+      {products.length > 0
+        ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} />)}</div>
+        : <div className="empty-state"><h2>{english ? "No coffee is available right now." : "Aucun café n’est disponible pour le moment."}</h2><p>{english ? "Our next freshly roasted selection is coming soon." : "Notre prochaine sélection fraîchement torréfiée arrive bientôt."}</p></div>}
     </section>
   </>;
 }
