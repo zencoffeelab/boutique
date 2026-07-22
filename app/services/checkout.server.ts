@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import Stripe from "stripe";
 import type { Audience } from "~/domain/types";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
+import { createStripe } from "~/lib/stripe.server";
 import { getLatestShippingQuote } from "~/services/shipping.server";
 
 export async function createCheckout(input: { cartId: string; shippingRateId: string; audience: Audience; profileId?: string }) {
@@ -19,7 +19,7 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
   const supabase = createServiceSupabase(); if (!supabase) throw new Error("Supabase service access is required for checkout.");
   const { data: order, error } = await supabase.rpc("create_checkout_order", { p_cart_id: quote.cartId, p_quote_id: quote.id, p_audience: quote.audience, p_locale: quote.locale, p_address: quote.address, p_lines: quote.lines, p_shipping_rate: rate, p_reservation_minutes: 30, p_profile_id: input.profileId ?? null });
   if (error || !order) throw new Response(error?.message ?? "Unable to reserve stock.", { status: 409 });
-  const stripe = new Stripe(config.STRIPE_SECRET_KEY);
+  const stripe = createStripe(config.STRIPE_SECRET_KEY);
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "payment", customer_email: quote.address.email, client_reference_id: order.id,
