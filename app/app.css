@@ -287,6 +287,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .admin-order-list { display: grid; gap: .8rem; }
 .admin-order > summary, .admin-content-page > summary { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 1rem; padding: 1.2rem; cursor: pointer; }
 .admin-order > summary span:first-child { display: grid; }
+.admin-order__products { margin-top: .35rem; color: var(--green-deep); font-weight: 700; }
 .admin-order__content { display: grid; grid-template-columns: 1.3fr 1fr; gap: 2rem; padding: 1.5rem; border-top: 1px solid #e7e9e3; }
 .admin-order-actions { display: grid; gap: .7rem; margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid #e7e9e3; }
 .admin-order-actions form { display: flex; flex-wrap: wrap; align-items: end; gap: .6rem; }
