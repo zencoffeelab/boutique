@@ -16,7 +16,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (cause) {
     const status = cause instanceof LabelRefundError ? cause.status : 500;
     const message = cause instanceof Error ? cause.message : "Le remboursement de l’étiquette a échoué.";
-    console.error("shippo_label_refund_failed", { orderId: parsed.data.orderId, shipmentId: parsed.data.shipmentId, status, message });
+    console.error("label_refund_failed", { orderId: parsed.data.orderId, shipmentId: parsed.data.shipmentId, status, message });
     return Response.json({ ok: false, message }, { status });
   }
 }

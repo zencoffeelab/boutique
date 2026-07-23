@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { pickupPointIdSchema, professionalApplicationSchema, shippingQuoteSchema } from "~/domain/schemas";
+import { pickupPointIdSchema, professionalApplicationSchema, shippingAddressSchema, shippingQuoteSchema } from "~/domain/schemas";
+import { EU_SHIPPING_COUNTRY_CODES } from "~/domain/shipping-countries";
+
+describe("shipping countries", () => {
+  it("accepts every EU destination and rejects unsupported countries", () => {
+    const address = { firstName: "Ada", lastName: "Lovelace", email: "ada@example.com", phone: "0600000000", line1: "1 Main Street", postalCode: "1000", city: "Capital" };
+    expect(EU_SHIPPING_COUNTRY_CODES).toHaveLength(27);
+    for (const countryCode of EU_SHIPPING_COUNTRY_CODES) expect(shippingAddressSchema.safeParse({ ...address, countryCode }).success).toBe(true);
+    expect(shippingAddressSchema.safeParse({ ...address, countryCode: "US" }).success).toBe(false);
+  });
+});
 
 describe("professional application", () => {
   const valid = { companyName: "Coffee Club", lastName: "Doe", firstName: "Jane", email: "jane@example.com", phone: "0600000000", businessType: "Coffee shop", monthlyVolume: "11-50 kg", locale: "fr-FR", privacyConsent: true };

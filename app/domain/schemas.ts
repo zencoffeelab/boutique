@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SHIPPING_COUNTRY_CODES } from "./shipping-countries";
 
 export const audienceSchema = z.enum(["retail", "professional"]);
 
@@ -19,11 +20,7 @@ export const shippingAddressSchema = z.object({
   line2: z.string().trim().max(160).optional().default(""),
   postalCode: z.string().trim().min(2).max(20),
   city: z.string().trim().min(1).max(100),
-  countryCode: z.enum([
-    "AT", "BE", "BG", "HR", "CY", "CZ", "DE", "DK", "EE", "ES", "FI",
-    "FR", "GB", "GR", "HU", "IE", "IT", "LT", "LU", "LV", "MT", "NL",
-    "PL", "PT", "RO", "SE", "SI", "SK",
-  ]),
+  countryCode: z.enum(SHIPPING_COUNTRY_CODES),
 });
 
 export const pickupPointIdSchema = z.string().trim().min(1).max(38).regex(/^[A-Za-z0-9]+$/);

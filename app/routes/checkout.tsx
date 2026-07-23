@@ -3,16 +3,16 @@ import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Link, useLoaderData } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
 import { formatMoney } from "~/domain/money";
+import { EU_SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
 import type { PickupPoint, ShippingRate } from "~/domain/types";
 import { getAudience } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
-import { pickupPointsConfigured } from "~/services/pickup-points.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request); const audience = await getAudience(request);
-  return { locale, audience, pickupConfigured: pickupPointsConfigured(), products: await getProducts({ status: "published", audience }) };
+  return { locale, audience, pickupConfigured: false, products: await getProducts({ status: "published", audience }) };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(
@@ -141,7 +141,7 @@ export default function Checkout() {
             <div className="field field--wide"><label htmlFor="line2">{english ? "Address line 2" : "Complément"}</label><input id="line2" name="line2" autoComplete="address-line2" /></div>
             <div className="field"><label htmlFor="postalCode">{english ? "Postcode" : "Code postal"}</label><input id="postalCode" name="postalCode" required autoComplete="postal-code" /></div>
             <div className="field"><label htmlFor="city">{english ? "City" : "Ville"}</label><input id="city" name="city" required autoComplete="address-level2" /></div>
-            <div className="field"><label htmlFor="countryCode">{english ? "Country" : "Pays"}</label><select id="countryCode" name="countryCode" value={countryCode} onChange={(event) => { const country = event.currentTarget.value; setCountryCode(country); if (country !== "FR") { setDeliveryMethod("home"); resetPickup(); } }}><option value="FR">France</option><option value="BE">Belgique</option><option value="DE">Deutschland</option><option value="ES">España</option><option value="IT">Italia</option><option value="LU">Luxembourg</option><option value="NL">Nederland</option><option value="PT">Portugal</option><option value="GB">United Kingdom</option></select></div>
+            <div className="field"><label htmlFor="countryCode">{english ? "Country" : "Pays"}</label><select id="countryCode" name="countryCode" value={countryCode} onChange={(event) => { const country = event.currentTarget.value; setCountryCode(country); if (country !== "FR") { setDeliveryMethod("home"); resetPickup(); } }}><optgroup label={english ? "European Union" : "Union européenne"}>{EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup><optgroup label={english ? "Outside the EU" : "Hors Union européenne"}><option value="GB">{shippingCountryLabel("GB", locale)}</option></optgroup></select></div>
           </div>
         </section>
 

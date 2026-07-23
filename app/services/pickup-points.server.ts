@@ -31,11 +31,6 @@ type ColissimoResponse = {
   pointRetraitAcheminement?: unknown;
 };
 
-const mockPoints: readonly PickupPoint[] = [
-  { id: "370000", name: "Bureau de poste Tours Centre", address1: "1 boulevard Heurteloup", address2: "", address3: "", postalCode: "37000", city: "Tours", countryCode: "FR", type: "BPR", network: "R01", locationHint: "Entrée principale", distanceMeters: 350, latitude: 47.3904, longitude: 0.6898, accessible: true, maxWeightGrams: 20_000 },
-  { id: "370001", name: "Relais Pickup Tours", address1: "18 rue Nationale", address2: "", address3: "", postalCode: "37000", city: "Tours", countryCode: "FR", type: "A2P", network: "R03", locationHint: "À proximité de la place Jean-Jaurès", distanceMeters: 620, latitude: 47.391, longitude: 0.688, accessible: false, maxWeightGrams: 20_000 },
-];
-
 function asText(value: unknown): string { return typeof value === "string" ? value.trim() : ""; }
 function finiteNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
@@ -78,13 +73,11 @@ function credentials() {
 }
 
 export function pickupPointsConfigured(): boolean {
-  const config = env(); return config.SHIPPO_MOCK || Boolean(config.COLISSIMO_PICKUP_API_KEY);
+  return false;
 }
 
 export async function searchPickupPoints(input: { locale: Locale; address: { line1: string; line2?: string; postalCode: string; city: string; countryCode: string }; weightGrams: number }): Promise<PickupPoint[]> {
-  const config = env();
   if (input.address.countryCode !== "FR") return [];
-  if (config.SHIPPO_MOCK) return [...mockPoints];
   const { apiKey, partnerCode } = credentials();
   const data = await postColissimo(SEARCH_ENDPOINT, {
     apiKey, ...(partnerCode ? { codTiersPourPartenaire: partnerCode } : {}),
@@ -97,12 +90,6 @@ export async function searchPickupPoints(input: { locale: Locale; address: { lin
 }
 
 export async function getPickupPointById(input: { id: string; locale: Locale; weightGrams: number }): Promise<PickupPoint> {
-  const config = env();
-  if (config.SHIPPO_MOCK) {
-    const point = mockPoints.find((candidate) => candidate.id === input.id);
-    if (!point) throw new Error("Pickup point is not available.");
-    return point;
-  }
   const { apiKey, partnerCode } = credentials();
   const data = await postColissimo(DETAIL_ENDPOINT, {
     apikey: apiKey, ...(partnerCode ? { codTiersPourPartenaire: partnerCode } : {}), id: input.id,

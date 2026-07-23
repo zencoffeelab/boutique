@@ -1,4 +1,5 @@
 import type { Money } from "./types";
+import { SHIPPING_COUNTRY_CODES } from "./shipping-countries";
 
 export function assertCents(value: number): number {
   if (!Number.isSafeInteger(value) || value < 0) {
@@ -50,10 +51,6 @@ export function calculateContribution(input: {
 
 export function freeShippingThresholdCents(countryCode: string, thresholds = { fr: 7_500, euUk: 15_000 }): number | null {
   if (countryCode.toUpperCase() === "FR") return thresholds.fr;
-  const euAndUk = new Set([
-    "AT", "BE", "BG", "HR", "CY", "CZ", "DE", "DK", "EE", "ES", "FI",
-    "GB", "GR", "HU", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PL",
-    "PT", "RO", "SE", "SI", "SK",
-  ]);
+  const euAndUk = new Set<string>(SHIPPING_COUNTRY_CODES);
   return euAndUk.has(countryCode.toUpperCase()) ? thresholds.euUk : null;
 }

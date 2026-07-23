@@ -16,7 +16,11 @@ const schema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   SHIPPO_API_TOKEN: z.string().optional(),
   SHIPPO_WEBHOOK_SECRET: z.string().optional(),
-  SHIPPO_ALLOWED_SERVICE_TOKENS: z.string().optional().default(""),
+  SENDCLOUD_PUBLIC_KEY: z.string().optional(),
+  SENDCLOUD_SECRET_KEY: z.string().optional(),
+  SENDCLOUD_WEBHOOK_SECRET: z.string().optional(),
+  SENDCLOUD_SHIPPING_METHOD_ID: z.coerce.number().int().positive().optional(),
+  SENDCLOUD_SHIPPING_METHODS: z.string().optional().default("{}"),
   COLISSIMO_PICKUP_API_KEY: z.string().optional(),
   COLISSIMO_PICKUP_PARTNER_CLIENT_CODE: z.preprocess((value) => value === "" ? undefined : value, z.string().regex(/^\d{6}$/).optional()),
   FREE_SHIPPING_FR_CENTS: z.coerce.number().int().nonnegative().default(7_500),
@@ -36,7 +40,7 @@ const schema = z.object({
   CRON_SECRET: z.string().optional(),
   ALLOW_DEMO_DATA: booleanString,
   PAYMENTS_MOCK: booleanString,
-  SHIPPO_MOCK: booleanString,
+  SHIPPING_MOCK: booleanString,
   DEMO_ADMIN: booleanString,
 });
 
@@ -50,12 +54,12 @@ export function env(): z.infer<typeof schema> {
       ...parsed,
       ALLOW_DEMO_DATA: process.env.ALLOW_DEMO_DATA === undefined ? localDefault : parsed.ALLOW_DEMO_DATA,
       PAYMENTS_MOCK: process.env.PAYMENTS_MOCK === undefined ? localDefault : parsed.PAYMENTS_MOCK,
-      SHIPPO_MOCK: process.env.SHIPPO_MOCK === undefined ? localDefault : parsed.SHIPPO_MOCK,
+      SHIPPING_MOCK: process.env.SHIPPING_MOCK === undefined ? localDefault : parsed.SHIPPING_MOCK,
       DEMO_ADMIN: process.env.DEMO_ADMIN === undefined ? localDefault : parsed.DEMO_ADMIN,
     };
   }
   if (cached.NODE_ENV === "production") {
-    const forbiddenMocks = cached.ALLOW_DEMO_DATA || cached.PAYMENTS_MOCK || cached.SHIPPO_MOCK || cached.DEMO_ADMIN;
+    const forbiddenMocks = cached.ALLOW_DEMO_DATA || cached.PAYMENTS_MOCK || cached.SHIPPING_MOCK || cached.DEMO_ADMIN;
     if (forbiddenMocks) throw new Error("Mock and demo flags must be disabled in production.");
   }
   return cached;
