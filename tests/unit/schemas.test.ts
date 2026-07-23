@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pickupPointIdSchema, professionalApplicationSchema, shippingAddressSchema, shippingQuoteSchema } from "~/domain/schemas";
-import { EU_SHIPPING_COUNTRY_CODES } from "~/domain/shipping-countries";
+import { EU_SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
 
 describe("shipping countries", () => {
   it("accepts every EU destination and rejects unsupported countries", () => {
@@ -8,6 +8,12 @@ describe("shipping countries", () => {
     expect(EU_SHIPPING_COUNTRY_CODES).toHaveLength(27);
     for (const countryCode of EU_SHIPPING_COUNTRY_CODES) expect(shippingAddressSchema.safeParse({ ...address, countryCode }).success).toBe(true);
     expect(shippingAddressSchema.safeParse({ ...address, countryCode: "US" }).success).toBe(false);
+  });
+
+  it("lists EU destinations alphabetically by their French names", () => {
+    const names = EU_SHIPPING_COUNTRY_CODES.map((countryCode) => shippingCountryLabel(countryCode, "fr-FR"));
+    expect(names).toEqual([...names].sort((left, right) => left.localeCompare(right, "fr-FR")));
+    expect(names[0]).toBe("Allemagne");
   });
 });
 

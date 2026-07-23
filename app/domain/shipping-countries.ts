@@ -1,8 +1,8 @@
 import type { Locale } from "./types";
 
 export const EU_SHIPPING_COUNTRY_CODES = [
-  "FR", "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "DE", "GR", "HU", "IE",
-  "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE",
+  "DE", "AT", "BE", "BG", "CY", "HR", "DK", "ES", "EE", "FI", "FR", "GR", "HU", "IE",
+  "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "SE", "CZ",
 ] as const;
 
 export const SHIPPING_COUNTRY_CODES = [...EU_SHIPPING_COUNTRY_CODES, "GB"] as const;
