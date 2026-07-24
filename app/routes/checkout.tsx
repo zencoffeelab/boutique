@@ -67,6 +67,10 @@ export default function Checkout() {
     const offer = variant?.offers.find((item) => item.audience === line.audience);
     return product && variant && offer ? { line, product, variant, offer } : null;
   }).filter((line): line is NonNullable<typeof line> => Boolean(line)), [products, validLines]);
+  const hasUnavailableItems = resolved.length !== validLines.length || resolved.some(({ line, variant, offer }) => {
+    const availableStock = variant.stockOnHand - variant.stockReserved;
+    return line.quantity > availableStock || line.quantity < offer.minimumQuantity;
+  });
   const subtotal = resolved.reduce((sum, item) => sum + item.offer.price.amount * item.line.quantity, 0);
   const estimatedShippingWeight = Math.min(30_000, resolved.reduce((sum, item) => sum + item.variant.weightGrams * item.line.quantity, 0) + 500);
 
@@ -93,6 +97,9 @@ export default function Checkout() {
 
   const requestQuote = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (hasUnavailableItems) {
+      setError(english ? "The stock for an item in your cart has changed. Return to your cart to update it." : "Le stock d’un produit de votre panier a changé. Retournez au panier pour le mettre à jour."); return;
+    }
     if (deliveryMethod === "pickup" && !selectedPickupPointId) {
       setError(english ? "Select a pickup point before calculating shipping." : "Sélectionnez un point relais avant de calculer la livraison."); return;
     }
@@ -125,7 +132,7 @@ export default function Checkout() {
   };
 
   if (!hydrated) return <div className="empty-state"><p>{english ? "Loading…" : "Chargement…"}</p></div>;
-  if (!resolved.length) return <div className="empty-state"><h1>{english ? "Your cart is empty" : "Votre panier est vide"}</h1><Link className="button button--dark" to={english ? "/en/shop" : "/boutique"}>{english ? "Back to shop" : "Retour à la boutique"}</Link></div>;
+  if (!resolved.length) return <div className="empty-state"><h1>{validLines.length ? (english ? "An item in your cart is no longer available" : "Un article de votre panier n’est plus disponible") : (english ? "Your cart is empty" : "Votre panier est vide")}</h1><Link className="button button--dark" to={validLines.length ? (english ? "/en/cart" : "/panier") : (english ? "/en/shop" : "/boutique")}>{validLines.length ? (english ? "Update cart" : "Mettre à jour le panier") : (english ? "Back to shop" : "Retour à la boutique")}</Link></div>;
 
   return <>
     <header className="page-hero"><p className="eyebrow">{english ? "Secure checkout" : "Commande sécurisée"}</p><h1>{english ? "Delivery & payment" : "Livraison & paiement"}</h1></header>
@@ -166,7 +173,8 @@ export default function Checkout() {
           </div> : null}
         </section> : null}
 
-        <button className="button button--dark" type="submit" disabled={busy || !cartId}>{busy ? (english ? "Calculating…" : "Calcul…") : (english ? "Calculate shipping" : "Calculer la livraison")}</button>
+        {hasUnavailableItems ? <p className="form-message form-error" role="alert">{english ? "The stock for an item has changed." : "Le stock d’un produit a changé."} <Link to={english ? "/en/cart" : "/panier"}>{english ? "Update cart" : "Mettre à jour le panier"}</Link></p> : null}
+        <button className="button button--dark" type="submit" disabled={busy || !cartId || hasUnavailableItems}>{busy ? (english ? "Calculating…" : "Calcul…") : (english ? "Calculate shipping" : "Calculer la livraison")}</button>
         {error ? <p className="form-message form-error" role="alert">{error}</p> : null}
         {quote?.rates?.length ? <section className="checkout-section shipping-rates"><h2>{pickupConfigured && countryCode === "FR" ? "4" : "3"}. {english ? "Delivery service" : "Mode de livraison"}</h2><div className="rate-list">{quote.rates.map((rate) => <label className="rate-option" key={rate.id}><input type="radio" name="shippingRate" checked={selectedRate === rate.id} onChange={() => setSelectedRate(rate.id)} /><span><strong>{rate.carrier} · {rate.service}</strong><br /><small>{rate.estimatedDays ? `${rate.estimatedDays} ${english ? "business days" : "jours ouvrés"}` : ""}{rate.pickupPoint ? `${rate.estimatedDays ? " · " : ""}${rate.pickupPoint.name}` : ""}</small></span><strong>{formatMoney(rate.amountCents, locale)}</strong></label>)}</div></section> : null}
       </form>
