@@ -23,7 +23,10 @@ export function SiteFooter() {
         <Link to={english ? "/en/general-terms-and-conditions-of-sale" : "/cgv"}>{english ? "Terms" : "CGV"}</Link>
       </div>
       <div className="footer-bottom">
-        <p>© {new Date().getFullYear()} Zen Coffee Lab</p>
+        <div className="footer-bottom__meta">
+          <p>© {new Date().getFullYear()} Zen Coffee Lab</p>
+          <Link className="footer-admin-link" to="/admin">Back-office</Link>
+        </div>
         <a href="https://www.instagram.com/zencoffeeclub/" rel="noreferrer" target="_blank">Instagram ↗</a>
       </div>
     </footer>
