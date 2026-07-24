@@ -1,8 +1,8 @@
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
-import { useFetcher, useLoaderData } from "react-router";
+import { Link, useFetcher, useLoaderData } from "react-router";
 import { ProductCard } from "~/components/product-card";
 import { ContentBlocks } from "~/components/content-blocks";
-import { getAudience } from "~/lib/auth.server";
+import { getViewer } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
 import { getContentPage } from "~/lib/content.server";
 import { getLocale } from "~/lib/i18n";
@@ -10,23 +10,32 @@ import { pageMeta } from "~/lib/seo";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request);
-  const audience = await getAudience(request);
-  const [products, content] = await Promise.all([audience === "professional" ? getProducts({ status: "published", audience: "professional", availableOnly: true }) : Promise.resolve([]), getContentPage("professionnel", locale)]);
-  return { locale, approved: audience === "professional", products, content };
+  const viewer = await getViewer(request);
+  const professionalStatus = viewer?.profile?.professional_status ?? null;
+  const approved = professionalStatus === "approved";
+  const [products, content] = await Promise.all([approved ? getProducts({ status: "published", audience: "professional", availableOnly: true }) : Promise.resolve([]), getContentPage("professionnel", locale)]);
+  return { locale, approved, signedIn: Boolean(viewer), professionalStatus, products, content };
 }
 export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(data?.locale === "en-GB" ? "Coffee for professionals | Zen Coffee Lab" : "Café pour professionnels | Zen Coffee Lab", data?.locale === "en-GB" ? "Specialty coffee and support for cafés, restaurants and resellers." : "Cafés de spécialité et accompagnement pour coffee shops, restaurants et revendeurs.", data?.locale === "en-GB" ? "/en/professional" : "/professionnel");
 
 type ApplicationResponse = { ok?: boolean; message?: string; errors?: Record<string, string[]> };
 
 export default function Professional() {
-  const { locale, approved, products, content } = useLoaderData<typeof loader>();
+  const { locale, approved, signedIn, professionalStatus, products, content } = useLoaderData<typeof loader>();
   const english = locale === "en-GB";
   const fetcher = useFetcher<ApplicationResponse>();
+  const professionalPath = english ? "/en/professional" : "/professionnel";
+  const accountPath = english ? "/en/my-account" : "/mon-compte";
+  const loginPath = `${accountPath}?next=${encodeURIComponent(professionalPath)}`;
   return <>
     <header className="page-hero"><p className="eyebrow">B2B · Zen Coffee Lab</p><h1>{approved ? (english ? "Your professional shop" : "Votre boutique professionnelle") : (content?.title ?? (english ? "Coffee made for your business" : "Du café pensé pour votre établissement"))}</h1><p className="lede">{approved ? (english ? "Your approved formats, prices and minimum quantities are displayed below." : "Vos formats, tarifs et minimums approuvés sont affichés ci-dessous.") : (english ? "Traceable coffees, consistent profiles and direct support from the roaster." : "Des cafés traçables, des profils constants et un accompagnement direct par le torréfacteur.")}</p></header>
     {!approved ? <ContentBlocks blocks={content?.blocks} /> : null}
     {approved ? <section className="section page-shell">{products.length > 0 ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} audience="professional" />)}</div> : <div className="empty-state"><h2>{english ? "No professional coffee is currently available." : "Aucun café professionnel n’est disponible actuellement."}</h2></div>}<p className="admin-notice" style={{ marginTop: "2rem" }}>{english ? "Professional prices are visible only in this authenticated session." : "Les prix professionnels ne sont visibles que dans cette session authentifiée."}</p></section> : <>
       <section className="steps"><article><span>01</span><h3>{english ? "Tell us about your business" : "Présentez votre activité"}</h3><p>{english ? "Complete the form in a few minutes." : "Complétez le formulaire en quelques minutes."}</p></article><article><span>02</span><h3>{english ? "Manual review" : "Validation manuelle"}</h3><p>{english ? "We review every request and get back to you." : "Nous étudions chaque demande et revenons vers vous."}</p></article><article><span>03</span><h3>{english ? "Secure access" : "Accès sécurisé"}</h3><p>{english ? "Set your password and access professional terms." : "Définissez votre mot de passe et accédez aux conditions pro."}</p></article></section>
+      <section className="professional-access-card page-shell" aria-labelledby="professional-access-title">
+        <div><p className="eyebrow">{english ? "Approved professionals" : "Professionnels validés"}</p><h2 id="professional-access-title">{english ? "Already have professional access?" : "Vous avez déjà un accès professionnel ?"}</h2><p>{signedIn ? (professionalStatus === "pending" ? (english ? "Your professional application is awaiting administrator review." : "Votre demande professionnelle attend la validation d’un administrateur.") : (english ? "This signed-in account does not currently have approved professional access." : "Ce compte connecté ne dispose pas actuellement d’un accès professionnel validé.")) : (english ? "Sign in with the email and password activated after your application was approved." : "Connectez-vous avec l’e-mail et le mot de passe activés après la validation de votre demande.")}</p></div>
+        <Link className="button button--dark" to={signedIn ? accountPath : loginPath}>{signedIn ? (english ? "Open my account" : "Ouvrir mon compte") : (english ? "Professional sign in" : "Connexion professionnelle")}</Link>
+      </section>
       <fetcher.Form className="form-card" method="post" action="/api/pro-applications">
         <h2>{english ? "Apply for an account" : "Demander un compte"}</h2><p>{english ? "All fields are required." : "Tous les champs sont obligatoires."}</p>
         {fetcher.data?.message ? <p className={fetcher.data.ok ? "form-message" : "form-message form-error"} role="status">{fetcher.data.message}</p> : null}

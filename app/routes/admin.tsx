@@ -70,8 +70,20 @@ export const meta: MetaFunction = () => [
 ];
 
 function ProfessionalDecision({ application }: { application: { id: string; company_name: string; first_name: string; last_name: string; email: string; business_type: string; monthly_volume: string } }) {
-  const fetcher = useFetcher<{ ok?: boolean; message?: string }>();
-  return <article className="admin-application"><div><strong>{application.company_name}</strong><p>{application.first_name} {application.last_name} · {application.business_type} · {application.monthly_volume}</p><small>{application.email}</small></div><fetcher.Form method="post" action={`/api/admin/pro-applications/${application.id}/decision`}><input type="hidden" name="note" value="" /><button className="ui-button ui-button--default ui-button--sm" name="decision" value="approved" disabled={fetcher.state !== "idle"}>Approuver</button><button className="ui-button ui-button--ghost ui-button--sm" name="decision" value="rejected" disabled={fetcher.state !== "idle"}>Refuser</button></fetcher.Form></article>;
+  const fetcher = useFetcher<{ ok?: boolean; message?: string; activationUrl?: string }>();
+  return <article className="admin-application">
+    <div><strong>{application.company_name}</strong><p>{application.first_name} {application.last_name} · {application.business_type} · {application.monthly_volume}</p><small>{application.email}</small></div>
+    <fetcher.Form method="post" action={`/api/admin/pro-applications/${application.id}/decision`}>
+      <label className="admin-application__note">Note facultative<input name="note" maxLength={1_000} placeholder="Visible dans l’e-mail en cas de refus" /></label>
+      <button className="ui-button ui-button--default ui-button--sm" name="decision" value="approved" disabled={fetcher.state !== "idle"}>Approuver et envoyer l’accès</button>
+      <button className="ui-button ui-button--ghost ui-button--sm" name="decision" value="rejected" disabled={fetcher.state !== "idle"}>Refuser</button>
+    </fetcher.Form>
+    {fetcher.data?.message ? <small className={fetcher.data.ok ? undefined : "form-error"} role="status">{fetcher.data.message}</small> : null}
+    {fetcher.data?.activationUrl ? <div className="admin-activation-link">
+      <label>Lien d’activation à transmettre<input readOnly value={fetcher.data.activationUrl} onFocus={(event) => event.currentTarget.select()} /></label>
+      <a className="ui-button ui-button--ghost ui-button--sm" href={fetcher.data.activationUrl} target="_blank" rel="noreferrer">Ouvrir le lien</a>
+    </div> : null}
+  </article>;
 }
 
 export default function Admin() {

@@ -2,9 +2,9 @@ import type { ActionFunctionArgs } from "react-router";
 import { professionalApplicationSchema } from "~/domain/schemas";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
-import { enqueueNotification, escapeEmailHtml } from "~/services/notifications.server";
+import { enqueueNotification, escapeEmailHtml, processNotificationQueue } from "~/services/notifications.server";
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   if (request.method !== "POST") return Response.json({ ok: false, message: "Method not allowed." }, { status: 405 });
   const contentType = request.headers.get("content-type") ?? "";
   const raw = contentType.includes("application/json") ? await request.json().catch(() => null) : Object.fromEntries(await request.formData());
@@ -20,7 +20,12 @@ export async function action({ request }: ActionFunctionArgs) {
       const duplicate = error.code === "23505";
       return Response.json({ ok: false, message: duplicate ? (english ? "An application already exists for this email." : "Une demande existe déjà pour cet e-mail.") : (english ? "The application could not be saved." : "La demande n’a pas pu être enregistrée.") }, { status: duplicate ? 409 : 500 });
     }
-    try { await enqueueNotification({ kind: "pro_application", to: env().ADMIN_NOTIFICATION_EMAIL, locale: parsed.data.locale, subject: `Nouvelle demande pro · ${parsed.data.companyName}`, html: `<h1>Nouvelle demande professionnelle</h1><p>${escapeEmailHtml(parsed.data.firstName)} ${escapeEmailHtml(parsed.data.lastName)} · ${escapeEmailHtml(parsed.data.companyName)}</p><p>${escapeEmailHtml(parsed.data.businessType)} · ${escapeEmailHtml(parsed.data.monthlyVolume)}</p>`, payload: { email: parsed.data.email } }); }
+    try {
+      await enqueueNotification({ kind: "pro_application", to: env().ADMIN_NOTIFICATION_EMAIL, locale: parsed.data.locale, subject: `Nouvelle demande pro · ${parsed.data.companyName}`, html: `<h1>Nouvelle demande professionnelle</h1><p>${escapeEmailHtml(parsed.data.firstName)} ${escapeEmailHtml(parsed.data.lastName)} · ${escapeEmailHtml(parsed.data.companyName)}</p><p>${escapeEmailHtml(parsed.data.businessType)} · ${escapeEmailHtml(parsed.data.monthlyVolume)}</p><p><a href="${escapeEmailHtml(`${env().VITE_SITE_URL}/admin#demandes-pro`)}">Ouvrir le back-office</a></p>`, payload: { email: parsed.data.email } });
+      const task = processNotificationQueue(10).catch((cause) => console.error("professional_application_notification_delivery_failed", { message: cause instanceof Error ? cause.message : String(cause) }));
+      const cloudflare = (context as { cloudflare?: { ctx?: { waitUntil(promise: Promise<unknown>): void } } }).cloudflare;
+      if (cloudflare?.ctx) cloudflare.ctx.waitUntil(task); else void task;
+    }
     catch (cause) { console.error("professional_application_notification_failed", { message: cause instanceof Error ? cause.message : String(cause) }); }
   }
   return Response.json({ ok: true, message: english ? "Thank you. Your application will be reviewed and you will receive an email." : "Merci. Votre demande va être étudiée et vous recevrez une réponse par e-mail." }, { status: 201 });

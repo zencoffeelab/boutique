@@ -231,6 +231,10 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 
 .professional-banner { padding: 5rem 1rem; background: var(--green-deep); color: white; text-align: center; }
 .professional-banner h2 { margin-bottom: 1rem; }
+.professional-access-card { display: flex; align-items: center; justify-content: space-between; gap: 2rem; margin-bottom: 3rem; padding: clamp(1.5rem, 4vw, 2.5rem); border: 1px solid var(--line); background: var(--paper); }
+.professional-access-card h2 { margin: .35rem 0 .6rem; font-size: clamp(1.8rem, 4vw, 3rem); }
+.professional-access-card p:last-child { max-width: 46rem; }
+.professional-access-card .button { flex: 0 0 auto; }
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; width: var(--page); margin: 0 auto; padding: 6rem 0; }
 .steps article { padding: 2rem; border-top: 1px solid var(--ink); }
 .steps span { color: var(--orange); font: 500 3rem/1 var(--display); }
@@ -307,6 +311,11 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .admin-application { display: grid; gap: .75rem; padding: 1rem 0; border-bottom: 1px solid #e7e9e3; }
 .admin-application p { margin: .2rem 0; color: #62675c; font-size: .8rem; }
 .admin-application form { display: flex; flex-wrap: wrap; gap: .4rem; }
+.admin-application__note { display: grid; flex: 1 0 100%; gap: .25rem; color: #62675c; font-size: .7rem; }
+.admin-application__note input { min-height: 2.5rem; padding: .45rem .6rem; border: 1px solid #dfe2db; background: white; }
+.admin-activation-link { display: flex; align-items: end; gap: .5rem; padding: .8rem; border: 1px solid #e8c97c; background: #fff8e4; }
+.admin-activation-link label { display: grid; flex: 1; gap: .3rem; color: #62675c; font-size: .7rem; }
+.admin-activation-link input { min-width: 0; padding: .55rem .65rem; border: 1px solid #d8c891; background: white; font: inherit; }
 .admin-filter { display: grid; grid-template-columns: minmax(220px, 1fr) 220px auto; gap: .7rem; margin-bottom: 1.25rem; }
 .admin-filter input, .admin-filter select { width: 100%; min-height: 3rem; padding: .65rem .8rem; border: 1px solid #dfe2db; background: white; }
 .admin-order-list { display: grid; gap: .8rem; }
@@ -383,6 +392,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
   .cart-line > strong { grid-column: 2; }
   .site-footer { grid-template-columns: 1fr 1fr; gap: 3rem 1.5rem; }
   .footer-intro { grid-column: 1 / -1; }
+  .professional-access-card { display: grid; }
+  .professional-access-card .button { justify-self: start; }
   .cookie-banner { display: block; }
   .cookie-actions { margin-top: 1rem; }
   .admin-shell { display: block; }
