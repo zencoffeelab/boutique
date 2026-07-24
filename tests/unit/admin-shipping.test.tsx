@@ -21,14 +21,14 @@ describe("shipping administration", () => {
   });
 
   it("documents packaging, free shipping and label purchase in the help dialog", () => {
-    const html = renderToStaticMarkup(<ShippingHelp presets={[preset]} thresholds={{ fr: 7_500, euUk: 15_000 }} colissimoMode="compare" />);
+    const html = renderToStaticMarkup(<ShippingHelp presets={[preset]} thresholds={{ fr: 7_500, euUk: 15_000 }} colissimoMode="sendcloud_only" />);
 
     expect(html).toContain("Comprendre les emballages et le franco");
     expect(html).toContain("Carton S");
     expect(html).toContain("75");
     expect(html).toContain("150");
     expect(html).toContain("Acheter les étiquettes");
-    expect(html).toContain("comparaison Shippo / Sendcloud");
+    expect(html).toContain("Sendcloud seul");
     expect(html).toContain("Royaume-Uni");
   });
 });

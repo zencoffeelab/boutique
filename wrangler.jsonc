@@ -7,7 +7,7 @@
   "main": "./workers/app.ts",
   "vars": {
     "NODE_ENV": "production",
-    "COLISSIMO_FR_MODE": "compare"
+    "COLISSIMO_FR_MODE": "sendcloud_only"
   },
   "observability": {
     "enabled": true
