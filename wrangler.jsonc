@@ -6,7 +6,8 @@
   "keep_vars": true,
   "main": "./workers/app.ts",
   "vars": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "COLISSIMO_FR_MODE": "compare"
   },
   "observability": {
     "enabled": true

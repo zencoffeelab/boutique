@@ -21,6 +21,7 @@ async function cartLine() {
 
 function useRealShippingEnvironment() {
   vi.stubEnv("SHIPPING_MOCK", "false");
+  vi.stubEnv("COLISSIMO_FR_MODE", "shippo_only");
   vi.stubEnv("SENDCLOUD_PUBLIC_KEY", "public-key");
   vi.stubEnv("SENDCLOUD_SECRET_KEY", "private-key");
   vi.stubEnv("VITE_SUPABASE_URL", "");
@@ -81,6 +82,48 @@ describe("Sendcloud shipping quotes", () => {
     expect(quote.rates.find((rate) => rate.carrier === "Colissimo")).toMatchObject({ provider: "shippo", shippoRateIds: ["shippo-colissimo-rate"] });
     expect(quote.rates.some((rate) => rate.provider === "sendcloud" && rate.carrier === "Colissimo")).toBe(false);
     expect(publicQuote(quote).rates.find((rate) => rate.carrier === "Colissimo")).not.toHaveProperty("shippoRateIds");
+  });
+
+  it("returns both Shippo and Sendcloud Colissimo rates in comparison mode", async () => {
+    useHybridShippingEnvironment();
+    vi.stubEnv("COLISSIMO_FR_MODE", "compare");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("api.goshippo.com/shipments")) return new Response(JSON.stringify({ rates: [{
+        object_id: "shippo-colissimo-rate", amount: "6.25", currency: "EUR", provider: "Colissimo",
+        estimated_days: 2, servicelevel: { name: "Colissimo Domicile", token: "colissimo_home" },
+      }] }), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ data: [
+        option({ code: "colissimo:home", carrierCode: "colissimo", carrier: "Colissimo", name: "Colissimo France", lastMile: "home_delivery", amount: "7.90" }),
+        option({ code: "fedex:domestic", carrierCode: "fedex", carrier: "FedEx", name: "FedEx Priority", lastMile: "home_delivery", amount: "9.33" }),
+      ] }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+    vi.resetModules();
+    const { createShippingQuote } = await import("~/services/shipping.server");
+    const quote = await createShippingQuote({ cartId: crypto.randomUUID(), locale: "fr-FR", audience: "retail", address, lines: [await cartLine()] });
+    const colissimoRates = quote.rates.filter((rate) => rate.carrier === "Colissimo");
+
+    expect(colissimoRates).toHaveLength(2);
+    expect(colissimoRates.map((rate) => ({ provider: rate.provider, amountCents: rate.amountCents }))).toEqual([
+      { provider: "shippo", amountCents: 625 },
+      { provider: "sendcloud", amountCents: 790 },
+    ]);
+  });
+
+  it("can restore a Sendcloud-only Colissimo mode without calling Shippo", async () => {
+    useHybridShippingEnvironment();
+    vi.stubEnv("COLISSIMO_FR_MODE", "sendcloud_only");
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => new Response(JSON.stringify({ data: [
+      option({ code: "colissimo:home", carrierCode: "colissimo", carrier: "Colissimo", name: "Colissimo France", lastMile: "home_delivery", amount: "7.90" }),
+    ] }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.resetModules();
+    const { createShippingQuote } = await import("~/services/shipping.server");
+    const quote = await createShippingQuote({ cartId: crypto.randomUUID(), locale: "fr-FR", audience: "retail", address, lines: [await cartLine()] });
+
+    expect(quote.rates).toHaveLength(1);
+    expect(quote.rates[0]).toMatchObject({ provider: "sendcloud", carrier: "Colissimo", amountCents: 790 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("sendcloud.sc");
   });
 
   it("reuses the active Sendcloud sender address when dedicated Shippo sender variables are absent", async () => {

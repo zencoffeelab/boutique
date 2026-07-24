@@ -16,6 +16,7 @@ const schema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   SHIPPO_API_TOKEN: z.string().optional(),
   SHIPPO_WEBHOOK_SECRET: z.string().optional(),
+  COLISSIMO_FR_MODE: z.enum(["compare", "shippo_only", "sendcloud_only"]).default("shippo_only"),
   SENDCLOUD_PUBLIC_KEY: z.string().optional(),
   SENDCLOUD_SECRET_KEY: z.string().optional(),
   SENDCLOUD_WEBHOOK_SECRET: z.string().optional(),

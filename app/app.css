@@ -227,6 +227,9 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .pickup-distance { color: var(--green); font-size: .72rem; font-weight: 750; white-space: nowrap; }
 .rate-list { display: grid; gap: .65rem; }
 .rate-option { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .8rem; padding: .9rem; border: 1px solid var(--line); background: white; }
+.rate-option__heading { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; }
+.shipping-provider { display: inline-flex; align-items: center; padding: .18rem .45rem; border: 1px solid currentColor; border-radius: 999px; color: var(--green); font: 700 .62rem/1 var(--sans); letter-spacing: .04em; text-transform: uppercase; }
+.shipping-provider--sendcloud { color: var(--orange); }
 .shipping-rates { margin-top: 2rem; }
 
 .professional-banner { padding: 5rem 1rem; background: var(--green-deep); color: white; text-align: center; }

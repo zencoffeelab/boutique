@@ -151,7 +151,7 @@ async function sendcloudOptionsForParcel(parcel: PackedParcel, address: QuoteAdd
     const carrierCode = asText(option.carrier?.code);
     return Boolean(code) && code !== "sendcloud:letter" && lastMile === expectedLastMile
       && option.functionalities?.tracked !== false && option.functionalities?.form_factor !== "mailbox"
-      && (address.countryCode !== "FR" || !isColissimoCarrier({ code: carrierCode, name: option.carrier?.name }))
+      && (address.countryCode !== "FR" || config.COLISSIMO_FR_MODE !== "shippo_only" || !isColissimoCarrier({ code: carrierCode, name: option.carrier?.name }))
       && (!pickupPoint || carrierCode === pickupPoint.network);
   });
 }
@@ -276,7 +276,10 @@ export async function createShippingQuote(input: { cartId: string; locale: Local
   let rates: StoredRate[];
   if (env().SHIPPING_MOCK) rates = mockRates(parcels, subtotalCents, input.address.countryCode, pickupPoint);
   else {
-    const useShippoColissimo = input.address.countryCode === "FR" && (!pickupPoint || isColissimoCarrier({ code: pickupPoint.network }));
+    const config = env();
+    const useShippoColissimo = config.COLISSIMO_FR_MODE !== "sendcloud_only"
+      && input.address.countryCode === "FR"
+      && (!pickupPoint || isColissimoCarrier({ code: pickupPoint.network }));
     const providers = await Promise.allSettled([
       sendcloudRates(parcels, input.address, subtotalCents, pickupPoint),
       ...(useShippoColissimo ? [shippoColissimoRates(parcels, input.address, pickupPoint)] : []),
