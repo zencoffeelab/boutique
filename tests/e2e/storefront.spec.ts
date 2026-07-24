@@ -20,12 +20,25 @@ test("public header identifies a signed-out visitor", async ({ page }) => {
   }
 });
 
+test("a coffee can be added to the cart directly from the shop", async ({ page }) => {
+  await page.goto("/boutique");
+  const firstProduct = page.locator(".product-card").first();
+  await expect(firstProduct.getByRole("combobox", { name: "Poids" })).toBeVisible();
+  await firstProduct.getByRole("button", { name: "Ajouter au panier" }).click();
+  const drawer = page.getByRole("dialog", { name: "Votre panier" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.locator(".cart-drawer-line")).toHaveCount(1);
+  await expect(page).toHaveURL(/\/boutique$/);
+  await expect(page.getByRole("button", { name: "Panier (1)" })).toBeVisible();
+});
+
 test("French guest can add a coffee and reach checkout", async ({ page }) => {
   const consoleErrors: string[] = []; page.on("console", (message) => { if (message.type() === "error" && !message.text().includes("net::ERR_CONNECTION_RESET")) consoleErrors.push(message.text()); }); page.on("pageerror", (error) => consoleErrors.push(error.message));
   await page.goto("/boutique");
   await expect(page.getByRole("heading", { name: "La boutique café" })).toBeVisible();
   await page.locator(".product-card h3 a").first().click();
-  await page.getByRole("button", { name: /Ajouter au panier/ }).click();
+  await expect(page).toHaveURL(/\/boutique\/[^/]+$/);
+  await page.locator(".purchase-panel").getByRole("button", { name: /Ajouter au panier/ }).click();
   await page.getByRole("button", { name: /Panier \(1\)/ }).click();
   const drawer = page.getByRole("dialog", { name: "Votre panier" });
   await expect(drawer).toBeVisible();
@@ -53,7 +66,8 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
 test("cart drawer removes an item without leaving the current page", async ({ page }) => {
   await page.goto("/boutique");
   await page.locator(".product-card h3 a").first().click();
-  await page.getByRole("button", { name: /Ajouter au panier/ }).click();
+  await expect(page).toHaveURL(/\/boutique\/[^/]+$/);
+  await page.locator(".purchase-panel").getByRole("button", { name: /Ajouter au panier/ }).click();
   await page.getByRole("button", { name: /Panier \(1\)/ }).click();
   const drawer = page.getByRole("dialog", { name: "Votre panier" });
   await drawer.getByRole("button", { name: /Supprimer/ }).click();
@@ -76,7 +90,8 @@ test("English URLs, language switch and professional form are accessible", async
 test("Zone 2 checkout offers Mondial Relay only after pickup-point selection", async ({ page }) => {
   await page.goto("/boutique");
   await page.locator(".product-card h3 a").first().click();
-  await page.getByRole("button", { name: /Ajouter au panier/ }).click();
+  await expect(page).toHaveURL(/\/boutique\/[^/]+$/);
+  await page.locator(".purchase-panel").getByRole("button", { name: /Ajouter au panier/ }).click();
   await page.getByRole("button", { name: /Panier \(1\)/ }).click();
   await page.getByRole("dialog", { name: "Votre panier" }).getByRole("link", { name: "Passer la commande" }).click();
   await page.getByLabel("Prénom").fill("Ada");

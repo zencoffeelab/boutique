@@ -1,6 +1,7 @@
 import { Minus, Plus, ShoppingBag } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useCart } from "~/components/cart/cart-provider";
+import { buildProductCartLine } from "~/domain/cart";
 import { formatMoney } from "~/domain/money";
 import type { Audience, Locale, Product } from "~/domain/types";
 import { dictionary } from "~/lib/i18n";
@@ -22,19 +23,7 @@ export function ProductPurchase({ product, locale, audience = "retail" }: { prod
   const t = dictionary[locale];
   if (!variant || !offer) return <p>{t.soldOut}</p>;
   const add = () => {
-    addItem({
-      productId: product.id,
-      variantId: variant.id,
-      audience,
-      quantity: Math.max(minimum, quantity),
-      preview: {
-        productSlug: product.slug,
-        productNames: { "fr-FR": product.translations["fr-FR"].name, "en-GB": product.translations["en-GB"].name },
-        variantLabel: variant.label,
-        unitPriceCents: offer.price.amount,
-        imageUrl: product.media[0]?.url ?? "",
-      },
-    });
+    addItem(buildProductCartLine({ product, variant, offer, audience, quantity: Math.max(minimum, quantity) }));
     setAdded(true);
   };
   return (

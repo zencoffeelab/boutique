@@ -8,6 +8,9 @@ type CartContextValue = {
   lines: CartLine[];
   itemCount: number;
   hydrated: boolean;
+  drawerOpen: boolean;
+  openDrawer: () => void;
+  closeDrawer: () => void;
   addItem: (item: Omit<CartLine, "quantity"> & { quantity?: number }) => void;
   updateQuantity: (variantId: string, audience: Audience, quantity: number) => void;
   removeItem: (variantId: string, audience: Audience) => void;
@@ -19,6 +22,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   useEffect(() => {
     const stored = safeJson<CartLine[]>(window.localStorage.getItem(storageKey), []);
     setLines((current) => current.length > 0 ? current : stored.filter((line) => Number.isSafeInteger(line.quantity) && line.quantity > 0));
@@ -45,15 +49,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setLines((current) => current.filter((line) => line.variantId !== variantId || line.audience !== audience));
   }, []);
   const clear = useCallback(() => setLines([]), []);
+  const openDrawer = useCallback(() => setDrawerOpen(true), []);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
   const value = useMemo(() => ({
     lines,
     itemCount: lines.reduce((total, line) => total + line.quantity, 0),
     hydrated,
+    drawerOpen,
+    openDrawer,
+    closeDrawer,
     addItem,
     updateQuantity,
     removeItem,
     clear,
-  }), [addItem, clear, hydrated, lines, removeItem, updateQuantity]);
+  }), [addItem, clear, closeDrawer, drawerOpen, hydrated, lines, openDrawer, removeItem, updateQuantity]);
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 

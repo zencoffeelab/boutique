@@ -23,7 +23,7 @@ export default function Shop() {
     <section className="page-shell section" aria-label={english ? "Coffee catalogue" : "Catalogue de cafés"}>
       <div className="filter-bar"><span>{products.length} {english ? "coffees" : "cafés"}</span><span>{english ? "Roasted every week in Tours" : "Torréfiés chaque semaine à Tours"}</span></div>
       {products.length > 0
-        ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} />)}</div>
+        ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} quickAdd />)}</div>
         : <div className="empty-state"><h2>{english ? "No coffee is available right now." : "Aucun café n’est disponible pour le moment."}</h2><p>{english ? "Our next freshly roasted selection is coming soon." : "Notre prochaine sélection fraîchement torréfiée arrive bientôt."}</p></div>}
     </section>
   </>;

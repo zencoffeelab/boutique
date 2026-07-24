@@ -1,10 +1,38 @@
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, ShoppingBag } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
+import { useCart } from "~/components/cart/cart-provider";
+import { buildProductCartLine } from "~/domain/cart";
 import type { Audience, Locale, Product } from "~/domain/types";
 import { formatMoney } from "~/domain/money";
 import { dictionary } from "~/lib/i18n";
 
-export function ProductCard({ product, locale, audience }: { product: Product; locale: Locale; audience?: Audience }) {
+function ProductCardQuickAdd({ product, locale, audience }: { product: Product; locale: Locale; audience: Audience }) {
+  const purchasableVariants = product.variants.filter((variant) => {
+    const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active);
+    return offer ? variant.stockOnHand - variant.stockReserved >= offer.minimumQuantity : false;
+  });
+  const [variantId, setVariantId] = useState(purchasableVariants[0]?.id ?? "");
+  const { addItem, hydrated, openDrawer } = useCart();
+  const selectedVariant = purchasableVariants.find((variant) => variant.id === variantId);
+  const selectedOffer = selectedVariant?.offers.find((offer) => offer.audience === audience && offer.active);
+  const add = () => {
+    if (!selectedVariant || !selectedOffer) return;
+    addItem(buildProductCartLine({ product, variant: selectedVariant, offer: selectedOffer, audience, quantity: selectedOffer.minimumQuantity }));
+    openDrawer();
+  };
+  return <div className="product-card__quick-add">
+    <label><span>{dictionary[locale].weight}</span><select value={variantId} onChange={(event) => setVariantId(event.target.value)} disabled={purchasableVariants.length === 0}>
+      {purchasableVariants.map((variant) => {
+        const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active)!;
+        return <option value={variant.id} key={variant.id}>{variant.label} — {formatMoney(offer.price.amount, locale)}</option>;
+      })}
+    </select></label>
+    <button className="button button--dark" type="button" onClick={add} disabled={!hydrated || !selectedVariant || !selectedOffer}><ShoppingBag aria-hidden="true" />{purchasableVariants.length === 0 ? dictionary[locale].soldOut : dictionary[locale].addToCart}</button>
+  </div>;
+}
+
+export function ProductCard({ product, locale, audience, quickAdd = false }: { product: Product; locale: Locale; audience?: Audience; quickAdd?: boolean }) {
   const translation = product.translations[locale];
   const resolvedAudience = audience ?? product.variants.flatMap((variant) => variant.offers)[0]?.audience ?? "retail";
   const baseHref = locale === "fr-FR" ? `/boutique/${product.slug}` : `/en/shop/${product.slug}`;
@@ -24,6 +52,7 @@ export function ProductCard({ product, locale, audience }: { product: Product; l
       <ul className="taste-list" aria-label={dictionary[locale].tasting}>
         {translation.tastingNotes.map((note) => <li key={note}>{note}</li>)}
       </ul>
+      {quickAdd ? <ProductCardQuickAdd product={product} locale={locale} audience={resolvedAudience} /> : null}
     </article>
   );
 }

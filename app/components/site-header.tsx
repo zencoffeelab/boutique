@@ -11,8 +11,7 @@ export function SiteHeader({ signedIn }: { signedIn: boolean }) {
   const locale = location.pathname === "/en" || location.pathname.startsWith("/en/") ? "en-GB" : "fr-FR";
   const t = dictionary[locale];
   const [menuOpen, setMenuOpen] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
-  const { itemCount } = useCart();
+  const { itemCount, drawerOpen, openDrawer, closeDrawer } = useCart();
   const paths = locale === "fr-FR"
     ? { home: "/", shop: "/boutique", professional: "/professionnel", advice: "/conseils", about: "/a-propos", cart: "/panier", account: "/mon-compte" }
     : { home: "/en", shop: "/en/shop", professional: "/en/professional", advice: "/en/tips", about: "/en/about-us", cart: "/en/cart", account: "/en/my-account" };
@@ -41,12 +40,12 @@ export function SiteHeader({ signedIn }: { signedIn: boolean }) {
         <div className="header-actions">
           <Link className="language-link" to={alternatePath(location.pathname)}>{locale === "fr-FR" ? "EN" : "FR"}</Link>
           <Link className={`icon-button account-button${signedIn ? " is-signed-in" : ""}`} to={paths.account} aria-label={accountLabel} title={accountLabel}><AccountIcon aria-hidden="true" /></Link>
-          <button className="icon-button cart-button" type="button" onClick={() => { closeMenu(); setCartOpen(true); }} aria-label={`${t.cart} (${itemCount})`} aria-expanded={cartOpen} aria-controls="cart-drawer">
+          <button className="icon-button cart-button" type="button" onClick={() => { closeMenu(); openDrawer(); }} aria-label={`${t.cart} (${itemCount})`} aria-expanded={drawerOpen} aria-controls="cart-drawer">
             <ShoppingBag aria-hidden="true" /><span>{itemCount}</span>
           </button>
         </div>
       </header>
-      <CartDrawer open={cartOpen} locale={locale} onClose={() => setCartOpen(false)} />
+      <CartDrawer open={drawerOpen} locale={locale} onClose={closeDrawer} />
     </>
   );
 }
