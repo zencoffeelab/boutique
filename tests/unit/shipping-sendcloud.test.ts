@@ -27,6 +27,14 @@ function useRealShippingEnvironment() {
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
 }
 
+function useHybridShippingEnvironment() {
+  useRealShippingEnvironment();
+  vi.stubEnv("SHIPPO_API_TOKEN", "shippo-token");
+  vi.stubEnv("SHIP_FROM_STREET1", "1 rue du Café");
+  vi.stubEnv("SHIP_FROM_POSTAL_CODE", "37000");
+  vi.stubEnv("SHIP_FROM_PHONE", "+33200000000");
+}
+
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.resetModules(); });
 
 describe("Sendcloud shipping quotes", () => {
@@ -49,6 +57,83 @@ describe("Sendcloud shipping quotes", () => {
 
     expect(quote.rates.map((rate) => rate.carrier)).toEqual(["Mondial Relay", "FedEx"]);
     expect(quote.rates.every((rate) => rate.deliveryMethod === "home")).toBe(true);
+  });
+
+  it("uses Shippo exclusively for Colissimo deliveries in France", async () => {
+    useHybridShippingEnvironment();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("api.goshippo.com/shipments")) return new Response(JSON.stringify({ rates: [{
+        object_id: "shippo-colissimo-rate", amount: "6.25", currency: "EUR", provider: "Colissimo",
+        estimated_days: 2, servicelevel: { name: "Colissimo Domicile", token: "colissimo_home" },
+      }] }), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ data: [
+        option({ code: "colissimo:home", carrierCode: "colissimo", carrier: "Colissimo", name: "Colissimo France", lastMile: "home_delivery", amount: "7.90" }),
+        option({ code: "fedex:domestic", carrierCode: "fedex", carrier: "FedEx", name: "FedEx Priority", lastMile: "home_delivery", amount: "9.33" }),
+      ] }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.resetModules();
+    const { createShippingQuote, publicQuote } = await import("~/services/shipping.server");
+    const quote = await createShippingQuote({ cartId: crypto.randomUUID(), locale: "fr-FR", audience: "retail", address, lines: [await cartLine()] });
+
+    expect(quote.rates).toHaveLength(2);
+    expect(quote.rates.find((rate) => rate.carrier === "Colissimo")).toMatchObject({ provider: "shippo", shippoRateIds: ["shippo-colissimo-rate"] });
+    expect(quote.rates.some((rate) => rate.provider === "sendcloud" && rate.carrier === "Colissimo")).toBe(false);
+    expect(publicQuote(quote).rates.find((rate) => rate.carrier === "Colissimo")).not.toHaveProperty("shippoRateIds");
+  });
+
+  it("reuses the active Sendcloud sender address when dedicated Shippo sender variables are absent", async () => {
+    useHybridShippingEnvironment();
+    vi.stubEnv("SHIP_FROM_STREET1", "");
+    vi.stubEnv("SHIP_FROM_POSTAL_CODE", "");
+    vi.stubEnv("SHIP_FROM_PHONE", "");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("sender-addresses")) return new Response(JSON.stringify({ data: [{ is_active: true, name: "Zen", company_name: "Zen Coffee Lab", house_number: "10", address_line_1: "rue du Test", city: "Tours", postal_code: "37000", country_code: "FR", phone_number: "+33200000000", email: "contact@example.com" }] }), { status: 200 });
+      if (url.includes("api.goshippo.com/shipments")) {
+        expect(JSON.parse(String(init?.body)).address_from).toMatchObject({ street1: "10 rue du Test", zip: "37000", country: "FR" });
+        return new Response(JSON.stringify({ rates: [{ object_id: "shippo-colissimo-rate", amount: "6.25", currency: "EUR", provider: "Colissimo", servicelevel: { name: "Colissimo Domicile", token: "colissimo_home" } }] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ data: [option({ code: "fedex:domestic", carrierCode: "fedex", carrier: "FedEx", name: "FedEx Priority", lastMile: "home_delivery", amount: "9.33" })] }), { status: 200 });
+    }));
+    vi.resetModules();
+    const { createShippingQuote } = await import("~/services/shipping.server");
+    const quote = await createShippingQuote({ cartId: crypto.randomUUID(), locale: "fr-FR", audience: "retail", address, lines: [await cartLine()] });
+
+    expect(quote.rates.map((rate) => rate.carrier)).toEqual(["Colissimo", "FedEx"]);
+  });
+
+  it("never falls back to Sendcloud Colissimo in France when Shippo fails", async () => {
+    useHybridShippingEnvironment();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("api.goshippo.com/shipments")) return new Response("unavailable", { status: 503 });
+      return new Response(JSON.stringify({ data: [
+        option({ code: "colissimo:home", carrierCode: "colissimo", carrier: "Colissimo", name: "Colissimo France", lastMile: "home_delivery", amount: "7.90" }),
+        option({ code: "fedex:domestic", carrierCode: "fedex", carrier: "FedEx", name: "FedEx Priority", lastMile: "home_delivery", amount: "9.33" }),
+      ] }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+    vi.resetModules();
+    const { createShippingQuote } = await import("~/services/shipping.server");
+    const quote = await createShippingQuote({ cartId: crypto.randomUUID(), locale: "fr-FR", audience: "retail", address, lines: [await cartLine()] });
+
+    expect(quote.rates.map((rate) => rate.carrier)).toEqual(["FedEx"]);
+  });
+
+  it("keeps Sendcloud Colissimo outside France and does not call Shippo", async () => {
+    useHybridShippingEnvironment();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => new Response(JSON.stringify({ data: [
+      option({ code: "colissimo:international", carrierCode: "colissimo", carrier: "Colissimo", name: "Colissimo International", lastMile: "home_delivery", amount: "12.40" }),
+    ] }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.resetModules();
+    const { createShippingQuote } = await import("~/services/shipping.server");
+    const quote = await createShippingQuote({ cartId: crypto.randomUUID(), locale: "fr-FR", audience: "retail", address: { ...address, countryCode: "DE", postalCode: "10115", city: "Berlin" }, lines: [await cartLine()] });
+
+    expect(quote.rates[0]).toMatchObject({ provider: "sendcloud", carrier: "Colissimo" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("sendcloud.sc");
   });
 
   it("validates a service point and returns only its compatible pickup options", async () => {

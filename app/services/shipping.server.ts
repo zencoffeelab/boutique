@@ -14,8 +14,10 @@ export type QuoteAddress = {
 };
 
 type StoredRate = ShippingRate & {
-  sendcloudShippingOptionCodes: string[];
-  sendcloudParcelAmountsCents: number[];
+  sendcloudShippingOptionCodes?: string[];
+  sendcloudParcelAmountsCents?: number[];
+  shippoRateIds?: string[];
+  serviceToken?: string;
 };
 export type ShippingQuoteRecord = {
   id: string; cartId: string; locale: Locale; audience: Audience; address: QuoteAddress;
@@ -68,6 +70,39 @@ function mockRates(parcels: PackedParcel[], subtotalCents: number, countryCode: 
 }
 
 function asText(value: unknown) { return typeof value === "string" ? value.trim() : ""; }
+function normalizedCarrier(value: unknown) { return asText(value).toLocaleLowerCase("fr-FR").replaceAll(/[^a-z0-9]+/g, ""); }
+export function isColissimoCarrier(input: { code?: unknown; name?: unknown; serviceToken?: unknown }) {
+  return [input.code, input.name, input.serviceToken].some((value) => normalizedCarrier(value).includes("colissimo"));
+}
+
+type SendcloudSenderAddress = {
+  is_active?: unknown; name?: unknown; company_name?: unknown; address_line_1?: unknown; address_line_2?: unknown;
+  house_number?: unknown; city?: unknown; postal_code?: unknown; country_code?: unknown; phone_number?: unknown; email?: unknown;
+};
+
+async function fromAddress() {
+  const config = env();
+  if (config.SHIP_FROM_STREET1 && config.SHIP_FROM_POSTAL_CODE && config.SHIP_FROM_PHONE) {
+    return { name: config.SHIP_FROM_NAME, company: config.SHIP_FROM_COMPANY, street1: config.SHIP_FROM_STREET1, street2: config.SHIP_FROM_STREET2 ?? "", city: config.SHIP_FROM_CITY, zip: config.SHIP_FROM_POSTAL_CODE, country: config.SHIP_FROM_COUNTRY, phone: config.SHIP_FROM_PHONE, email: config.SHIP_FROM_EMAIL };
+  }
+  const response = await fetch("https://panel.sendcloud.sc/api/v3/addresses/sender-addresses", {
+    headers: { authorization: sendcloudAuthorization(), accept: "application/json" },
+    signal: AbortSignal.timeout(10_000),
+  });
+  const result = await response.json().catch(() => null) as { data?: SendcloudSenderAddress[] } | null;
+  const sender = result?.data?.find((address) => address.is_active !== false) ?? result?.data?.[0];
+  const street1 = [asText(sender?.house_number), asText(sender?.address_line_1)].filter(Boolean).join(" ");
+  const postalCode = asText(sender?.postal_code);
+  const phone = asText(sender?.phone_number);
+  if (!response.ok || !sender || !street1 || !postalCode || !phone) throw new Error("The Shippo sender address is incomplete in Sendcloud.");
+  return {
+    name: asText(sender.name) || config.SHIP_FROM_NAME, company: asText(sender.company_name) || config.SHIP_FROM_COMPANY,
+    street1, street2: asText(sender.address_line_2), city: asText(sender.city) || config.SHIP_FROM_CITY,
+    zip: postalCode, country: asText(sender.country_code) || config.SHIP_FROM_COUNTRY, phone,
+    email: asText(sender.email) || config.SHIP_FROM_EMAIL,
+  };
+}
+
 function sendcloudAuthorization() {
   const config = env();
   if (!config.SENDCLOUD_PUBLIC_KEY || !config.SENDCLOUD_SECRET_KEY) throw new Error("Sendcloud is not configured.");
@@ -116,12 +151,12 @@ async function sendcloudOptionsForParcel(parcel: PackedParcel, address: QuoteAdd
     const carrierCode = asText(option.carrier?.code);
     return Boolean(code) && code !== "sendcloud:letter" && lastMile === expectedLastMile
       && option.functionalities?.tracked !== false && option.functionalities?.form_factor !== "mailbox"
+      && (address.countryCode !== "FR" || !isColissimoCarrier({ code: carrierCode, name: option.carrier?.name }))
       && (!pickupPoint || carrierCode === pickupPoint.network);
   });
 }
 
 async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, subtotalCents: number, pickupPoint?: PickupPoint): Promise<StoredRate[]> {
-  const config = env();
   const optionsByParcel = await Promise.all(parcels.map((parcel) => sendcloudOptionsForParcel(parcel, address, pickupPoint)));
   if (optionsByParcel.some((options) => options.length === 0)) throw new Error("No matching Sendcloud service is available for this parcel.");
 
@@ -156,13 +191,74 @@ async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, su
     }];
   });
 
-  const sortedRates = rates.toSorted((left, right) => left.amountCents - right.amountCents || left.carrier.localeCompare(right.carrier));
-  const threshold = freeShippingThresholdCents(address.countryCode, { fr: config.FREE_SHIPPING_FR_CENTS, euUk: config.FREE_SHIPPING_EU_UK_CENTS });
-  if (threshold !== null && subtotalCents >= threshold && rates.length) {
-    const cheapest = sortedRates[0];
-    return sortedRates.map((rate) => rate.id === cheapest.id ? { ...rate, amountCents: 0, freeShippingApplied: true } : rate);
-  }
-  return sortedRates;
+  return rates;
+}
+
+type ShippoRate = { object_id?: unknown; amount?: unknown; currency?: unknown; provider?: unknown; estimated_days?: unknown; servicelevel?: { name?: unknown; token?: unknown } };
+
+async function shippoColissimoRates(parcels: PackedParcel[], address: QuoteAddress, pickupPoint?: PickupPoint): Promise<StoredRate[]> {
+  const config = env();
+  if (!config.SHIPPO_API_TOKEN) throw new Error("Shippo is not configured.");
+  const senderAddress = await fromAddress();
+  const shipments = await Promise.all(parcels.map(async (parcel) => {
+    const payload: Record<string, unknown> = {
+      address_from: senderAddress,
+      address_to: { name: `${address.firstName} ${address.lastName}`, company: address.company ?? "", street1: address.line1, street2: address.line2 ?? "", city: address.city, zip: address.postalCode, country: address.countryCode, phone: address.phone, email: address.email },
+      parcels: [{ length: String(parcel.lengthCm), width: String(parcel.widthCm), height: String(parcel.heightCm), distance_unit: "cm", weight: String(parcel.shippingWeightGrams), mass_unit: "g" }],
+      async: false,
+      ...(pickupPoint ? { extra: { location_external_id: pickupPoint.id } } : {}),
+    };
+    const response = await fetch("https://api.goshippo.com/shipments/", {
+      method: "POST",
+      headers: { authorization: `ShippoToken ${config.SHIPPO_API_TOKEN}`, "content-type": "application/json", "shippo-api-version": "2018-02-08" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!response.ok) throw new Error(`Shippo rate request failed (${response.status}).`);
+    const data = await response.json() as { rates?: ShippoRate[] };
+    return (data.rates ?? []).filter((rate) => {
+      const token = asText(rate.servicelevel?.token);
+      const pickupService = token === "colissimo_pick_up_point";
+      return asText(rate.currency).toUpperCase() === "EUR"
+        && isColissimoCarrier({ name: rate.provider, serviceToken: token })
+        && (pickupPoint ? pickupService : !pickupService);
+    });
+  }));
+  if (shipments.some((rates) => rates.length === 0)) return [];
+
+  const byService = new Map<string, ShippoRate[][]>();
+  shipments.forEach((rates, parcelIndex) => rates.forEach((rate) => {
+    const token = asText(rate.servicelevel?.token);
+    const key = `${asText(rate.provider)}:${token || asText(rate.servicelevel?.name)}`;
+    const groups = byService.get(key) ?? Array.from({ length: parcels.length }, () => [] as ShippoRate[]);
+    groups[parcelIndex].push(rate);
+    byService.set(key, groups);
+  }));
+  return [...byService.values()].flatMap((groups) => {
+    if (!groups.every((rates) => rates[0])) return [];
+    const selected = groups.map((rates) => rates[0]);
+    const amounts = selected.map((rate) => Math.round(Number(rate.amount) * 100));
+    const rateIds = selected.map((rate) => asText(rate.object_id));
+    if (amounts.some((amount) => !Number.isFinite(amount) || amount < 0) || rateIds.some((id) => !id)) return [];
+    const token = asText(selected[0].servicelevel?.token);
+    const days = selected.map((rate) => Number(rate.estimated_days)).filter(Number.isFinite);
+    return [{
+      id: randomUUID(), provider: "shippo" as const, carrier: "Colissimo",
+      service: asText(selected[0].servicelevel?.name) || (pickupPoint ? "Point Retrait" : "Domicile"),
+      serviceToken: token, deliveryMethod: pickupPoint ? "pickup" as const : "home" as const,
+      ...(pickupPoint ? { pickupPoint } : {}), amountCents: amounts.reduce((sum, amount) => sum + amount, 0),
+      currency: "EUR" as const, estimatedDays: days.length ? Math.max(...days) : null,
+      freeShippingApplied: false, shippoRateIds: rateIds,
+    }];
+  });
+}
+
+function applyFreeShipping(rates: StoredRate[], countryCode: string, subtotalCents: number): StoredRate[] {
+  const sorted = rates.toSorted((left, right) => left.amountCents - right.amountCents || left.carrier.localeCompare(right.carrier));
+  const config = env();
+  const threshold = freeShippingThresholdCents(countryCode, { fr: config.FREE_SHIPPING_FR_CENTS, euUk: config.FREE_SHIPPING_EU_UK_CENTS });
+  if (threshold === null || subtotalCents < threshold || !sorted.length) return sorted;
+  return sorted.map((rate, index) => index === 0 ? { ...rate, amountCents: 0, freeShippingApplied: true } : rate);
 }
 
 async function storeQuote(quote: ShippingQuoteRecord) {
@@ -177,10 +273,18 @@ export async function createShippingQuote(input: { cartId: string; locale: Local
   const subtotalCents = lines.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0);
   const parcels = packCartByWeight(lines, await getPackagingPresets());
   const pickupPoint = input.pickupPointId ? await getPickupPointById({ id: input.pickupPointId, locale: input.locale, countryCode: input.address.countryCode }) : undefined;
-  const rates = env().SHIPPING_MOCK
-    ? mockRates(parcels, subtotalCents, input.address.countryCode, pickupPoint)
-    : await sendcloudRates(parcels, input.address, subtotalCents, pickupPoint);
-  if (rates.length === 0) throw new Error("No matching Sendcloud shipping service is available for all parcels.");
+  let rates: StoredRate[];
+  if (env().SHIPPING_MOCK) rates = mockRates(parcels, subtotalCents, input.address.countryCode, pickupPoint);
+  else {
+    const useShippoColissimo = input.address.countryCode === "FR" && (!pickupPoint || isColissimoCarrier({ code: pickupPoint.network }));
+    const providers = await Promise.allSettled([
+      sendcloudRates(parcels, input.address, subtotalCents, pickupPoint),
+      ...(useShippoColissimo ? [shippoColissimoRates(parcels, input.address, pickupPoint)] : []),
+    ]);
+    rates = applyFreeShipping(providers.flatMap((result) => result.status === "fulfilled" ? result.value : []), input.address.countryCode, subtotalCents);
+    providers.filter((result) => result.status === "rejected").forEach((result) => console.error("shipping_provider_quote_failed", { message: result.reason instanceof Error ? result.reason.message : String(result.reason) }));
+  }
+  if (rates.length === 0) throw new Error("No matching shipping service is available for all parcels.");
   const quote: ShippingQuoteRecord = { id: randomUUID(), cartId: input.cartId, locale: input.locale, audience: input.audience, address: input.address, lines, parcels, rates, subtotalCents, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() };
   await storeQuote(quote); return quote;
 }
@@ -208,6 +312,6 @@ export function publicQuote(quote: ShippingQuoteRecord) {
     expiresAt: quote.expiresAt,
     subtotalCents: quote.subtotalCents,
     parcels: quote.parcels.map(({ presetName, shippingWeightGrams }) => ({ presetName, shippingWeightGrams })),
-    rates: quote.rates.map(({ sendcloudShippingOptionCodes: _, sendcloudParcelAmountsCents: __, ...rate }) => rate),
+    rates: quote.rates.map(({ sendcloudShippingOptionCodes: _, sendcloudParcelAmountsCents: __, shippoRateIds: ___, serviceToken: ____, ...rate }) => rate),
   };
 }
