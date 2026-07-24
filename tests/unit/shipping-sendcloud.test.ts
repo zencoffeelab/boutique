@@ -80,6 +80,7 @@ describe("Sendcloud zoned shipping quotes", () => {
       if (url.includes("servicepoints.sendcloud.sc")) return new Response(JSON.stringify({ id: 10445088, is_active: true, name: "Berlin PaketShop", street: "Hauptstrasse", house_number: "1", postal_code: "10115", city: "Berlin", country: "DE", carrier: "mondial_relay", general_shop_type: "servicepoint" }), { status: 200 });
       expect(JSON.parse(String(init?.body))).toMatchObject({ carrier_code: "mondial_relay", functionalities: { last_mile: "service_point" }, to_service_point: { id: 10445088 } });
       return new Response(JSON.stringify({ data: [
+        option({ code: "mondial_relay:service_point,international_dualapi_qr/c2c", carrierCode: "mondial_relay", carrier: "Mondial Relay", name: "Mondial Relay Point Relais International QR", lastMile: "service_point", amount: "6.10" }),
         option({ code: "mondial_relay:service_point,international_dualapi/c2c", carrierCode: "mondial_relay", carrier: "Mondial Relay", name: "Mondial Relay Point Relais International", lastMile: "service_point", amount: "6.25" }),
       ] }), { status: 200 });
     }));

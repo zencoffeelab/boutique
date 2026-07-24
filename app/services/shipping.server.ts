@@ -176,7 +176,9 @@ async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, pi
     const selected = selectedByService.get(service);
     const actualCost = rate.sendcloudParcelAmountsCents?.reduce((sum, amount) => sum + amount, 0) ?? Number.POSITIVE_INFINITY;
     const selectedCost = selected?.sendcloudParcelAmountsCents?.reduce((sum, amount) => sum + amount, 0) ?? Number.POSITIVE_INFINITY;
-    if (!selected || actualCost < selectedCost) selectedByService.set(service, rate);
+    const qrVariant = rate.sendcloudShippingOptionCodes?.some((code) => code.includes("_qr")) ?? false;
+    const selectedQrVariant = selected?.sendcloudShippingOptionCodes?.some((code) => code.includes("_qr")) ?? false;
+    if (!selected || (selectedQrVariant && !qrVariant) || (selectedQrVariant === qrVariant && actualCost < selectedCost)) selectedByService.set(service, rate);
   }
   const orderedServices = configuredShippingServicesForDelivery(address.countryCode, pickupPoint ? "pickup" : "home");
   return orderedServices.flatMap((service) => {
