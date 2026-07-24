@@ -22,10 +22,10 @@ describe("commerce boundaries", () => {
     const response = await shippingQuoteAction({ request, params: {}, context: {} } as never); const data = await response.json();
     expect(response.status).toBe(200); expect(data.parcels[0].shippingWeightGrams).toBe(580); expect(data.rates[0]).not.toHaveProperty("sendcloudShippingOptionCodes");
   });
-  it("rejects pickup delivery while only Sendcloud home delivery is enabled", async () => {
+  it("returns a pickup rate for a selected Sendcloud service point", async () => {
     const product = (await getProducts({ status: "published" }))[0]; const variant = product.variants[0];
-    const request = new Request("http://localhost/api/shipping/quote", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cartId: crypto.randomUUID(), locale: "fr-FR", lines: [{ productId: product.id, variantId: variant.id, audience: "retail", quantity: 1 }], pickupPointId: "370000", address: { firstName: "Ada", lastName: "Lovelace", company: "", email: "ada@example.com", phone: "0600000000", line1: "1 rue du Café", line2: "", postalCode: "37000", city: "Tours", countryCode: "FR" } }) });
+    const request = new Request("http://localhost/api/shipping/quote", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cartId: crypto.randomUUID(), locale: "fr-FR", lines: [{ productId: product.id, variantId: variant.id, audience: "retail", quantity: 1 }], pickupPointId: "100001", address: { firstName: "Ada", lastName: "Lovelace", company: "", email: "ada@example.com", phone: "0600000000", line1: "1 rue du Café", line2: "", postalCode: "37000", city: "Tours", countryCode: "FR" } }) });
     const response = await shippingQuoteAction({ request, params: {}, context: {} } as never); const data = await response.json();
-    expect(response.status).toBe(422); expect(data.message).toContain("Sendcloud");
+    expect(response.status).toBe(200); expect(data.rates[0]).toMatchObject({ deliveryMethod: "pickup", carrier: "Mondial Relay", pickupPoint: { id: "100001" } });
   });
 });

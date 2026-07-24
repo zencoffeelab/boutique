@@ -51,9 +51,9 @@ La finalisation d’une vente intervient uniquement dans `finalize_paid_order`, 
 ## Configuration externe
 
 - Stripe : webhook `/api/webhooks/stripe`, événements `checkout.session.completed`, `checkout.session.expired` et `charge.refunded`.
-- Sendcloud : prestataire unique pour les nouveaux devis et achats d’étiquettes via l’API v3. Renseigner `SENDCLOUD_PUBLIC_KEY` et `SENDCLOUD_SECRET_KEY`. Configurer le webhook sur `https://<domaine-production>/api/webhooks/sendcloud?secret=<SENDCLOUD_WEBHOOK_SECRET>`. Une erreur Sendcloud bloque l’achat ; aucun repli Shippo n’est effectué. L’annulation utilise également l’API v3.
+- Sendcloud : prestataire unique pour les nouveaux devis et achats d’étiquettes via l’API v3. Renseigner `SENDCLOUD_PUBLIC_KEY` et `SENDCLOUD_SECRET_KEY`. Tous les transporteurs activés et compatibles avec le colis sont proposés, triés par prix. Configurer le webhook sur `https://<domaine-production>/api/webhooks/sendcloud?secret=<SENDCLOUD_WEBHOOK_SECRET>`. Une erreur Sendcloud bloque l’achat ; aucun repli Shippo n’est effectué. L’annulation utilise également l’API v3.
 - Shippo : désactivé pour les nouveaux devis et les nouvelles étiquettes. Les clés et le webhook restent temporairement disponibles uniquement pour suivre ou rembourser les étiquettes historiques déjà achetées.
-- Points relais : temporairement masqués jusqu’à l’association des identifiants de points relais avec les options Sendcloud v3. La livraison à domicile Sendcloud reste active.
+- Points relais : la recherche utilise l’API Sendcloud Service Points et affiche les réseaux activés, notamment Mondial Relay et Colissimo. Le point choisi est revalidé avant le devis puis transmis à l’achat de l’étiquette Sendcloud v3.
 - Franco : `FREE_SHIPPING_FR_CENTS=7500` et `FREE_SHIPPING_EU_UK_CENTS=15000`, distincts par environnement.
 - Resend : domaine d’envoi validé et `RESEND_FROM_EMAIL` ; toute communication passe par l’outbox.
 - GA4 : uniquement `VITE_GA_MEASUREMENT_ID`, chargé après consentement. Aucun événement ne doit contenir d’e-mail, téléphone, adresse ou nom.

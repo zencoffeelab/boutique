@@ -55,4 +55,25 @@ describe("Sendcloud labels", () => {
       parcels: [{ weight: { value: "0.380", unit: "kg" } }],
     });
   });
+
+  it("attaches the selected service point to a pickup shipment", async () => {
+    vi.stubEnv("SENDCLOUD_PUBLIC_KEY", "public-key");
+    vi.stubEnv("SENDCLOUD_SECRET_KEY", "private-key");
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 17 }] }), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
+        id: "shipment-52", carrier: { name: "Mondial Relay" },
+        parcels: [{ id: 43, status: { code: "READY_TO_SEND" }, documents: [{ type: "label", link: "https://panel.sendcloud.sc/api/v3/parcels/43/documents/label" }] }],
+      } }), { status: 201, headers: { "content-type": "application/json" } })));
+    vi.resetModules();
+    const { createSendcloudLabel } = await import("~/services/sendcloud-labels.server");
+
+    await createSendcloudLabel({
+      orderNumber: "ZCL-2026-000002", address: { firstName: "Ada", lastName: "Lovelace", email: "ada@example.com", phone: "+33600000000", line1: "1 rue du Café", postalCode: "37000", city: "Tours", countryCode: "FR" },
+      lines: [line], parcel, pickupPointId: "10575092", rate: { sendcloudShippingOptionCode: "mondial_relay:service_point", sendcloudActualCostCents: 391 },
+    });
+
+    const [, init] = vi.mocked(fetch).mock.calls[1];
+    expect(JSON.parse(String(init?.body))).toMatchObject({ to_service_point: { id: 10575092 } });
+  });
 });

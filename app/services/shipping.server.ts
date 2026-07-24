@@ -1,11 +1,12 @@
 import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
-import type { Audience, Locale, PackedParcel, ResolvedCartLine, ShippingRate } from "~/domain/types";
+import type { Audience, Locale, PackedParcel, PickupPoint, ResolvedCartLine, ShippingRate } from "~/domain/types";
 import { packCartByWeight } from "~/domain/packing";
 import { freeShippingThresholdCents } from "~/domain/money";
 import { getPackagingPresets, resolveCartLines } from "~/lib/catalog.server";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
+import { getPickupPointById } from "~/services/pickup-points.server";
 
 export type QuoteAddress = {
   firstName: string; lastName: string; company?: string; email: string; phone: string;
@@ -25,24 +26,43 @@ type SendcloudOption = {
   code?: unknown;
   name?: unknown;
   carrier?: { code?: unknown; name?: unknown };
+  functionalities?: { last_mile?: unknown; tracked?: unknown; form_factor?: unknown };
   quotes?: Array<{ price?: { total?: { value?: unknown; currency?: unknown } }; lead_time?: unknown }>;
 };
 
 const localQuotes = new Map<string, ShippingQuoteRecord>();
 
-function mockRates(parcels: PackedParcel[], subtotalCents: number, countryCode: string): StoredRate[] {
+function mockRates(parcels: PackedParcel[], subtotalCents: number, countryCode: string, pickupPoint?: PickupPoint): StoredRate[] {
   const totalWeight = parcels.reduce((sum, parcel) => sum + parcel.shippingWeightGrams, 0);
   const parcelSupplement = Math.max(0, parcels.length - 1) * 390;
   const baseEconomy = 490 + Math.ceil(totalWeight / 1000) * 110 + parcelSupplement;
   const config = env();
   const threshold = freeShippingThresholdCents(countryCode, { fr: config.FREE_SHIPPING_FR_CENTS, euUk: config.FREE_SHIPPING_EU_UK_CENTS });
   const free = threshold !== null && subtotalCents >= threshold;
+  if (pickupPoint) return [{
+    id: randomUUID(), provider: "mock", carrier: "Mondial Relay", service: pickupPoint.type === "locker" ? "Consigne" : "Point Relais",
+    deliveryMethod: "pickup", pickupPoint, amountCents: free ? 0 : Math.max(0, baseEconomy - 150), currency: "EUR",
+    estimatedDays: 3, freeShippingApplied: free, sendcloudShippingOptionCodes: parcels.map(() => "mock:pickup"),
+    sendcloudParcelAmountsCents: parcels.map((_, index) => index === 0 ? baseEconomy - parcelSupplement - 150 : 390),
+  }];
   return [
     {
       id: randomUUID(), provider: "mock", carrier: "Colissimo", service: "Domicile", deliveryMethod: "home",
       amountCents: free ? 0 : baseEconomy, currency: "EUR", estimatedDays: countryCode === "FR" ? 2 : 5,
       freeShippingApplied: free, sendcloudShippingOptionCodes: parcels.map(() => "mock:home"),
       sendcloudParcelAmountsCents: parcels.map((_, index) => index === 0 ? baseEconomy - parcelSupplement : 390),
+    },
+    {
+      id: randomUUID(), provider: "mock", carrier: "Mondial Relay", service: "Domicile", deliveryMethod: "home",
+      amountCents: baseEconomy + 80, currency: "EUR", estimatedDays: 3, freeShippingApplied: false,
+      sendcloudShippingOptionCodes: parcels.map(() => "mock:mondial-relay-home"),
+      sendcloudParcelAmountsCents: parcels.map((_, index) => index === 0 ? baseEconomy - parcelSupplement + 80 : 390),
+    },
+    {
+      id: randomUUID(), provider: "mock", carrier: "FedEx", service: "Priority", deliveryMethod: "home",
+      amountCents: baseEconomy + 750, currency: "EUR", estimatedDays: 1, freeShippingApplied: false,
+      sendcloudShippingOptionCodes: parcels.map(() => "mock:fedex-priority"),
+      sendcloudParcelAmountsCents: parcels.map((_, index) => index === 0 ? baseEconomy - parcelSupplement + 750 : 390),
     },
   ];
 }
@@ -54,17 +74,29 @@ function sendcloudAuthorization() {
   return `Basic ${Buffer.from(`${config.SENDCLOUD_PUBLIC_KEY}:${config.SENDCLOUD_SECRET_KEY}`).toString("base64")}`;
 }
 
-async function sendcloudOptionsForParcel(parcel: PackedParcel, address: QuoteAddress): Promise<SendcloudOption[]> {
+function pickupLastMile(point: PickupPoint): "locker" | "service_point" {
+  return point.type === "locker" ? "locker" : "service_point";
+}
+
+async function sendcloudOptionsForParcel(parcel: PackedParcel, address: QuoteAddress, pickupPoint?: PickupPoint): Promise<SendcloudOption[]> {
   const config = env();
+  const expectedLastMile = pickupPoint ? pickupLastMile(pickupPoint) : "home_delivery";
+  const servicePointId = pickupPoint ? Number(pickupPoint.id) : null;
+  if (pickupPoint && !Number.isSafeInteger(servicePointId)) throw new Error("Invalid Sendcloud service-point identifier.");
   const response = await fetch("https://panel.sendcloud.sc/api/v3/shipping-options", {
     method: "POST",
     headers: { authorization: sendcloudAuthorization(), accept: "application/json", "content-type": "application/json" },
     body: JSON.stringify({
-      from_country_code: config.SHIP_FROM_COUNTRY,
-      from_postal_code: config.SHIP_FROM_POSTAL_CODE,
-      to_country_code: address.countryCode,
-      to_postal_code: address.postalCode,
-      carrier_code: "colissimo",
+      from_address: {
+        country_code: config.SHIP_FROM_COUNTRY, postal_code: config.SHIP_FROM_POSTAL_CODE,
+        city: config.SHIP_FROM_CITY, address_line_1: config.SHIP_FROM_STREET1,
+      },
+      to_address: {
+        country_code: address.countryCode, postal_code: address.postalCode,
+        city: address.city, address_line_1: address.line1,
+      },
+      functionalities: { last_mile: expectedLastMile },
+      ...(pickupPoint ? { carrier_code: pickupPoint.network, to_service_point: { id: servicePointId } } : {}),
       calculate_quotes: true,
       parcels: [{
         dimensions: { length: String(parcel.lengthCm), width: String(parcel.widthCm), height: String(parcel.heightCm), unit: "cm" },
@@ -79,15 +111,19 @@ async function sendcloudOptionsForParcel(parcel: PackedParcel, address: QuoteAdd
     throw new Error(detail || `Sendcloud rate request failed (${response.status}).`);
   }
   return (result.data ?? []).filter((option) => {
-    const searchable = `${asText(option.code)} ${asText(option.name)}`;
-    return Boolean(asText(option.code)) && !/post.?office|service.?point|pick.?up|point.?retrait/i.test(searchable);
+    const code = asText(option.code);
+    const lastMile = asText(option.functionalities?.last_mile);
+    const carrierCode = asText(option.carrier?.code);
+    return Boolean(code) && code !== "sendcloud:letter" && lastMile === expectedLastMile
+      && option.functionalities?.tracked !== false && option.functionalities?.form_factor !== "mailbox"
+      && (!pickupPoint || carrierCode === pickupPoint.network);
   });
 }
 
-async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, subtotalCents: number): Promise<StoredRate[]> {
+async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, subtotalCents: number, pickupPoint?: PickupPoint): Promise<StoredRate[]> {
   const config = env();
-  const optionsByParcel = await Promise.all(parcels.map((parcel) => sendcloudOptionsForParcel(parcel, address)));
-  if (optionsByParcel.some((options) => options.length === 0)) throw new Error("No Sendcloud home-delivery service is available for this parcel.");
+  const optionsByParcel = await Promise.all(parcels.map((parcel) => sendcloudOptionsForParcel(parcel, address, pickupPoint)));
+  if (optionsByParcel.some((options) => options.length === 0)) throw new Error("No matching Sendcloud service is available for this parcel.");
 
   const byCode = new Map<string, SendcloudOption[][]>();
   optionsByParcel.forEach((options, parcelIndex) => options.forEach((option) => {
@@ -109,7 +145,8 @@ async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, su
       id: randomUUID(), provider: "sendcloud" as const,
       carrier: asText(parcelOptions[0].carrier?.name) || "Sendcloud",
       service: asText(parcelOptions[0].name) || "Standard",
-      deliveryMethod: "home" as const,
+      deliveryMethod: pickupPoint ? "pickup" as const : "home" as const,
+      ...(pickupPoint ? { pickupPoint } : {}),
       amountCents: parcelAmounts.reduce((sum, amount) => sum + amount, 0),
       currency: "EUR" as const,
       estimatedDays: leadTimes.length ? Math.max(...leadTimes.map((hours) => Math.ceil(hours / 24))) : null,
@@ -119,12 +156,13 @@ async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, su
     }];
   });
 
+  const sortedRates = rates.toSorted((left, right) => left.amountCents - right.amountCents || left.carrier.localeCompare(right.carrier));
   const threshold = freeShippingThresholdCents(address.countryCode, { fr: config.FREE_SHIPPING_FR_CENTS, euUk: config.FREE_SHIPPING_EU_UK_CENTS });
   if (threshold !== null && subtotalCents >= threshold && rates.length) {
-    const cheapest = rates.reduce((best, rate) => rate.amountCents < best.amountCents ? rate : best);
-    return rates.map((rate) => rate.id === cheapest.id ? { ...rate, amountCents: 0, freeShippingApplied: true } : rate);
+    const cheapest = sortedRates[0];
+    return sortedRates.map((rate) => rate.id === cheapest.id ? { ...rate, amountCents: 0, freeShippingApplied: true } : rate);
   }
-  return rates;
+  return sortedRates;
 }
 
 async function storeQuote(quote: ShippingQuoteRecord) {
@@ -135,11 +173,13 @@ async function storeQuote(quote: ShippingQuoteRecord) {
 }
 
 export async function createShippingQuote(input: { cartId: string; locale: Locale; audience: Audience; address: QuoteAddress; pickupPointId?: string; lines: { productId: string; variantId: string; audience: Audience; quantity: number }[] }) {
-  if (input.pickupPointId) throw new Error("La livraison en point relais est temporairement indisponible avec Sendcloud.");
   const lines = await resolveCartLines(input.lines, input.locale, input.audience);
   const subtotalCents = lines.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0);
   const parcels = packCartByWeight(lines, await getPackagingPresets());
-  const rates = env().SHIPPING_MOCK ? mockRates(parcels, subtotalCents, input.address.countryCode) : await sendcloudRates(parcels, input.address, subtotalCents);
+  const pickupPoint = input.pickupPointId ? await getPickupPointById({ id: input.pickupPointId, locale: input.locale, countryCode: input.address.countryCode }) : undefined;
+  const rates = env().SHIPPING_MOCK
+    ? mockRates(parcels, subtotalCents, input.address.countryCode, pickupPoint)
+    : await sendcloudRates(parcels, input.address, subtotalCents, pickupPoint);
   if (rates.length === 0) throw new Error("No matching Sendcloud shipping service is available for all parcels.");
   const quote: ShippingQuoteRecord = { id: randomUUID(), cartId: input.cartId, locale: input.locale, audience: input.audience, address: input.address, lines, parcels, rates, subtotalCents, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() };
   await storeQuote(quote); return quote;

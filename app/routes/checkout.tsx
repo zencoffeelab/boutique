@@ -9,10 +9,11 @@ import { getAudience } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
+import { pickupPointsConfigured } from "~/services/pickup-points.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request); const audience = await getAudience(request);
-  return { locale, audience, pickupConfigured: false, products: await getProducts({ status: "published", audience }) };
+  return { locale, audience, pickupConfigured: pickupPointsConfigured(), products: await getProducts({ status: "published", audience }) };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(
@@ -37,6 +38,12 @@ function getAddress(form: HTMLFormElement) {
 
 function pickupAddress(point: PickupPoint) {
   return [point.address1, point.address2, point.address3].filter(Boolean).join(", ");
+}
+
+function pickupCarrierLabel(code: string) {
+  if (code === "mondial_relay") return "Mondial Relay";
+  if (code === "colissimo") return "Colissimo";
+  return code.replaceAll("_", " ");
 }
 
 export default function Checkout() {
@@ -149,13 +156,13 @@ export default function Checkout() {
           <h2>3. {english ? "Delivery preference" : "Préférence de livraison"}</h2>
           <div className="delivery-methods" role="radiogroup" aria-label={english ? "Delivery preference" : "Préférence de livraison"}>
             <label className={deliveryMethod === "home" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="deliveryMethod" value="home" checked={deliveryMethod === "home"} onChange={() => { setDeliveryMethod("home"); invalidateQuote(); }} /><span><strong>{english ? "Home delivery" : "Livraison à domicile"}</strong><small>{english ? "Delivered to the address above" : "Livraison à l’adresse indiquée"}</small></span></label>
-            <label className={deliveryMethod === "pickup" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="deliveryMethod" value="pickup" checked={deliveryMethod === "pickup"} onChange={() => { setDeliveryMethod("pickup"); invalidateQuote(); }} /><span><strong>{english ? "Pickup point" : "Point relais"}</strong><small>{english ? "Choose a nearby Colissimo location" : "Choisissez un relais Colissimo à proximité"}</small></span></label>
+            <label className={deliveryMethod === "pickup" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="deliveryMethod" value="pickup" checked={deliveryMethod === "pickup"} onChange={() => { setDeliveryMethod("pickup"); invalidateQuote(); }} /><span><strong>{english ? "Pickup point" : "Point relais"}</strong><small>{english ? "Choose a nearby Sendcloud location" : "Choisissez un relais Mondial Relay ou Colissimo"}</small></span></label>
           </div>
           {deliveryMethod === "pickup" ? <div className="pickup-search">
             <button className="button button--light" type="button" onClick={searchForPickupPoints} disabled={pickupBusy}>{pickupBusy ? (english ? "Searching…" : "Recherche…") : (english ? "Find pickup points" : "Rechercher les points relais")}</button>
             {pickupError ? <p className="form-message form-error" role="alert">{pickupError}</p> : null}
             <p className="sr-only" aria-live="polite">{pickupPoints.length ? (english ? `${pickupPoints.length} pickup points found.` : `${pickupPoints.length} points relais trouvés.`) : ""}</p>
-            {pickupPoints.length ? <fieldset className="pickup-list"><legend>{english ? "Choose your pickup point" : "Choisissez votre point relais"}</legend>{pickupPoints.map((point) => <label className={selectedPickupPointId === point.id ? "pickup-option is-selected" : "pickup-option"} key={point.id}><input type="radio" name="pickupPoint" value={point.id} checked={selectedPickupPointId === point.id} onChange={() => { setSelectedPickupPointId(point.id); invalidateQuote(); }} /><span><strong>{point.name}</strong><small>{pickupAddress(point)}<br />{point.postalCode} {point.city}{point.locationHint ? ` · ${point.locationHint}` : ""}</small></span>{point.distanceMeters !== null && point.distanceMeters >= 0 ? <span className="pickup-distance">{point.distanceMeters < 1_000 ? `${Math.round(point.distanceMeters)} m` : `${(point.distanceMeters / 1_000).toFixed(1)} km`}</span> : null}</label>)}</fieldset> : null}
+            {pickupPoints.length ? <fieldset className="pickup-list"><legend>{english ? "Choose your pickup point" : "Choisissez votre point relais"}</legend>{pickupPoints.map((point) => <label className={selectedPickupPointId === point.id ? "pickup-option is-selected" : "pickup-option"} key={point.id}><input type="radio" name="pickupPoint" value={point.id} checked={selectedPickupPointId === point.id} onChange={() => { setSelectedPickupPointId(point.id); invalidateQuote(); }} /><span><strong>{point.name}</strong><small>{pickupCarrierLabel(point.network)} · {point.locationHint}<br />{pickupAddress(point)}<br />{point.postalCode} {point.city}</small></span>{point.distanceMeters !== null && point.distanceMeters >= 0 ? <span className="pickup-distance">{point.distanceMeters < 1_000 ? `${Math.round(point.distanceMeters)} m` : `${(point.distanceMeters / 1_000).toFixed(1)} km`}</span> : null}</label>)}</fieldset> : null}
           </div> : null}
         </section> : null}
 

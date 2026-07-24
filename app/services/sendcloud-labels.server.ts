@@ -75,7 +75,8 @@ function splitAddress(line: string) { const match = line.trim().match(/^(\d+[\p{
 function items(parcel: PackedParcel, lines: ResolvedCartLine[]) { return parcel.lines.map((part) => { const line = lines.find((candidate) => candidate.variantId === part.variantId); if (!line) throw new Error(`Unknown variant ${part.variantId}.`); return { item_id: line.variantId, description: `${line.productName} roasted coffee`, quantity: part.quantity, weight: { value: (part.unitWeightGrams * part.quantity / 1000).toFixed(3), unit: "kg" }, price: { value: (line.unitPriceCents / 100).toFixed(2), currency: "EUR" }, hs_code: line.hsCode, origin_country: line.customsOriginCountry, sku: line.variantId, product_id: line.variantId }; }); }
 
 export async function createSendcloudLabel(input: { orderNumber: string; address: QuoteAddress; lines: ResolvedCartLine[]; parcel: PackedParcel; rate: SendcloudRate; pickupPointId?: string }): Promise<SendcloudLabel> {
-  if (input.pickupPointId) throw new Error("Sendcloud v3 service-point mapping is not configured.");
+  const pickupPointId = input.pickupPointId ? Number(input.pickupPointId) : null;
+  if (input.pickupPointId && !Number.isSafeInteger(pickupPointId)) throw new Error("Invalid Sendcloud service-point identifier.");
   const destination = splitAddress(input.address.line1);
   const directOption = text(input.rate.sendcloudShippingOptionCode);
   const method = directOption ? null : await resolveMethodId(input.rate, input.parcel, input.address.countryCode);
@@ -93,6 +94,7 @@ export async function createSendcloudLabel(input: { orderNumber: string; address
       external_reference_id: `${input.orderNumber}-${input.parcel.presetId}-${input.parcel.shippingWeightGrams}`, label_details: { mime_type: "application/pdf", dpi: 72 },
       from_address: { sender_address_id: senderId },
       to_address: { name: `${input.address.firstName} ${input.address.lastName}`.trim(), company_name: input.address.company ?? "", address_line_1: destination.street, address_line_2: input.address.line2 ?? "", house_number: destination.houseNumber, postal_code: input.address.postalCode, city: input.address.city, country_code: input.address.countryCode, phone_number: input.address.phone, email: input.address.email },
+      ...(pickupPointId ? { to_service_point: { id: pickupPointId } } : {}),
       ship_with: { type: "shipping_option_code", properties: { shipping_option_code: option } }, order_number: input.orderNumber, total_order_price: { currency: "EUR", value: total },
       parcels: [{ dimensions: { length: String(input.parcel.lengthCm), width: String(input.parcel.widthCm), height: String(input.parcel.heightCm), unit: "cm" }, weight: { value: (input.parcel.shippingWeightGrams / 1000).toFixed(3), unit: "kg" }, parcel_items: parcelItems }],
     }) }, 30_000);

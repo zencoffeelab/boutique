@@ -7,7 +7,6 @@ export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") return Response.json({ ok: false, message: "Method not allowed." }, { status: 405 });
   const parsed = shippingQuoteSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ ok: false, message: "Invalid shipping details.", errors: parsed.error.flatten().fieldErrors }, { status: 422 });
-  if (parsed.data.pickupPointId) return Response.json({ ok: false, message: parsed.data.locale === "fr-FR" ? "La livraison en point relais est temporairement indisponible avec Sendcloud." : "Pickup delivery is temporarily unavailable with Sendcloud." }, { status: 422 });
   const audience = await getAudience(request);
   if (parsed.data.lines.some((line) => line.audience === "professional") && audience !== "professional") return Response.json({ ok: false, message: "Professional access is required." }, { status: 403 });
   try { return Response.json(publicQuote(await createShippingQuote({ ...parsed.data, audience })), { headers: { "cache-control": "no-store" } }); }

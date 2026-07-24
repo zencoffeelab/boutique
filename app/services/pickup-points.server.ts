@@ -1,102 +1,130 @@
+import { Buffer } from "node:buffer";
 import type { Locale, PickupPoint } from "~/domain/types";
 import { env } from "~/lib/env.server";
 
-const SEARCH_ENDPOINT = "https://ws.colissimo.fr/pointretrait-ws-cxf/rest/v2/pointretrait/findRDVPointRetraitAcheminement";
-const DETAIL_ENDPOINT = "https://ws.colissimo.fr/pointretrait-ws-cxf/rest/v2/pointretrait/findPointRetraitAcheminementByID";
+const SERVICE_POINTS_ENDPOINT = "https://servicepoints.sendcloud.sc/api/v2/service-points";
 
-type ColissimoPoint = {
-  identifiant?: unknown;
-  nom?: unknown;
-  adresse1?: unknown;
-  adresse2?: unknown;
-  adresse3?: unknown;
-  codePostal?: unknown;
-  localite?: unknown;
-  codePays?: unknown;
-  typeDePoint?: unknown;
-  reseau?: unknown;
-  indiceDeLocalisation?: unknown;
-  distanceEnMetre?: unknown;
-  coordGeolocalisationLatitude?: unknown;
-  coordGeolocalisationLongitude?: unknown;
-  accesPersonneMobiliteReduite?: unknown;
-  poidsMaxi?: unknown;
-  congesTotal?: unknown;
+type SendcloudServicePoint = {
+  id?: unknown;
+  is_active?: unknown;
+  name?: unknown;
+  street?: unknown;
+  house_number?: unknown;
+  postal_code?: unknown;
+  city?: unknown;
+  country?: unknown;
+  carrier?: unknown;
+  shop_type?: unknown;
+  general_shop_type?: unknown;
+  distance?: unknown;
+  latitude?: unknown;
+  longitude?: unknown;
 };
 
-type ColissimoResponse = {
-  errorCode?: unknown;
-  errorMessage?: unknown;
-  listePointRetraitAcheminement?: unknown;
-  pointRetraitAcheminement?: unknown;
-};
-
-function asText(value: unknown): string { return typeof value === "string" ? value.trim() : ""; }
-function finiteNumber(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const number = Number(value); return Number.isFinite(number) ? number : null;
+function asText(value: unknown): string {
+  return typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
 }
 
-function mapPoint(value: unknown): PickupPoint | null {
+function finiteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function authorization(): string {
+  const config = env();
+  if (!config.SENDCLOUD_PUBLIC_KEY || !config.SENDCLOUD_SECRET_KEY) throw new Error("Sendcloud service points are not configured.");
+  return `Basic ${Buffer.from(`${config.SENDCLOUD_PUBLIC_KEY}:${config.SENDCLOUD_SECRET_KEY}`).toString("base64")}`;
+}
+
+function pointTypeLabel(value: string, locale: Locale): string {
+  if (value === "locker") return locale === "en-GB" ? "Locker" : "Consigne";
+  if (value === "post_office") return locale === "en-GB" ? "Post office" : "Bureau de poste";
+  return locale === "en-GB" ? "Pickup point" : "Point relais";
+}
+
+function mapPoint(value: unknown, locale: Locale): PickupPoint | null {
   if (!value || typeof value !== "object") return null;
-  const point = value as ColissimoPoint; const id = asText(point.identifiant); const name = asText(point.nom);
-  if (!id || !name || point.congesTotal === true) return null;
+  const point = value as SendcloudServicePoint;
+  const id = asText(point.id);
+  const name = asText(point.name);
+  const carrier = asText(point.carrier);
+  const countryCode = asText(point.country).toUpperCase();
+  if (!/^\d+$/.test(id) || !name || !carrier || !countryCode || point.is_active === false) return null;
+  const type = asText(point.general_shop_type) || asText(point.shop_type) || "servicepoint";
   return {
-    id, name, address1: asText(point.adresse1), address2: asText(point.adresse2), address3: asText(point.adresse3),
-    postalCode: asText(point.codePostal), city: asText(point.localite), countryCode: asText(point.codePays) || "FR",
-    type: asText(point.typeDePoint), network: asText(point.reseau), locationHint: asText(point.indiceDeLocalisation),
-    distanceMeters: finiteNumber(point.distanceEnMetre), latitude: finiteNumber(point.coordGeolocalisationLatitude),
-    longitude: finiteNumber(point.coordGeolocalisationLongitude), accessible: point.accesPersonneMobiliteReduite === true,
-    maxWeightGrams: finiteNumber(point.poidsMaxi),
+    id,
+    name,
+    address1: [asText(point.house_number), asText(point.street)].filter(Boolean).join(" "),
+    address2: "",
+    address3: "",
+    postalCode: asText(point.postal_code),
+    city: asText(point.city),
+    countryCode,
+    type,
+    network: carrier,
+    locationHint: pointTypeLabel(type, locale),
+    distanceMeters: finiteNumber(point.distance),
+    latitude: finiteNumber(point.latitude),
+    longitude: finiteNumber(point.longitude),
+    accessible: false,
+    maxWeightGrams: null,
   };
 }
 
-function estimatedShippingDate(): string {
-  const date = new Date(); date.setDate(date.getDate() + 1);
-  return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Paris" }).format(date);
-}
-
-async function postColissimo(endpoint: string, body: Record<string, unknown>): Promise<ColissimoResponse> {
-  const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(8_000) });
-  const data = await response.json().catch(() => null) as ColissimoResponse | null;
-  if (!response.ok || !data || Number(data.errorCode) !== 0) {
-    const detail = data ? asText(data.errorMessage) : "";
-    throw new Error(detail ? `Colissimo pickup lookup failed: ${detail}` : `Colissimo pickup lookup failed (${response.status}).`);
-  }
-  return data;
-}
-
-function credentials() {
-  const config = env();
-  if (!config.COLISSIMO_PICKUP_API_KEY) throw new Error("Colissimo pickup lookup is not configured.");
-  return { apiKey: config.COLISSIMO_PICKUP_API_KEY, partnerCode: config.COLISSIMO_PICKUP_PARTNER_CLIENT_CODE };
+function mockPoints(input: { locale: Locale; address: { postalCode: string; city: string; countryCode: string } }): PickupPoint[] {
+  const common = {
+    address2: "", address3: "", postalCode: input.address.postalCode, city: input.address.city,
+    countryCode: input.address.countryCode, latitude: null, longitude: null, accessible: false, maxWeightGrams: null,
+  };
+  return [
+    { ...common, id: "100001", name: "Point Relais démo", address1: "1 rue du Café", type: "servicepoint", network: "mondial_relay", locationHint: input.locale === "en-GB" ? "Pickup point" : "Point relais", distanceMeters: 250 },
+    { ...common, id: "100002", name: "Consigne démo", address1: "2 rue du Café", type: "locker", network: "mondial_relay", locationHint: input.locale === "en-GB" ? "Locker" : "Consigne", distanceMeters: 600 },
+  ];
 }
 
 export function pickupPointsConfigured(): boolean {
-  return false;
+  const config = env();
+  return config.SHIPPING_MOCK || Boolean(config.SENDCLOUD_PUBLIC_KEY && config.SENDCLOUD_SECRET_KEY);
 }
 
 export async function searchPickupPoints(input: { locale: Locale; address: { line1: string; line2?: string; postalCode: string; city: string; countryCode: string }; weightGrams: number }): Promise<PickupPoint[]> {
-  if (input.address.countryCode !== "FR") return [];
-  const { apiKey, partnerCode } = credentials();
-  const data = await postColissimo(SEARCH_ENDPOINT, {
-    apiKey, ...(partnerCode ? { codTiersPourPartenaire: partnerCode } : {}),
-    address: [input.address.line1, input.address.line2].filter(Boolean).join(" "), zipCode: input.address.postalCode,
-    city: input.address.city, countryCode: "FR", weight: String(input.weightGrams), shippingDate: estimatedShippingDate(),
-    filterRelay: "1", requestId: crypto.randomUUID().replaceAll("-", ""), lang: "FR", optionInter: "0", origin: "CMS",
-  });
-  const points = Array.isArray(data.listePointRetraitAcheminement) ? data.listePointRetraitAcheminement : [];
-  return points.map(mapPoint).filter((point): point is PickupPoint => Boolean(point)).slice(0, 12);
+  if (env().SHIPPING_MOCK) return mockPoints(input);
+  const url = new URL(SERVICE_POINTS_ENDPOINT);
+  url.search = new URLSearchParams({
+    country: input.address.countryCode,
+    address: `${input.address.postalCode} ${input.address.city}`.trim(),
+    radius: "15000",
+  }).toString();
+  const response = await fetch(url, { headers: { authorization: authorization(), accept: "application/json" }, signal: AbortSignal.timeout(10_000) });
+  const data = await response.json().catch(() => null) as unknown;
+  if (!response.ok || !Array.isArray(data)) throw new Error(`Sendcloud service-point search failed (${response.status}).`);
+  return data
+    .map((point) => mapPoint(point, input.locale))
+    .filter((point): point is PickupPoint => point !== null && point.countryCode === input.address.countryCode)
+    .toSorted((left, right) => (left.distanceMeters ?? Number.MAX_SAFE_INTEGER) - (right.distanceMeters ?? Number.MAX_SAFE_INTEGER))
+    .slice(0, 12);
 }
 
-export async function getPickupPointById(input: { id: string; locale: Locale; weightGrams: number }): Promise<PickupPoint> {
-  const { apiKey, partnerCode } = credentials();
-  const data = await postColissimo(DETAIL_ENDPOINT, {
-    apikey: apiKey, ...(partnerCode ? { codTiersPourPartenaire: partnerCode } : {}), id: input.id,
-    weight: String(input.weightGrams), date: estimatedShippingDate(), filterRelay: "1", reseau: "", langue: "FR",
-  });
-  const point = mapPoint(data.pointRetraitAcheminement);
-  if (!point || point.id !== input.id || point.countryCode !== "FR") throw new Error("Pickup point is not available.");
-  if (point.maxWeightGrams !== null && point.maxWeightGrams < input.weightGrams) throw new Error("Pickup point does not accept this parcel weight.");
+export async function getPickupPointById(input: { id: string; locale: Locale; countryCode: string }): Promise<PickupPoint> {
+  if (env().SHIPPING_MOCK) {
+    const point = mockPoints({ locale: input.locale, address: { postalCode: "37000", city: "Tours", countryCode: input.countryCode } }).find((candidate) => candidate.id === input.id);
+    if (!point) throw new Error("Pickup point is not available.");
+    return point;
+  }
+  if (!/^\d+$/.test(input.id)) throw new Error("Invalid Sendcloud service-point identifier.");
+  const headers = { authorization: authorization(), accept: "application/json" };
+  const [detailResponse, availabilityResponse] = await Promise.all([
+    fetch(`${SERVICE_POINTS_ENDPOINT}/${encodeURIComponent(input.id)}`, { headers, signal: AbortSignal.timeout(10_000) }),
+    fetch(`${SERVICE_POINTS_ENDPOINT}/${encodeURIComponent(input.id)}/check-availability`, { headers, signal: AbortSignal.timeout(10_000) }),
+  ]);
+  const [detail, available] = await Promise.all([
+    detailResponse.json().catch(() => null),
+    availabilityResponse.json().catch(() => false),
+  ]);
+  const point = mapPoint(detail, input.locale);
+  if (!detailResponse.ok || !availabilityResponse.ok || available !== true || !point || point.id !== input.id || point.countryCode !== input.countryCode) {
+    throw new Error("Pickup point is not available.");
+  }
   return point;
 }

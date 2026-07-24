@@ -41,6 +41,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         lines: quote.lines,
         parcel: quote.parcels[index],
         rate: { ...rate, sendcloudShippingOptionCode: optionCode, sendcloudActualCostCents: parcelAmounts[index] },
+        pickupPointId: rate.pickupPoint?.id,
       });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
