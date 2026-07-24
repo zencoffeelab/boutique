@@ -19,10 +19,11 @@ describe("commercial shipping zones", () => {
     expect(configuredShippingServices("CY")).toEqual(["colissimo"]);
   });
 
-  it("replaces Mondial Relay home with pickup delivery in Zone 2", () => {
+  it("reserves Mondial Relay for pickup delivery in Zones 1 and 2", () => {
+    expect(configuredShippingServicesForDelivery("FR", "home")).toEqual(["fedex"]);
+    expect(configuredShippingServicesForDelivery("FR", "pickup")).toEqual(["mondial_relay"]);
     expect(configuredShippingServicesForDelivery("DE", "home")).toEqual(["fedex", "fedex_signature"]);
     expect(configuredShippingServicesForDelivery("DE", "pickup")).toEqual(["mondial_relay"]);
-    expect(configuredShippingServicesForDelivery("FR", "home")).toEqual(["mondial_relay", "fedex"]);
     expect(["FR", "DE", "BE", "LU", "NL"].every(supportsPickupDelivery)).toBe(true);
     expect(supportsPickupDelivery("ES")).toBe(false);
   });

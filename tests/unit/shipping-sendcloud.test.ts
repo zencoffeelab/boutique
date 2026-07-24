@@ -32,7 +32,7 @@ function useRealShippingEnvironment() {
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.resetModules(); });
 
 describe("Sendcloud zoned shipping quotes", () => {
-  it("keeps only Mondial Relay Home and FedEx Priority in France at the configured prices", async () => {
+  it("keeps only FedEx for home delivery in France", async () => {
     useRealShippingEnvironment();
     const fetchMock = vi.fn(async (_input: RequestInfo | URL) => new Response(JSON.stringify({ data: [
       option({ code: "mondial_relay:home_domestic,dualapi/c2c", carrierCode: "mondial_relay", carrier: "Mondial Relay", name: "Mondial Relay Home Domestic", amount: "5.17" }),
@@ -47,10 +47,9 @@ describe("Sendcloud zoned shipping quotes", () => {
     const quote = await createShippingQuote({ cartId: crypto.randomUUID(), locale: "fr-FR", audience: "retail", address, lines: [await cartLine()] });
 
     expect(quote.rates.map(({ carrier, service, amountCents, provider }) => ({ carrier, service, amountCents, provider }))).toEqual([
-      { carrier: "Mondial Relay", service: "Mondial Relay Home Domestic", amountCents: 390, provider: "sendcloud" },
       { carrier: "FedEx", service: "FedEx Priority", amountCents: 950, provider: "sendcloud" },
     ]);
-    expect(quote.rates[0].sendcloudParcelAmountsCents).toEqual([517]);
+    expect(quote.rates[0].sendcloudParcelAmountsCents).toEqual([933]);
     expect(publicQuote(quote).rates[0]).not.toHaveProperty("configuredService");
     expect(fetchMock.mock.calls.every(([input]) => String(input).includes("sendcloud.sc"))).toBe(true);
   });

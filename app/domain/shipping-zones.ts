@@ -42,7 +42,8 @@ export function supportsPickupDelivery(countryCode: string) {
 export function configuredShippingServicesForDelivery(countryCode: string, deliveryMethod: ShippingDeliveryMethod): readonly ConfiguredShippingService[] {
   const services = configuredShippingServices(countryCode);
   if (deliveryMethod === "pickup") return supportsPickupDelivery(countryCode) && services.includes("mondial_relay") ? ["mondial_relay"] : [];
-  return shippingZoneForCountry(countryCode) === 2 ? services.filter((service) => service !== "mondial_relay") : services;
+  const zone = shippingZoneForCountry(countryCode);
+  return zone === 1 || zone === 2 ? services.filter((service) => service !== "mondial_relay") : services;
 }
 
 export function customerShippingPriceCents(countryCode: string, service: ConfiguredShippingService, weightGrams: number): number | null {

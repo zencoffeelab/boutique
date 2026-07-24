@@ -20,7 +20,8 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   const quoteResponse = page.waitForResponse((response) => response.url().endsWith("/api/shipping/quote") && response.request().method() === "POST");
   await page.getByRole("button", { name: "Calculer la livraison" }).click();
   await expect((await quoteResponse).status()).toBe(200);
-  await expect(page.locator(".rate-option").getByText("Mondial Relay", { exact: true })).toBeVisible();
+  await expect(page.locator(".rate-option").getByText("FedEx", { exact: true })).toBeVisible();
+  await expect(page.locator(".rate-option").getByText("Mondial Relay", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Payer en toute sécurité" }).click();
   await expect(page.getByRole("heading", { name: "Merci." })).toBeVisible();
   await expect(page.getByRole("link", { name: /Panier \(0\)/ })).toBeVisible();
