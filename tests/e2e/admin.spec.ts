@@ -24,3 +24,18 @@ test("product editor provides a save action at the top", async ({ page }) => {
   await expect(topSave).toHaveAttribute("form", "product-editor-form");
   await expect(page.locator("form#product-editor-form")).toHaveCount(1);
 });
+
+test("FAQ and advice management use separate pages", async ({ page }) => {
+  await page.goto("/admin/faq");
+  await expect(page.getByRole("heading", { name: "FAQ", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nouveau conseil" })).toHaveCount(0);
+  await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Conseils", exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/conseils$/);
+  await expect(page.getByRole("heading", { name: "Conseils", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nouvelle question" })).toHaveCount(0);
+});
+
+test("legacy editorial URL redirects to the FAQ page", async ({ page }) => {
+  await page.goto("/admin/editorial");
+  await expect(page).toHaveURL(/\/admin\/faq$/);
+});

@@ -30,6 +30,8 @@ export default [
   route("admin/professionnels", "routes/admin-professionals.tsx"),
   route("admin/contenus", "routes/admin-content.tsx"),
   route("admin/editorial", "routes/admin-editorial.tsx"),
+  route("admin/faq", "routes/admin-faq.tsx"),
+  route("admin/conseils", "routes/admin-advice.tsx"),
   route("en", "routes/home.tsx", { id: "home-en" }),
   route("en/shop", "routes/shop.tsx", { id: "shop-en" }),
   route("en/shop/:slug", "routes/product.tsx", { id: "product-en" }),
