@@ -1,10 +1,12 @@
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
+import { labelIsRefundable, normalizedTrackingStatus, trackingStatusAllowsLabelRefund } from "~/domain/label-refunds";
+
+export { labelIsRefundable, normalizedTrackingStatus } from "~/domain/label-refunds";
 
 const REFUND_EVENT_PROVIDER = "shippo-label-refund";
 const SENDCLOUD_REFUND_EVENT_PROVIDER = "sendcloud-label-refund";
 const FINAL_REFUND_STATUSES = new Set(["SUCCESS", "ERROR"]);
-const REFUNDABLE_TRACKING_STATUSES = new Set(["", "UNKNOWN", "PRE_TRANSIT", "READY_TO_SEND"]);
 
 export type LabelRefundStatus = "REQUESTING" | "QUEUED" | "PENDING" | "SUCCESS" | "ERROR";
 
@@ -43,24 +45,12 @@ export function normalizeLabelRefundStatus(value: unknown): LabelRefundStatus {
   return "PENDING";
 }
 
-export function normalizedTrackingStatus(value: unknown): string {
-  if (value && typeof value === "object" && "status" in value) return text((value as { status?: unknown }).status).toUpperCase();
-  return text(value).toUpperCase();
-}
-
 export function labelRefundStatusFromTransaction(value: unknown): LabelRefundStatus | null {
   const status = text(value).toUpperCase();
   if (status === "REFUNDED") return "SUCCESS";
   if (status === "REFUNDPENDING") return "PENDING";
   if (status === "REFUNDREJECTED") return "ERROR";
   return null;
-}
-
-export function labelIsRefundable(input: { trackingStatus: unknown; purchasedAt: string; now?: number }): boolean {
-  if (!REFUNDABLE_TRACKING_STATUSES.has(normalizedTrackingStatus(input.trackingStatus))) return false;
-  const purchasedAt = new Date(input.purchasedAt).getTime();
-  const now = input.now ?? Date.now();
-  return Number.isFinite(purchasedAt) && purchasedAt <= now && now - purchasedAt <= 90 * 24 * 60 * 60_000;
 }
 
 function shippoMessages(value: unknown): string | null {
@@ -169,7 +159,7 @@ async function refreshExistingRefund(client: NonNullable<ReturnType<typeof creat
     const transaction = await shippoRequest<ShippoTransaction>(`/transactions/${encodeURIComponent(input.transactionId)}`);
     const transactionStatus = text(transaction.status).toUpperCase();
     const existingStatus = labelRefundStatusFromTransaction(transactionStatus);
-    if (!existingStatus && input.current.status === "PENDING" && transactionStatus === "SUCCESS" && REFUNDABLE_TRACKING_STATUSES.has(normalizedTrackingStatus(transaction.tracking_status))) {
+    if (!existingStatus && input.current.status === "PENDING" && transactionStatus === "SUCCESS" && trackingStatusAllowsLabelRefund(transaction.tracking_status)) {
       try {
         const refund = await shippoRequest<ShippoRefund>("/refunds/", { method: "POST", body: JSON.stringify({ transaction: input.transactionId, async: false }) });
         const refundId = text(refund.object_id);
@@ -264,7 +254,7 @@ export async function requestOrRefreshLabelRefund(input: { orderId: string; ship
       await storeState(client, shipment.shippo_transaction_id, existingRefund);
       return existingRefund;
     }
-    if (transactionStatus !== "SUCCESS" || !REFUNDABLE_TRACKING_STATUSES.has(trackingStatus)) {
+    if (transactionStatus !== "SUCCESS" || !labelIsRefundable({ trackingStatus, purchasedAt: shipment.created_at })) {
       const message = shippoMessages(transaction.messages) || "Shippo indique que cette étiquette ne peut plus être remboursée.";
       const rejected: LabelRefundState = { ...requesting, status: "ERROR", message, updatedAt: new Date().toISOString() };
       await storeState(client, shipment.shippo_transaction_id, rejected);

@@ -14,6 +14,7 @@ import type {
 import { Form, useActionData, useFetcher, useLoaderData } from "react-router";
 import { AdminShell } from "~/components/admin-shell";
 import { Badge } from "~/components/ui/badge";
+import { labelIsRefundable } from "~/domain/label-refunds";
 import { formatMoney, formatSignedMoney } from "~/domain/money";
 import { orderStatuses } from "~/domain/types";
 import { requireAdmin } from "~/lib/auth.server";
@@ -243,9 +244,10 @@ function ShipmentActions({
     (shipment.shippo_transaction_id || shipment.sendcloud_parcel_id) &&
     shipment.label_url &&
     !refund &&
-    ["", "UNKNOWN", "PRE_TRANSIT"].includes(
-      String(shipment.status ?? "").toUpperCase(),
-    ),
+    labelIsRefundable({
+      trackingStatus: shipment.status,
+      purchasedAt: shipment.created_at,
+    }),
   );
   const canRefresh = Boolean(pending);
   const formAction = `/api/admin/orders/${orderId}/shipments/${shipment.id}/refund-label`;
