@@ -11,7 +11,7 @@ const navigation = [
   { section: "products", label: "Produits", href: "/admin#catalogue", icon: Package },
   { section: "stocks", label: "Stocks", href: "/admin#catalogue", icon: Boxes },
   { section: "shipping", label: "Expédition", href: "/admin/expedition", icon: Boxes },
-  { section: "professionals", label: "Demandes pro", href: "/admin#demandes-pro", icon: Users },
+  { section: "professionals", label: "Professionnels", href: "/admin/professionnels", icon: Users },
   { section: "content", label: "Pages", href: "/admin/contenus", icon: FileText },
   { section: "editorial", label: "FAQ & Conseils", href: "/admin/editorial", icon: FileText },
   { section: "archives", label: "Archives", href: "/admin#catalogue", icon: Archive },

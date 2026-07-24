@@ -316,6 +316,16 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .admin-activation-link { display: flex; align-items: end; gap: .5rem; padding: .8rem; border: 1px solid #e8c97c; background: #fff8e4; }
 .admin-activation-link label { display: grid; flex: 1; gap: .3rem; color: #62675c; font-size: .7rem; }
 .admin-activation-link input { min-width: 0; padding: .55rem .65rem; border: 1px solid #d8c891; background: white; font: inherit; }
+.admin-professional-section { margin-bottom: 1.25rem; }
+.admin-professional-section h2 { margin: .2rem 0 0; font: 650 1.45rem/1.1 var(--sans); }
+.admin-professional-filter { grid-template-columns: minmax(260px, 1fr) 220px auto; }
+.admin-professional-request:last-child { border-bottom: 0; }
+.admin-member-actions { display: grid; min-width: 20rem; gap: .5rem; }
+.admin-member-actions form { display: flex; flex-wrap: wrap; gap: .4rem; }
+.admin-member-actions .admin-activation-link { min-width: 30rem; }
+.admin-pro-status--approved { background: #dcebd7; color: #245421; }
+.admin-pro-status--suspended, .admin-pro-status--rejected { background: #f8d9d5; color: #7b2318; }
+.admin-empty-state { padding: 1.25rem; }
 .admin-filter { display: grid; grid-template-columns: minmax(220px, 1fr) 220px auto; gap: .7rem; margin-bottom: 1.25rem; }
 .admin-filter input, .admin-filter select { width: 100%; min-height: 3rem; padding: .65rem .8rem; border: 1px solid #dfe2db; background: white; }
 .admin-order-list { display: grid; gap: .8rem; }
@@ -365,6 +375,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
   .summary-card { position: static; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .admin-grid { grid-template-columns: 1fr; }
+  .admin-professional-filter { grid-template-columns: 1fr 220px auto; }
 }
 
 @media (max-width: 700px) {
@@ -375,6 +386,9 @@ button:disabled { cursor: not-allowed; opacity: .48; }
   .hero__stamp { width: 7rem; height: 7rem; right: 1rem; bottom: 1rem; font-size: .6rem; }
   .admin-shipment { grid-template-columns: 1fr; }
   .admin-shipment__actions { justify-items: start; text-align: left; }
+  .admin-professional-filter { grid-template-columns: 1fr; }
+  .admin-member-actions, .admin-member-actions .admin-activation-link { min-width: 0; }
+  .admin-activation-link { align-items: stretch; flex-direction: column; }
   .section-header { display: block; }
   .section-header .text-link { margin-top: 1rem; }
   .product-grid, .value-grid, .split-feature, .article-grid, .steps { grid-template-columns: 1fr; }

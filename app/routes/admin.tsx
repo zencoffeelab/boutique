@@ -1,6 +1,6 @@
 import { LogOut, Store } from "lucide-react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
-import { Form, Link, useActionData, useFetcher, useLoaderData } from "react-router";
+import { Form, Link, useActionData, useLoaderData } from "react-router";
 import { z } from "zod";
 import { AdminShell } from "~/components/admin-shell";
 import { Badge } from "~/components/ui/badge";
@@ -60,7 +60,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
       contributionCents: totals?.contribution_cents ?? 0,
     },
     recentOrders: (orders ?? []).slice(0, 8),
-    applications: applications ?? [],
   };
 }
 
@@ -69,25 +68,8 @@ export const meta: MetaFunction = () => [
   { name: "robots", content: "noindex,nofollow" },
 ];
 
-function ProfessionalDecision({ application }: { application: { id: string; company_name: string; first_name: string; last_name: string; email: string; business_type: string; monthly_volume: string } }) {
-  const fetcher = useFetcher<{ ok?: boolean; message?: string; activationUrl?: string }>();
-  return <article className="admin-application">
-    <div><strong>{application.company_name}</strong><p>{application.first_name} {application.last_name} · {application.business_type} · {application.monthly_volume}</p><small>{application.email}</small></div>
-    <fetcher.Form method="post" action={`/api/admin/pro-applications/${application.id}/decision`}>
-      <label className="admin-application__note">Note facultative<input name="note" maxLength={1_000} placeholder="Visible dans l’e-mail en cas de refus" /></label>
-      <button className="ui-button ui-button--default ui-button--sm" name="decision" value="approved" disabled={fetcher.state !== "idle"}>Approuver et envoyer l’accès</button>
-      <button className="ui-button ui-button--ghost ui-button--sm" name="decision" value="rejected" disabled={fetcher.state !== "idle"}>Refuser</button>
-    </fetcher.Form>
-    {fetcher.data?.message ? <small className={fetcher.data.ok ? undefined : "form-error"} role="status">{fetcher.data.message}</small> : null}
-    {fetcher.data?.activationUrl ? <div className="admin-activation-link">
-      <label>Lien d’activation à transmettre<input readOnly value={fetcher.data.activationUrl} onFocus={(event) => event.currentTarget.select()} /></label>
-      <a className="ui-button ui-button--ghost ui-button--sm" href={fetcher.data.activationUrl} target="_blank" rel="noreferrer">Ouvrir le lien</a>
-    </div> : null}
-  </article>;
-}
-
 export default function Admin() {
-  const { demo, products, stats, recentOrders, applications } = useLoaderData<typeof loader>();
+  const { demo, products, stats, recentOrders } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   return (
     <AdminShell active="dashboard">
@@ -148,9 +130,9 @@ export default function Admin() {
               <CardHeader><p className="eyebrow">Commandes</p><h2 style={{ font: "600 1.3rem/1 var(--sans)", margin: 0 }}>Activité récente</h2></CardHeader>
               <CardContent style={{ padding: 0 }}><Table><TableHeader><TableRow><TableHead>N°</TableHead><TableHead>Statut</TableHead><TableHead>Total</TableHead></TableRow></TableHeader><TableBody>{recentOrders.map((order) => <TableRow key={order.id}><TableCell>{order.order_number}</TableCell><TableCell><Badge>{order.status}</Badge></TableCell><TableCell>{formatMoney(order.total_cents, "fr-FR")}</TableCell></TableRow>)}</TableBody></Table>{recentOrders.length === 0 ? <p style={{ padding: "1rem" }}>Aucune commande.</p> : null}</CardContent>
             </Card>
-            <Card id="demandes-pro" style={{ marginTop: "1rem" }}>
-              <CardHeader><p className="eyebrow">Professionnels</p><h2 style={{ font: "600 1.3rem/1 var(--sans)", margin: 0 }}>Demandes en attente</h2></CardHeader>
-              <CardContent>{applications.map((application) => <ProfessionalDecision key={application.id} application={application} />)}{applications.length === 0 ? <p>Aucune demande à traiter.</p> : null}</CardContent>
+            <Card style={{ marginTop: "1rem" }}>
+              <CardHeader><p className="eyebrow">Professionnels</p><h2 style={{ font: "600 1.3rem/1 var(--sans)", margin: 0 }}>Comptes professionnels</h2></CardHeader>
+              <CardContent><p><strong>{stats.proApplications}</strong> demande{stats.proApplications > 1 ? "s" : ""} en attente.</p><Link className="ui-button ui-button--default ui-button--sm" to="/admin/professionnels">Gérer les demandes et les membres</Link></CardContent>
             </Card>
           </div>
         </section>

@@ -26,6 +26,7 @@ export default [
   route("admin/commandes", "routes/admin-orders.tsx"),
   route("admin/commandes.csv", "routes/admin-orders-csv.ts"),
   route("admin/expedition", "routes/admin-shipping.tsx"),
+  route("admin/professionnels", "routes/admin-professionals.tsx"),
   route("admin/contenus", "routes/admin-content.tsx"),
   route("admin/editorial", "routes/admin-editorial.tsx"),
   route("en", "routes/home.tsx", { id: "home-en" }),
