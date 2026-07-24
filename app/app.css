@@ -355,6 +355,15 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .admin-quick-form label { display: grid; gap: .15rem; color: #667062; font-size: .62rem; text-transform: uppercase; }
 .admin-quick-form input { width: 100%; min-height: 2rem; padding: .25rem .4rem; border: 1px solid #dfe2db; border-radius: .2rem; background: white; }
 .admin-quick-form button { grid-column: 1 / -1; }
+.admin-catalogue-section { margin-bottom: 2rem; scroll-margin-top: 1.5rem; }
+.admin-catalogue-section__heading { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .8rem; margin-bottom: .85rem; }
+.admin-catalogue-section__heading > svg { width: 1.35rem; height: 1.35rem; color: var(--green-deep); }
+.admin-catalogue-section__heading h2 { margin: 0; font: 650 1.35rem/1.1 var(--sans); }
+.admin-catalogue-section__heading p { margin: .25rem 0 0; color: #667062; font-size: .8rem; }
+.admin-catalogue-section--archived { margin-top: 3rem; padding-top: 2rem; border-top: 2px solid #c8cec3; }
+.admin-catalogue-section--archived .admin-catalogue-section__heading > svg { color: #737b70; }
+.admin-catalogue-section--archived > .ui-card { border-color: #c8cec3; background: #f8f9f6; box-shadow: none; }
+.admin-catalogue-section--archived .ui-table { color: #555d52; }
 .admin-editor { margin-bottom: 1.5rem; padding: clamp(1rem, 3vw, 2rem); }
 .admin-editor__language { margin: 2rem 0; padding: 1.25rem; border: 1px solid #dfe2db; }
 .admin-editor__language legend { padding: 0 .5rem; font-weight: 750; }

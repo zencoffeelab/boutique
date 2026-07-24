@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Archive, PackageOpen, Plus } from "lucide-react";
 import { z } from "zod";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Form, Link, useActionData, useLoaderData } from "react-router";
@@ -7,6 +7,7 @@ import { Badge } from "~/components/ui/badge";
 import { Card, CardContent } from "~/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { formatMoney } from "~/domain/money";
+import type { Product, ProductStatus } from "~/domain/types";
 import { requireAdmin } from "~/lib/auth.server";
 import { getAdminProducts } from "~/lib/catalog.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
@@ -61,9 +62,64 @@ export const meta: MetaFunction = () => [
   { name: "robots", content: "noindex,nofollow" },
 ];
 
+const statusLabels: Record<ProductStatus, string> = {
+  draft: "Brouillon",
+  published: "Publié",
+  archived: "Archivé",
+};
+
+function ProductTable({ products, demo, emptyMessage, label }: { products: readonly Product[]; demo: boolean; emptyMessage: string; label: string }) {
+  return (
+    <CardContent style={{ padding: 0 }}>
+      <Table aria-label={label}>
+        <TableHeader><TableRow><TableHead>Café</TableHead><TableHead>Statut</TableHead><TableHead>Variante</TableHead><TableHead>Stock</TableHead><TableHead>Prix public</TableHead><TableHead>Mise à jour rapide</TableHead></TableRow></TableHeader>
+        <TableBody>
+          {products.flatMap((product) => product.variants.length === 0 ? [
+            <TableRow key={product.id}>
+              <TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>{product.translations["fr-FR"].name}</Link></TableCell>
+              <TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell>
+              <TableCell colSpan={4}><span className="admin-muted">Aucune variante — ouvrez la fiche pour en ajouter une.</span></TableCell>
+            </TableRow>,
+          ] : product.variants.map((variant) => {
+            const retailOffer = variant.offers.find((offer) => offer.audience === "retail");
+            const proOffer = variant.offers.find((offer) => offer.audience === "professional");
+            const availableStock = variant.stockOnHand - variant.stockReserved;
+            return (
+              <TableRow key={variant.id}>
+                <TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>{product.translations["fr-FR"].name}</Link><br /><small>{variant.sku}</small></TableCell>
+                <TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell>
+                <TableCell>{variant.label}</TableCell>
+                <TableCell><span className={availableStock <= variant.lowStockThreshold ? "admin-stock-warning" : undefined}>{availableStock}</span><br /><small>Seuil {variant.lowStockThreshold}</small></TableCell>
+                <TableCell>{formatMoney(retailOffer?.price.amount ?? 0, "fr-FR")}</TableCell>
+                <TableCell>
+                  <Form method="post" className="admin-quick-form">
+                    <input type="hidden" name="intent" value="update_variant" />
+                    <input type="hidden" name="variantId" value={variant.id} />
+                    <input type="hidden" name="retailOfferId" value={retailOffer?.id} />
+                    <input type="hidden" name="proOfferId" value={proOffer?.id ?? ""} />
+                    <label><span>Stock</span><input name="stockOnHand" type="number" min="0" defaultValue={variant.stockOnHand} /></label>
+                    <label><span>Seuil</span><input name="lowStockThreshold" type="number" min="0" defaultValue={variant.lowStockThreshold} /></label>
+                    <label><span>Prix ¢</span><input name="retailPriceCents" type="number" min="0" defaultValue={retailOffer?.price.amount ?? 0} /></label>
+                    <label><span>Coût ¢</span><input name="internalCostCents" type="number" min="0" defaultValue={variant.internalCostCents} /></label>
+                    {proOffer ? <><label><span>Prix pro ¢</span><input name="proPriceCents" type="number" min="0" defaultValue={proOffer.price.amount} /></label><label><span>Minimum pro</span><input name="proMinimumQuantity" type="number" min="1" defaultValue={proOffer.minimumQuantity} /></label></> : null}
+                    <button className="ui-button ui-button--outline ui-button--sm" type="submit" disabled={demo}>Enregistrer</button>
+                  </Form>
+                </TableCell>
+              </TableRow>
+            );
+          }))}
+        </TableBody>
+      </Table>
+      {products.length === 0 ? <p className="admin-empty-state">{emptyMessage}</p> : null}
+    </CardContent>
+  );
+}
+
 export default function AdminProducts() {
   const { demo, products, stats } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
+  const currentProducts = products.filter((product) => product.status !== "archived");
+  const archivedProducts = products.filter((product) => product.status === "archived");
   return (
     <AdminShell active="products">
       <header className="admin-heading">
@@ -79,50 +135,14 @@ export default function AdminProducts() {
         <Card><CardContent><p className="stat-label">Stocks faibles</p><p className="stat-value">{stats.lowStock}</p></CardContent></Card>
         <Card><CardContent><p className="stat-label">Archivés</p><p className="stat-value">{stats.archived}</p></CardContent></Card>
       </section>
-      <Card id="catalogue">
-        <CardContent style={{ padding: 0 }}>
-          <Table>
-            <TableHeader><TableRow><TableHead>Café</TableHead><TableHead>Statut</TableHead><TableHead>Variante</TableHead><TableHead>Stock</TableHead><TableHead>Prix public</TableHead><TableHead>Mise à jour rapide</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {products.flatMap((product) => product.variants.length === 0 ? [
-                <TableRow key={product.id}>
-                  <TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>{product.translations["fr-FR"].name}</Link></TableCell>
-                  <TableCell><Badge>{product.status}</Badge></TableCell>
-                  <TableCell colSpan={4}><span className="admin-muted">Aucune variante — ouvrez la fiche pour en ajouter une.</span></TableCell>
-                </TableRow>,
-              ] : product.variants.map((variant) => {
-                const retailOffer = variant.offers.find((offer) => offer.audience === "retail");
-                const proOffer = variant.offers.find((offer) => offer.audience === "professional");
-                const availableStock = variant.stockOnHand - variant.stockReserved;
-                return (
-                  <TableRow key={variant.id}>
-                    <TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>{product.translations["fr-FR"].name}</Link><br /><small>{variant.sku}</small></TableCell>
-                    <TableCell><Badge>{product.status}</Badge></TableCell>
-                    <TableCell>{variant.label}</TableCell>
-                    <TableCell><span className={availableStock <= variant.lowStockThreshold ? "admin-stock-warning" : undefined}>{availableStock}</span><br /><small>Seuil {variant.lowStockThreshold}</small></TableCell>
-                    <TableCell>{formatMoney(retailOffer?.price.amount ?? 0, "fr-FR")}</TableCell>
-                    <TableCell>
-                      <Form method="post" className="admin-quick-form">
-                        <input type="hidden" name="intent" value="update_variant" />
-                        <input type="hidden" name="variantId" value={variant.id} />
-                        <input type="hidden" name="retailOfferId" value={retailOffer?.id} />
-                        <input type="hidden" name="proOfferId" value={proOffer?.id ?? ""} />
-                        <label><span>Stock</span><input name="stockOnHand" type="number" min="0" defaultValue={variant.stockOnHand} /></label>
-                        <label><span>Seuil</span><input name="lowStockThreshold" type="number" min="0" defaultValue={variant.lowStockThreshold} /></label>
-                        <label><span>Prix ¢</span><input name="retailPriceCents" type="number" min="0" defaultValue={retailOffer?.price.amount ?? 0} /></label>
-                        <label><span>Coût ¢</span><input name="internalCostCents" type="number" min="0" defaultValue={variant.internalCostCents} /></label>
-                        {proOffer ? <><label><span>Prix pro ¢</span><input name="proPriceCents" type="number" min="0" defaultValue={proOffer.price.amount} /></label><label><span>Minimum pro</span><input name="proMinimumQuantity" type="number" min="1" defaultValue={proOffer.minimumQuantity} /></label></> : null}
-                        <button className="ui-button ui-button--outline ui-button--sm" type="submit" disabled={demo}>Enregistrer</button>
-                      </Form>
-                    </TableCell>
-                  </TableRow>
-                );
-              }))}
-            </TableBody>
-          </Table>
-          {products.length === 0 ? <p className="admin-empty-state">Aucun produit dans le catalogue.</p> : null}
-        </CardContent>
-      </Card>
+      <section id="catalogue" className="admin-catalogue-section" aria-labelledby="current-products-title">
+        <div className="admin-catalogue-section__heading"><PackageOpen aria-hidden="true" /><div><h2 id="current-products-title">Catalogue actuel</h2><p>Produits publiés et brouillons en cours de préparation.</p></div><Badge>{currentProducts.length} produit{currentProducts.length > 1 ? "s" : ""}</Badge></div>
+        <Card><ProductTable products={currentProducts} demo={demo} label="Produits publiés et brouillons" emptyMessage="Aucun produit actif ou brouillon dans le catalogue." /></Card>
+      </section>
+      <section className="admin-catalogue-section admin-catalogue-section--archived" aria-labelledby="archived-products-title">
+        <div className="admin-catalogue-section__heading"><Archive aria-hidden="true" /><div><h2 id="archived-products-title">Produits archivés</h2><p>Ces produits ne sont plus proposés à la vente, mais leur historique reste accessible.</p></div><Badge>{archivedProducts.length} produit{archivedProducts.length > 1 ? "s" : ""}</Badge></div>
+        <Card><ProductTable products={archivedProducts} demo={demo} label="Produits archivés" emptyMessage="Aucun produit archivé." /></Card>
+      </section>
     </AdminShell>
   );
 }

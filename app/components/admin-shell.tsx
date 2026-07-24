@@ -1,9 +1,9 @@
-import { Archive, Boxes, FileText, LayoutDashboard, Package, ShoppingCart, Users } from "lucide-react";
+import { Boxes, FileText, LayoutDashboard, Package, ShoppingCart, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { Logo } from "~/components/logo";
 
-export type AdminSection = "dashboard" | "orders" | "products" | "stocks" | "shipping" | "professionals" | "content" | "editorial" | "archives";
+export type AdminSection = "dashboard" | "orders" | "products" | "stocks" | "shipping" | "professionals" | "content" | "editorial";
 
 const navigation = [
   { section: "dashboard", label: "Tableau de bord", href: "/admin", icon: LayoutDashboard },
@@ -14,7 +14,6 @@ const navigation = [
   { section: "professionals", label: "Professionnels", href: "/admin/professionnels", icon: Users },
   { section: "content", label: "Pages", href: "/admin/contenus", icon: FileText },
   { section: "editorial", label: "FAQ & Conseils", href: "/admin/editorial", icon: FileText },
-  { section: "archives", label: "Archives", href: "/admin/produits#catalogue", icon: Archive },
 ] as const;
 
 export function AdminShell({ active, children }: { active: AdminSection; children: ReactNode }) {
