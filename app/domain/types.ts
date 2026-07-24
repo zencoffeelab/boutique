@@ -95,6 +95,13 @@ export type CartLine = Readonly<{
   variantId: string;
   audience: Audience;
   quantity: number;
+  preview?: Readonly<{
+    productSlug: string;
+    productNames: Readonly<Record<Locale, string>>;
+    variantLabel: string;
+    unitPriceCents: number;
+    imageUrl: string;
+  }>;
 }>;
 
 export type ResolvedCartLine = CartLine &

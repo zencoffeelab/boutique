@@ -33,7 +33,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setLines((current) => {
       const index = current.findIndex((line) => line.variantId === item.variantId && line.audience === item.audience);
       if (index < 0) return [...current, { ...item, quantity }];
-      return current.map((line, lineIndex) => lineIndex === index ? { ...line, quantity: Math.min(100, line.quantity + quantity) } : line);
+      return current.map((line, lineIndex) => lineIndex === index ? { ...line, ...item, quantity: Math.min(100, line.quantity + quantity) } : line);
     });
   }, []);
   const updateQuantity = useCallback((variantId: string, audience: Audience, quantity: number) => {

@@ -93,6 +93,34 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .cart-button span { min-width: 1.1rem; font-size: .7rem; font-weight: 700; }
 .mobile-menu-button { display: none; }
 
+.cart-drawer { width: min(500px, 100vw); max-width: none; height: 100dvh; max-height: none; margin: 0 0 0 auto; padding: 0; border: 0; background: transparent; color: var(--ink); overflow: hidden; }
+.cart-drawer[open] { animation: cart-drawer-in .28s ease-out; }
+.cart-drawer::backdrop { background: #10170db3; animation: cart-backdrop-in .2s ease-out; }
+.cart-drawer__panel { display: grid; height: 100%; grid-template-rows: auto auto minmax(0, 1fr) auto; border-left: 1px solid var(--green-deep); background: var(--cream); box-shadow: -20px 0 70px #10170d35; }
+.cart-drawer__header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; padding: 1.5rem clamp(1.25rem, 5vw, 2rem); border-bottom: 1px solid var(--line); }
+.cart-drawer__header h2 { margin: 0; font-size: clamp(2rem, 5vw, 3rem); }
+.cart-drawer__header .icon-button { flex: none; border: 1px solid var(--line); border-radius: 50%; }
+.cart-drawer__shipping-message { margin: 0; padding: 1rem clamp(1.25rem, 5vw, 2rem); border-bottom: 1px solid var(--line); background: var(--yellow); color: var(--green-deep); font-size: .78rem; font-weight: 700; }
+.cart-drawer__content { min-height: 0; padding: 0 clamp(1.25rem, 5vw, 2rem); overflow-y: auto; overscroll-behavior: contain; }
+.cart-drawer__status, .cart-drawer__empty { padding: 2rem 0; color: var(--muted); }
+.cart-drawer__empty { display: grid; justify-items: start; gap: 1rem; }
+.cart-drawer__lines { display: grid; }
+.cart-drawer-line { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; gap: 1rem; align-items: start; padding: 1.25rem 0; border-bottom: 1px solid var(--line); }
+.cart-drawer-line img { width: 88px; height: 88px; border: 1px solid var(--line); object-fit: cover; }
+.cart-drawer-line__name { font-size: .78rem; font-weight: 800; letter-spacing: .04em; line-height: 1.35; text-transform: uppercase; }
+.cart-drawer-line p { margin: .35rem 0; font-size: .76rem; }
+.cart-drawer-line__warning { color: #8a2d24; font-weight: 700; }
+.cart-drawer-line__remove { display: grid; width: 2rem; height: 2rem; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
+.cart-drawer-line__remove:hover { background: #e7e9e3; color: var(--ink); }
+.cart-drawer-line__remove svg { width: 1rem; height: 1rem; }
+.cart-drawer-line--unavailable { grid-template-columns: minmax(0, 1fr) auto; }
+.cart-drawer__footer { display: grid; gap: 1rem; padding: 1.5rem clamp(1.25rem, 5vw, 2rem); border-top: 1px solid var(--line); background: var(--paper); }
+.cart-drawer__subtotal { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.cart-drawer__subtotal span { font: 500 1.8rem/1 var(--serif); }
+.cart-drawer__cart-link { justify-self: center; border-bottom: 1px solid currentColor; font-size: .7rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+@keyframes cart-drawer-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes cart-backdrop-in { from { background: transparent; } to { background: #10170db3; } }
+
 .button, .ui-button { display: inline-flex; min-height: 3.2rem; align-items: center; justify-content: center; gap: .6rem; padding: .75rem 1.35rem; border: 1px solid transparent; border-radius: 999px; font-size: .76rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; transition: transform .2s, background .2s, color .2s; }
 .button:hover, .ui-button:hover { transform: translateY(-2px); }
 .button--dark, .ui-button--default { background: var(--green-deep); color: white; }
@@ -406,6 +434,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 @media (max-width: 700px) {
   h1 { font-size: clamp(3rem, 17vw, 5rem); }
   .site-header .logo img { width: auto; height: 32px; }
+  .cart-drawer-line { grid-template-columns: 72px minmax(0, 1fr) auto; gap: .75rem; }
+  .cart-drawer-line img { width: 72px; height: 72px; }
   .header-actions > .icon-button:not(.cart-button) { display: none; }
   .hero__media { min-height: 82vw; }
   .hero__stamp { width: 7rem; height: 7rem; right: 1rem; bottom: 1rem; font-size: .6rem; }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getProducts } from "~/lib/catalog.server";
+import { action as cartPreviewAction } from "~/routes/api.cart-preview";
 import { action as shippingQuoteAction } from "~/routes/api.shipping-quote";
 
 describe("commerce boundaries", () => {
@@ -15,6 +16,15 @@ describe("commerce boundaries", () => {
     const product = (await getProducts({ status: "published", audience: "professional" }))[0]; const variant = product.variants[0];
     const request = new Request("http://localhost/api/shipping/quote", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cartId: crypto.randomUUID(), locale: "fr-FR", lines: [{ productId: product.id, variantId: variant.id, audience: "professional", quantity: 5 }], address: { firstName: "Ada", lastName: "Lovelace", company: "Lab", email: "ada@example.com", phone: "0600000000", line1: "1 rue du Café", postalCode: "37000", city: "Tours", countryCode: "FR" } }) });
     const response = await shippingQuoteAction({ request, params: {}, context: {} } as never); expect(response.status).toBe(403);
+  });
+  it("returns only the public details required by the cart drawer", async () => {
+    const product = (await getProducts({ status: "published" }))[0]; const variant = product.variants[0];
+    const request = new Request("http://localhost/api/cart/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ locale: "fr-FR", lines: [{ productId: product.id, variantId: variant.id, audience: "retail", quantity: 1 }] }) });
+    const response = await cartPreviewAction({ request, params: {}, context: {} } as never); const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data.lines[0]).toMatchObject({ productId: product.id, variantId: variant.id, productName: product.translations["fr-FR"].name, variantLabel: variant.label, quantity: 1 });
+    expect(data.lines[0]).not.toHaveProperty("internalCostCents");
+    expect(data.freeShippingFranceThresholdCents).toBe(7_500);
   });
   it("quotes real parcel weight in mock mode without exposing Sendcloud identifiers", async () => {
     const product = (await getProducts({ status: "published" }))[0]; const variant = product.variants[0];

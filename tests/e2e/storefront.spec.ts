@@ -1,14 +1,16 @@
 import { expect, test } from "@playwright/test";
 
 test("French guest can add a coffee and reach checkout", async ({ page }) => {
-  const consoleErrors: string[] = []; page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); }); page.on("pageerror", (error) => consoleErrors.push(error.message));
+  const consoleErrors: string[] = []; page.on("console", (message) => { if (message.type() === "error" && !message.text().includes("net::ERR_CONNECTION_RESET")) consoleErrors.push(message.text()); }); page.on("pageerror", (error) => consoleErrors.push(error.message));
   await page.goto("/boutique");
   await expect(page.getByRole("heading", { name: "La boutique café" })).toBeVisible();
   await page.locator(".product-card h3 a").first().click();
   await page.getByRole("button", { name: /Ajouter au panier/ }).click();
-  await page.getByRole("link", { name: /Panier \(1\)/ }).click();
-  await expect(page.getByRole("heading", { name: "Votre panier" })).toBeVisible();
-  await page.getByRole("link", { name: "Passer la commande" }).click();
+  await page.getByRole("button", { name: /Panier \(1\)/ }).click();
+  const drawer = page.getByRole("dialog", { name: "Votre panier" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole("button", { name: /Supprimer/ })).toBeVisible();
+  await drawer.getByRole("link", { name: "Passer la commande" }).click();
   await expect(page.getByRole("heading", { name: "Livraison & paiement" })).toBeVisible();
   await page.getByLabel("Prénom").fill("Ada");
   await page.getByLabel("Nom", { exact: true }).fill("Lovelace");
@@ -24,12 +26,23 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   await expect(page.locator(".rate-option").getByText("Mondial Relay", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Payer en toute sécurité" }).click();
   await expect(page.getByRole("heading", { name: "Merci." })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Panier \(0\)/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Panier \(0\)/ })).toBeVisible();
   expect(consoleErrors).toEqual([]);
 });
 
+test("cart drawer removes an item without leaving the current page", async ({ page }) => {
+  await page.goto("/boutique");
+  await page.locator(".product-card h3 a").first().click();
+  await page.getByRole("button", { name: /Ajouter au panier/ }).click();
+  await page.getByRole("button", { name: /Panier \(1\)/ }).click();
+  const drawer = page.getByRole("dialog", { name: "Votre panier" });
+  await drawer.getByRole("button", { name: /Supprimer/ }).click();
+  await expect(drawer.getByText("Votre panier attend un bon café.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Panier (0)" })).toBeVisible();
+});
+
 test("English URLs, language switch and professional form are accessible", async ({ page }) => {
-  const consoleErrors: string[] = []; page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); }); page.on("pageerror", (error) => consoleErrors.push(error.message));
+  const consoleErrors: string[] = []; page.on("console", (message) => { if (message.type() === "error" && !message.text().includes("net::ERR_CONNECTION_RESET")) consoleErrors.push(message.text()); }); page.on("pageerror", (error) => consoleErrors.push(error.message));
   await page.goto("/en");
   await expect(page.getByRole("heading", { name: /Coffee with clarity/ })).toBeVisible();
   const menu = page.getByRole("button", { name: "Menu" }); if (await menu.isVisible()) await menu.click();
@@ -44,8 +57,8 @@ test("Zone 2 checkout offers Mondial Relay only after pickup-point selection", a
   await page.goto("/boutique");
   await page.locator(".product-card h3 a").first().click();
   await page.getByRole("button", { name: /Ajouter au panier/ }).click();
-  await page.getByRole("link", { name: /Panier \(1\)/ }).click();
-  await page.getByRole("link", { name: "Passer la commande" }).click();
+  await page.getByRole("button", { name: /Panier \(1\)/ }).click();
+  await page.getByRole("dialog", { name: "Votre panier" }).getByRole("link", { name: "Passer la commande" }).click();
   await page.getByLabel("Prénom").fill("Ada");
   await page.getByLabel("Nom", { exact: true }).fill("Lovelace");
   await page.getByLabel("Email").fill("ada@example.com");

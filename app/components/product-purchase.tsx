@@ -22,7 +22,19 @@ export function ProductPurchase({ product, locale, audience = "retail" }: { prod
   const t = dictionary[locale];
   if (!variant || !offer) return <p>{t.soldOut}</p>;
   const add = () => {
-    addItem({ productId: product.id, variantId: variant.id, audience, quantity: Math.max(minimum, quantity) });
+    addItem({
+      productId: product.id,
+      variantId: variant.id,
+      audience,
+      quantity: Math.max(minimum, quantity),
+      preview: {
+        productSlug: product.slug,
+        productNames: { "fr-FR": product.translations["fr-FR"].name, "en-GB": product.translations["en-GB"].name },
+        variantLabel: variant.label,
+        unitPriceCents: offer.price.amount,
+        imageUrl: product.media[0]?.url ?? "",
+      },
+    });
     setAdded(true);
   };
   return (
