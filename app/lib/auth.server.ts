@@ -2,6 +2,16 @@ import { redirect } from "react-router";
 import { env } from "./env.server";
 import { createRequestSupabase } from "./supabase.server";
 
+export async function getSessionStatus(request: Request) {
+  const supabase = createRequestSupabase(request);
+  if (!supabase) return { signedIn: false, responseHeaders: new Headers() };
+  const { data, error } = await supabase.client.auth.getUser();
+  return {
+    signedIn: !error && Boolean(data.user),
+    responseHeaders: supabase.responseHeaders,
+  };
+}
+
 export async function getViewer(request: Request) {
   const supabase = createRequestSupabase(request);
   if (!supabase) return null;

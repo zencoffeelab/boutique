@@ -1,5 +1,25 @@
 import { expect, test } from "@playwright/test";
 
+test("public header stays visible while scrolling", async ({ page }) => {
+  await page.goto("/");
+  const header = page.locator(".site-header");
+  await expect(header).toHaveCSS("position", "sticky");
+  await page.evaluate(() => window.scrollTo(0, 900));
+  await expect.poll(async () => Math.round((await header.boundingBox())?.y ?? -1)).toBe(0);
+});
+
+test("public header identifies a signed-out visitor", async ({ page }) => {
+  await page.goto("/");
+  if ((page.viewportSize()?.width ?? 0) <= 700) {
+    await page.getByRole("button", { name: "Menu" }).click();
+    await expect(page.locator(".mobile-account-link")).toHaveAccessibleName("Se connecter");
+    await expect(page.locator(".mobile-account-link .lucide-log-in")).toBeVisible();
+  } else {
+    await expect(page.locator(".account-button")).toHaveAccessibleName("Se connecter");
+    await expect(page.locator(".account-button .lucide-log-in")).toBeVisible();
+  }
+});
+
 test("French guest can add a coffee and reach checkout", async ({ page }) => {
   const consoleErrors: string[] = []; page.on("console", (message) => { if (message.type() === "error" && !message.text().includes("net::ERR_CONNECTION_RESET")) consoleErrors.push(message.text()); }); page.on("pageerror", (error) => consoleErrors.push(error.message));
   await page.goto("/boutique");

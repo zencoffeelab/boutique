@@ -1,5 +1,6 @@
 import type { LinksFunction, LoaderFunctionArgs, MetaFunction } from "react-router";
 import {
+  data,
   Links,
   Meta,
   Outlet,
@@ -14,6 +15,7 @@ import { CartProvider } from "~/components/cart/cart-provider";
 import { CookieConsent } from "~/components/cookie-consent";
 import { SiteFooter } from "~/components/site-footer";
 import { SiteHeader } from "~/components/site-header";
+import { getSessionStatus } from "~/lib/auth.server";
 import { getLocale } from "~/lib/i18n";
 import "./app.css";
 
@@ -30,14 +32,16 @@ export const meta: MetaFunction = () => [
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  return {
+  const session = await getSessionStatus(request);
+  return data({
     locale: getLocale(request),
     gaMeasurementId: process.env.VITE_GA_MEASUREMENT_ID ?? "",
-  };
+    signedIn: session.signedIn,
+  }, { headers: session.responseHeaders });
 }
 
 export default function App() {
-  const { locale, gaMeasurementId } = useLoaderData<typeof loader>();
+  const { locale, gaMeasurementId, signedIn } = useLoaderData<typeof loader>();
   const location = useLocation();
   const isAdmin = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
   return (
@@ -50,7 +54,7 @@ export default function App() {
       </head>
       <body className={isAdmin ? "admin-body" : undefined}>
         <CartProvider>
-          {isAdmin ? null : <SiteHeader />}
+          {isAdmin ? null : <SiteHeader signedIn={signedIn} />}
           <main id="main-content" tabIndex={-1}>
             <Outlet />
           </main>

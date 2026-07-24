@@ -2,7 +2,7 @@ import type { HTMLAttributes, TableHTMLAttributes, TdHTMLAttributes, ThHTMLAttri
 import { cn } from "~/lib/utils";
 
 export function Table({ className, ...props }: TableHTMLAttributes<HTMLTableElement>) {
-  return <div className="ui-table-wrap"><table className={cn("ui-table", className)} {...props} /></div>;
+  return <div className="ui-table-wrap" tabIndex={0}><table className={cn("ui-table", className)} {...props} /></div>;
 }
 export function TableHeader(props: HTMLAttributes<HTMLTableSectionElement>) { return <thead {...props} />; }
 export function TableBody(props: HTMLAttributes<HTMLTableSectionElement>) { return <tbody {...props} />; }

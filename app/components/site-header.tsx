@@ -1,4 +1,4 @@
-import { Menu, ShoppingBag, UserRound, X } from "lucide-react";
+import { LogIn, Menu, ShoppingBag, UserRoundCheck, X } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import { CartDrawer } from "~/components/cart/cart-drawer";
@@ -6,7 +6,7 @@ import { useCart } from "~/components/cart/cart-provider";
 import { Logo } from "~/components/logo";
 import { alternatePath, dictionary } from "~/lib/i18n";
 
-export function SiteHeader() {
+export function SiteHeader({ signedIn }: { signedIn: boolean }) {
   const location = useLocation();
   const locale = location.pathname === "/en" || location.pathname.startsWith("/en/") ? "en-GB" : "fr-FR";
   const t = dictionary[locale];
@@ -17,6 +17,10 @@ export function SiteHeader() {
     ? { home: "/", shop: "/boutique", professional: "/professionnel", advice: "/conseils", about: "/a-propos", cart: "/panier", account: "/mon-compte" }
     : { home: "/en", shop: "/en/shop", professional: "/en/professional", advice: "/en/tips", about: "/en/about-us", cart: "/en/cart", account: "/en/my-account" };
   const closeMenu = () => setMenuOpen(false);
+  const accountLabel = signedIn
+    ? (locale === "fr-FR" ? "Mon compte — connecté" : "My account — signed in")
+    : (locale === "fr-FR" ? "Se connecter" : "Sign in");
+  const AccountIcon = signedIn ? UserRoundCheck : LogIn;
   return (
     <>
       <a className="skip-link" href="#main-content">{locale === "fr-FR" ? "Aller au contenu" : "Skip to content"}</a>
@@ -31,11 +35,12 @@ export function SiteHeader() {
           <Link onClick={closeMenu} to={paths.professional}>{t.professional}</Link>
           <Link onClick={closeMenu} to={paths.advice}>{t.advice}</Link>
           <Link onClick={closeMenu} to={paths.about}>{t.about}</Link>
+          <Link className={`mobile-account-link${signedIn ? " is-signed-in" : ""}`} onClick={closeMenu} to={paths.account}><AccountIcon aria-hidden="true" />{accountLabel}</Link>
         </nav>
         <Logo home={paths.home} />
         <div className="header-actions">
           <Link className="language-link" to={alternatePath(location.pathname)}>{locale === "fr-FR" ? "EN" : "FR"}</Link>
-          <Link className="icon-button" to={paths.account} aria-label={t.account}><UserRound aria-hidden="true" /></Link>
+          <Link className={`icon-button account-button${signedIn ? " is-signed-in" : ""}`} to={paths.account} aria-label={accountLabel} title={accountLabel}><AccountIcon aria-hidden="true" /></Link>
           <button className="icon-button cart-button" type="button" onClick={() => { closeMenu(); setCartOpen(true); }} aria-label={`${t.cart} (${itemCount})`} aria-expanded={cartOpen} aria-controls="cart-drawer">
             <ShoppingBag aria-hidden="true" /><span>{itemCount}</span>
           </button>
