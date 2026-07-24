@@ -1,23 +1,37 @@
-import { demoArticles, demoPackagingPresets, demoProducts } from "~/data/demo-catalog";
-import type { AdviceArticle, Audience, Locale, PackagingPreset, Product, ResolvedCartLine } from "~/domain/types";
+import {
+  demoArticles,
+  demoPackagingPresets,
+  demoProducts,
+} from "~/data/demo-catalog";
+import type {
+  AdviceArticle,
+  Audience,
+  Locale,
+  PackagingPreset,
+  Product,
+  ResolvedCartLine,
+} from "~/domain/types";
 import { env, hasSupabaseConfig } from "./env.server";
 import { createServiceSupabase } from "./supabase.server";
 
 function mapDatabaseProduct(row: any): Product {
   const translations = Object.fromEntries(
-    row.product_translations.map((translation: any) => [translation.locale, {
-      locale: translation.locale,
-      name: translation.name,
-      shortDescription: translation.short_description,
-      body: translation.body,
-      producer: translation.producer,
-      region: translation.region,
-      variety: translation.variety,
-      process: translation.process,
-      tastingNotes: translation.tasting_notes ?? [],
-      seoTitle: translation.seo_title,
-      seoDescription: translation.seo_description,
-    }]),
+    row.product_translations.map((translation: any) => [
+      translation.locale,
+      {
+        locale: translation.locale,
+        name: translation.name,
+        shortDescription: translation.short_description,
+        body: translation.body,
+        producer: translation.producer,
+        region: translation.region,
+        variety: translation.variety,
+        process: translation.process,
+        tastingNotes: translation.tasting_notes ?? [],
+        seoTitle: translation.seo_title,
+        seoDescription: translation.seo_description,
+      },
+    ]),
   ) as Product["translations"];
   return {
     id: row.id,
@@ -35,6 +49,16 @@ function mapDatabaseProduct(row: any): Product {
         width: media.width,
         height: media.height,
         position: media.position,
+      })),
+    editorialBlocks: (row.product_editorial_blocks ?? [])
+      .toSorted((a: any, b: any) => a.position - b.position)
+      .map((block: any) => ({
+        id: block.id,
+        position: block.position,
+        imageUrl: block.public_url,
+        imageAlt: { "fr-FR": block.alt_fr, "en-GB": block.alt_en },
+        title: { "fr-FR": block.title_fr, "en-GB": block.title_en },
+        body: { "fr-FR": block.body_fr, "en-GB": block.body_en },
       })),
     variants: row.product_variants.map((variant: any) => ({
       id: variant.id,
@@ -63,13 +87,21 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
   if (!client) throw new Error("Supabase service configuration is incomplete.");
   const { data, error } = await client
     .from("products")
-    .select(`
+    .select(
+      `
       id, slug, status, altitude_meters, featured,
       product_translations(*),
       product_media(*),
+      product_editorial_blocks(*),
       product_variants(*, variant_offers(*))
-    `)
-    .in("status", includeDrafts ? ["draft", "published", "archived"] : ["published", "archived"])
+    `,
+    )
+    .in(
+      "status",
+      includeDrafts
+        ? ["draft", "published", "archived"]
+        : ["published", "archived"],
+    )
     .order("created_at", { ascending: false });
   if (error) throw new Error(`Unable to load catalog: ${error.message}`);
   return (data ?? []).map(mapDatabaseProduct);
@@ -80,44 +112,83 @@ async function getRawProducts(): Promise<Product[]> {
     ? await databaseProducts()
     : env().ALLOW_DEMO_DATA
       ? demoProducts
-      : (() => { throw new Error("Catalog database is not configured."); })();
+      : (() => {
+          throw new Error("Catalog database is not configured.");
+        })();
   return products;
 }
 
-export function hasPurchasableVariant(product: Product, audience: Audience): boolean {
+export function hasPurchasableVariant(
+  product: Product,
+  audience: Audience,
+): boolean {
   return product.variants.some((variant) => {
     const availableStock = variant.stockOnHand - variant.stockReserved;
-    return variant.offers.some((offer) => offer.audience === audience && offer.active && availableStock >= offer.minimumQuantity);
+    return variant.offers.some(
+      (offer) =>
+        offer.audience === audience &&
+        offer.active &&
+        availableStock >= offer.minimumQuantity,
+    );
   });
 }
 
-function safeProductProjection(product: Product, audience: Audience, availableOnly = false): Product {
+function safeProductProjection(
+  product: Product,
+  audience: Audience,
+  availableOnly = false,
+): Product {
   return {
     ...product,
     variants: product.variants
       .map((variant) => ({
         ...variant,
         internalCostCents: 0,
-        offers: variant.offers.filter((offer) => offer.audience === audience && offer.active),
+        offers: variant.offers.filter(
+          (offer) => offer.audience === audience && offer.active,
+        ),
       }))
-      .filter((variant) => variant.offers.length > 0 && (!availableOnly || variant.offers.some((offer) => variant.stockOnHand - variant.stockReserved >= offer.minimumQuantity))),
+      .filter(
+        (variant) =>
+          variant.offers.length > 0 &&
+          (!availableOnly ||
+            variant.offers.some(
+              (offer) =>
+                variant.stockOnHand - variant.stockReserved >=
+                offer.minimumQuantity,
+            )),
+      ),
   };
 }
 
-export async function getProducts(options: { status?: "published" | "archived"; audience?: Audience; availableOnly?: boolean } = {}): Promise<Product[]> {
+export async function getProducts(
+  options: {
+    status?: "published" | "archived";
+    audience?: Audience;
+    availableOnly?: boolean;
+  } = {},
+): Promise<Product[]> {
   const audience = options.audience ?? "retail";
   const products = await getRawProducts();
   return products
-    .filter((product) => options.status ? product.status === options.status : true)
-    .map((product) => safeProductProjection(product, audience, options.availableOnly))
+    .filter((product) =>
+      options.status ? product.status === options.status : true,
+    )
+    .map((product) =>
+      safeProductProjection(product, audience, options.availableOnly),
+    )
     .filter((product) => !options.availableOnly || product.variants.length > 0);
 }
 
 export async function getAdminProducts(): Promise<Product[]> {
-  const products = hasSupabaseConfig() ? await databaseProducts(true) : await getRawProducts();
+  const products = hasSupabaseConfig()
+    ? await databaseProducts(true)
+    : await getRawProducts();
   return products.map((product) => ({
     ...product,
-    variants: product.variants.filter((variant) => variant.offers.some((offer) => offer.active)),
+    variants: product.variants.filter((variant) =>
+      variant.offers.some((offer) => offer.active),
+    ),
   }));
 }
 
@@ -129,7 +200,10 @@ export async function getPackagingPresets(): Promise<PackagingPreset[]> {
   if (!hasSupabaseConfig()) return demoPackagingPresets;
   const client = createServiceSupabase();
   if (!client) throw new Error("Supabase service configuration is incomplete.");
-  const { data, error } = await client.from("packaging_presets").select("*").eq("active", true);
+  const { data, error } = await client
+    .from("packaging_presets")
+    .select("*")
+    .eq("active", true);
   if (error) throw new Error(`Unable to load packaging: ${error.message}`);
   return (data ?? []).map((row) => ({
     id: row.id,
@@ -145,34 +219,81 @@ export async function getPackagingPresets(): Promise<PackagingPreset[]> {
 
 export async function getArticles(): Promise<AdviceArticle[]> {
   if (!hasSupabaseConfig()) return demoArticles;
-  const client = createServiceSupabase(); if (!client) throw new Error("Supabase service configuration is incomplete.");
-  const { data, error } = await client.from("advice_articles").select("slug,published_at,advice_translations(locale,title,excerpt,blocks)").eq("status", "published").order("published_at", { ascending: false });
+  const client = createServiceSupabase();
+  if (!client) throw new Error("Supabase service configuration is incomplete.");
+  const { data, error } = await client
+    .from("advice_articles")
+    .select(
+      "slug,published_at,advice_translations(locale,title,excerpt,blocks)",
+    )
+    .eq("status", "published")
+    .order("published_at", { ascending: false });
   if (error) throw new Error(`Unable to load advice: ${error.message}`);
   return (data ?? []).flatMap((article: any) => {
-    const fr = article.advice_translations?.find((item: any) => item.locale === "fr-FR"); const en = article.advice_translations?.find((item: any) => item.locale === "en-GB"); if (!fr || !en) return [];
-    const paragraphs = (translation: any) => (translation.blocks ?? []).filter((block: any) => block.type === "paragraph").map((block: any) => String(block.content));
-    return [{ slug: article.slug, publishedAt: article.published_at ?? new Date(0).toISOString(), title: { "fr-FR": fr.title, "en-GB": en.title }, excerpt: { "fr-FR": fr.excerpt, "en-GB": en.excerpt }, body: { "fr-FR": paragraphs(fr), "en-GB": paragraphs(en) } }];
+    const fr = article.advice_translations?.find(
+      (item: any) => item.locale === "fr-FR",
+    );
+    const en = article.advice_translations?.find(
+      (item: any) => item.locale === "en-GB",
+    );
+    if (!fr || !en) return [];
+    const paragraphs = (translation: any) =>
+      (translation.blocks ?? [])
+        .filter((block: any) => block.type === "paragraph")
+        .map((block: any) => String(block.content));
+    return [
+      {
+        slug: article.slug,
+        publishedAt: article.published_at ?? new Date(0).toISOString(),
+        title: { "fr-FR": fr.title, "en-GB": en.title },
+        excerpt: { "fr-FR": fr.excerpt, "en-GB": en.excerpt },
+        body: { "fr-FR": paragraphs(fr), "en-GB": paragraphs(en) },
+      },
+    ];
   });
 }
 
 export async function resolveCartLines(
-  lines: readonly { productId: string; variantId: string; audience: Audience; quantity: number }[],
+  lines: readonly {
+    productId: string;
+    variantId: string;
+    audience: Audience;
+    quantity: number;
+  }[],
   locale: Locale,
   authorizedAudience: Audience,
 ): Promise<ResolvedCartLine[]> {
-  const products = (await getRawProducts()).filter((product) => product.status === "published");
-  const productsById = new Map(products.map((product) => [product.id, product]));
+  const products = (await getRawProducts()).filter(
+    (product) => product.status === "published",
+  );
+  const productsById = new Map(
+    products.map((product) => [product.id, product]),
+  );
   return lines.map((line) => {
-    if (line.audience === "professional" && authorizedAudience !== "professional") {
-      throw new Response("Professional pricing requires an approved account.", { status: 403 });
+    if (
+      line.audience === "professional" &&
+      authorizedAudience !== "professional"
+    ) {
+      throw new Response("Professional pricing requires an approved account.", {
+        status: 403,
+      });
     }
     const product = productsById.get(line.productId);
-    const variant = product?.variants.find((candidate) => candidate.id === line.variantId);
-    const offer = variant?.offers.find((candidate) => candidate.audience === line.audience && candidate.active);
-    if (!product || !variant || !offer) throw new Response("A cart item is no longer available.", { status: 409 });
-    if (line.quantity < offer.minimumQuantity) throw new Response("Minimum quantity not reached.", { status: 409 });
+    const variant = product?.variants.find(
+      (candidate) => candidate.id === line.variantId,
+    );
+    const offer = variant?.offers.find(
+      (candidate) => candidate.audience === line.audience && candidate.active,
+    );
+    if (!product || !variant || !offer)
+      throw new Response("A cart item is no longer available.", {
+        status: 409,
+      });
+    if (line.quantity < offer.minimumQuantity)
+      throw new Response("Minimum quantity not reached.", { status: 409 });
     const availableStock = variant.stockOnHand - variant.stockReserved;
-    if (line.quantity > availableStock) throw new Response("Insufficient stock.", { status: 409 });
+    if (line.quantity > availableStock)
+      throw new Response("Insufficient stock.", { status: 409 });
     return {
       ...line,
       productSlug: product.slug,

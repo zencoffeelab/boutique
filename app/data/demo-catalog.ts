@@ -34,9 +34,12 @@ const inputs: DemoProductInput[] = [
     notes: ["Pêche", "Mûre blanche", "Thé noir"],
     price200: 1300,
     price1000: 5850,
-    image: "https://www.zencoffeelab.com/wp-content/uploads/2026/05/Adola-P.jpeg",
-    descriptionFr: "Une tasse fruitée et douce, portée par une acidité d’agrumes et une finale délicate de thé noir.",
-    descriptionEn: "A soft, fruit-forward cup with citrus acidity and a delicate black-tea finish.",
+    image:
+      "https://www.zencoffeelab.com/wp-content/uploads/2026/05/Adola-P.jpeg",
+    descriptionFr:
+      "Une tasse fruitée et douce, portée par une acidité d’agrumes et une finale délicate de thé noir.",
+    descriptionEn:
+      "A soft, fruit-forward cup with citrus acidity and a delicate black-tea finish.",
   },
   {
     id: "ethiopia-aricha",
@@ -51,9 +54,12 @@ const inputs: DemoProductInput[] = [
     notes: ["Fraise", "Myrtille", "Fruits tropicaux"],
     price200: 1800,
     price1000: 8100,
-    image: "https://www.zencoffeelab.com/wp-content/uploads/2026/05/Aricha-P.jpeg",
-    descriptionFr: "Une fermentation contrôlée pour une tasse explosive, intensément fruitée et parfaitement nette.",
-    descriptionEn: "A controlled fermentation yielding an explosive, intensely fruity and beautifully clean cup.",
+    image:
+      "https://www.zencoffeelab.com/wp-content/uploads/2026/05/Aricha-P.jpeg",
+    descriptionFr:
+      "Une fermentation contrôlée pour une tasse explosive, intensément fruitée et parfaitement nette.",
+    descriptionEn:
+      "A controlled fermentation yielding an explosive, intensely fruity and beautifully clean cup.",
     featured: true,
   },
   {
@@ -69,9 +75,12 @@ const inputs: DemoProductInput[] = [
     notes: ["Pêche", "Pamplemousse", "Baies sauvages"],
     price200: 1300,
     price1000: 5850,
-    image: "https://www.zencoffeelab.com/wp-content/uploads/2026/05/Adola-P.jpeg",
-    descriptionFr: "La maturation lente en altitude révèle une tasse complexe, vive, florale et particulièrement élégante.",
-    descriptionEn: "Slow high-altitude maturation reveals a complex, bright, floral and particularly elegant cup.",
+    image:
+      "https://www.zencoffeelab.com/wp-content/uploads/2026/05/Adola-P.jpeg",
+    descriptionFr:
+      "La maturation lente en altitude révèle une tasse complexe, vive, florale et particulièrement élégante.",
+    descriptionEn:
+      "Slow high-altitude maturation reveals a complex, bright, floral and particularly elegant cup.",
     featured: true,
   },
   {
@@ -87,9 +96,12 @@ const inputs: DemoProductInput[] = [
     notes: ["Reine-claude", "Litchi", "Violette"],
     price200: 1500,
     price1000: 6750,
-    image: "https://www.zencoffeelab.com/wp-content/uploads/2026/05/Santa-Barbara-P.jpeg",
-    descriptionFr: "Une tasse complexe mêlant fruits verts, sucrosité tropicale et une finale florale persistante.",
-    descriptionEn: "A complex cup combining green fruit, tropical sweetness and a persistent floral finish.",
+    image:
+      "https://www.zencoffeelab.com/wp-content/uploads/2026/05/Santa-Barbara-P.jpeg",
+    descriptionFr:
+      "Une tasse complexe mêlant fruits verts, sucrosité tropicale et une finale florale persistante.",
+    descriptionEn:
+      "A complex cup combining green fruit, tropical sweetness and a persistent floral finish.",
     featured: true,
   },
   {
@@ -105,9 +117,12 @@ const inputs: DemoProductInput[] = [
     notes: ["Abricot", "Amande", "Orange confite"],
     price200: 1300,
     price1000: 5850,
-    image: "https://www.zencoffeelab.com/wp-content/uploads/2026/05/Lorayne-P.jpeg",
-    descriptionFr: "Un Pacamara nuancé, doux et onctueux, entre épices, fruits jaunes et agrumes confits.",
-    descriptionEn: "A nuanced, silky Pacamara balancing spice, yellow fruit and candied citrus.",
+    image:
+      "https://www.zencoffeelab.com/wp-content/uploads/2026/05/Lorayne-P.jpeg",
+    descriptionFr:
+      "Un Pacamara nuancé, doux et onctueux, entre épices, fruits jaunes et agrumes confits.",
+    descriptionEn:
+      "A nuanced, silky Pacamara balancing spice, yellow fruit and candied citrus.",
   },
   {
     id: "peru-el-laurel",
@@ -122,9 +137,12 @@ const inputs: DemoProductInput[] = [
     notes: ["Poire", "Citronnelle", "Fleur de cerisier"],
     price200: 1800,
     price1000: 8100,
-    image: "https://www.zencoffeelab.com/wp-content/uploads/2026/05/El-Laurel-P.jpeg",
-    descriptionFr: "Un Geisha élégant, très floral et juteux, à la finale fondante de pêche blanche.",
-    descriptionEn: "An elegant, highly floral and juicy Geisha with a melting white-peach finish.",
+    image:
+      "https://www.zencoffeelab.com/wp-content/uploads/2026/05/El-Laurel-P.jpeg",
+    descriptionFr:
+      "Un Geisha élégant, très floral et juteux, à la finale fondante de pêche blanche.",
+    descriptionEn:
+      "An elegant, highly floral and juicy Geisha with a melting white-peach finish.",
     featured: true,
   },
   {
@@ -140,16 +158,25 @@ const inputs: DemoProductInput[] = [
     notes: ["Fraise", "Groseille", "Hibiscus"],
     price200: 1500,
     price1000: 6750,
-    image: "https://www.zencoffeelab.com/wp-content/uploads/2026/05/Kaiguri-P.jpeg",
-    descriptionFr: "Toute la richesse des cafés kényans : fruits rouges, texture beurrée et floralité persistante.",
-    descriptionEn: "The richness of Kenyan coffee: red fruit, a buttery texture and a lasting floral character.",
+    image:
+      "https://www.zencoffeelab.com/wp-content/uploads/2026/05/Kaiguri-P.jpeg",
+    descriptionFr:
+      "Toute la richesse des cafés kényans : fruits rouges, texture beurrée et floralité persistante.",
+    descriptionEn:
+      "The richness of Kenyan coffee: red fruit, a buttery texture and a lasting floral character.",
     featured: true,
   },
 ];
 
 export const demoProducts: Product[] = inputs.map((input) => {
   const displayFr = `${input.country} — ${input.name}`;
-  const countryEn = ({ Éthiopie: "Ethiopia", Colombie: "Colombia", Pérou: "Peru" } as Record<string, string>)[input.country] ?? input.country;
+  const countryEn =
+    (
+      { Éthiopie: "Ethiopia", Colombie: "Colombia", Pérou: "Peru" } as Record<
+        string,
+        string
+      >
+    )[input.country] ?? input.country;
   const displayEn = `${countryEn} — ${input.name}`;
   return {
     id: input.id,
@@ -189,10 +216,46 @@ export const demoProducts: Product[] = inputs.map((input) => {
       {
         id: `${input.id}-pack`,
         url: input.image,
-        alt: { "fr-FR": `Paquet de café ${displayFr}`, "en-GB": `${displayEn} coffee bag` },
+        alt: {
+          "fr-FR": `Paquet de café ${displayFr}`,
+          "en-GB": `${displayEn} coffee bag`,
+        },
         width: 1300,
         height: 1300,
         position: 0,
+      },
+    ],
+    editorialBlocks: [
+      {
+        id: `${input.id}-story-1`,
+        position: 1,
+        imageUrl: input.image,
+        imageAlt: {
+          "fr-FR": `Le travail de ${input.producer}`,
+          "en-GB": `${input.producer} at work`,
+        },
+        title: {
+          "fr-FR": `À propos de ${input.producer}`,
+          "en-GB": `About ${input.producer}`,
+        },
+        body: { "fr-FR": input.descriptionFr, "en-GB": input.descriptionEn },
+      },
+      {
+        id: `${input.id}-story-2`,
+        position: 2,
+        imageUrl: input.image,
+        imageAlt: {
+          "fr-FR": `La variété ${input.variety} et son traitement`,
+          "en-GB": `${input.variety} variety and processing`,
+        },
+        title: {
+          "fr-FR": "À propos de la variété et du traitement",
+          "en-GB": "About the variety and processing",
+        },
+        body: {
+          "fr-FR": `${input.variety} · ${input.process}. ${input.descriptionFr}`,
+          "en-GB": `${input.variety} · ${input.process}. ${input.descriptionEn}`,
+        },
       },
     ],
     variants: [
@@ -208,7 +271,13 @@ export const demoProducts: Product[] = inputs.map((input) => {
         hsCode: "090121",
         customsOriginCountry: "FR",
         offers: [
-          { id: `${input.id}-200-retail`, audience: "retail", price: euros(input.price200), minimumQuantity: 1, active: true },
+          {
+            id: `${input.id}-200-retail`,
+            audience: "retail",
+            price: euros(input.price200),
+            minimumQuantity: 1,
+            active: true,
+          },
         ],
       },
       {
@@ -223,8 +292,20 @@ export const demoProducts: Product[] = inputs.map((input) => {
         hsCode: "090121",
         customsOriginCountry: "FR",
         offers: [
-          { id: `${input.id}-1000-retail`, audience: "retail", price: euros(input.price1000), minimumQuantity: 1, active: true },
-          { id: `${input.id}-1000-pro`, audience: "professional", price: euros(input.price1000), minimumQuantity: 5, active: true },
+          {
+            id: `${input.id}-1000-retail`,
+            audience: "retail",
+            price: euros(input.price1000),
+            minimumQuantity: 1,
+            active: true,
+          },
+          {
+            id: `${input.id}-1000-pro`,
+            audience: "professional",
+            price: euros(input.price1000),
+            minimumQuantity: 5,
+            active: true,
+          },
         ],
       },
     ],
@@ -232,36 +313,85 @@ export const demoProducts: Product[] = inputs.map((input) => {
 });
 
 export const demoPackagingPresets: PackagingPreset[] = [
-  { id: "box-s", name: "Carton S", maxNetWeightGrams: 1_000, tareWeightGrams: 180, lengthCm: 24, widthCm: 18, heightCm: 10, active: true },
-  { id: "box-m", name: "Carton M", maxNetWeightGrams: 5_000, tareWeightGrams: 420, lengthCm: 38, widthCm: 28, heightCm: 22, active: true },
-  { id: "box-l", name: "Carton L", maxNetWeightGrams: 20_000, tareWeightGrams: 900, lengthCm: 58, widthCm: 38, heightCm: 38, active: true },
+  {
+    id: "box-s",
+    name: "Carton S",
+    maxNetWeightGrams: 1_000,
+    tareWeightGrams: 180,
+    lengthCm: 24,
+    widthCm: 18,
+    heightCm: 10,
+    active: true,
+  },
+  {
+    id: "box-m",
+    name: "Carton M",
+    maxNetWeightGrams: 5_000,
+    tareWeightGrams: 420,
+    lengthCm: 38,
+    widthCm: 28,
+    heightCm: 22,
+    active: true,
+  },
+  {
+    id: "box-l",
+    name: "Carton L",
+    maxNetWeightGrams: 20_000,
+    tareWeightGrams: 900,
+    lengthCm: 58,
+    widthCm: 38,
+    heightCm: 38,
+    active: true,
+  },
 ];
 
 export const demoArticles: AdviceArticle[] = [
   {
     slug: "recette-extraction-v60",
     publishedAt: "2026-03-20",
-    title: { "fr-FR": "Recette d’extraction pour V60", "en-GB": "A V60 brewing recipe" },
+    title: {
+      "fr-FR": "Recette d’extraction pour V60",
+      "en-GB": "A V60 brewing recipe",
+    },
     excerpt: {
-      "fr-FR": "Une base simple pour révéler la clarté et la douceur d’un café légèrement torréfié.",
-      "en-GB": "A simple starting point to reveal the clarity and sweetness of a lightly roasted coffee.",
+      "fr-FR":
+        "Une base simple pour révéler la clarté et la douceur d’un café légèrement torréfié.",
+      "en-GB":
+        "A simple starting point to reveal the clarity and sweetness of a lightly roasted coffee.",
     },
     body: {
-      "fr-FR": ["Utilisez 15 g de café pour 250 g d’eau, moulus juste avant l’extraction.", "Versez en quatre étapes avec une eau douce à 94 °C, pour un temps total proche de trois minutes."],
-      "en-GB": ["Use 15 g of coffee for 250 g of water, ground immediately before brewing.", "Pour in four stages with soft water at 94°C, aiming for a total brew time close to three minutes."],
+      "fr-FR": [
+        "Utilisez 15 g de café pour 250 g d’eau, moulus juste avant l’extraction.",
+        "Versez en quatre étapes avec une eau douce à 94 °C, pour un temps total proche de trois minutes.",
+      ],
+      "en-GB": [
+        "Use 15 g of coffee for 250 g of water, ground immediately before brewing.",
+        "Pour in four stages with soft water at 94°C, aiming for a total brew time close to three minutes.",
+      ],
     },
   },
   {
     slug: "importance-de-leau",
     publishedAt: "2026-03-12",
-    title: { "fr-FR": "De l’importance de l’eau", "en-GB": "Why water matters" },
+    title: {
+      "fr-FR": "De l’importance de l’eau",
+      "en-GB": "Why water matters",
+    },
     excerpt: {
-      "fr-FR": "L’eau compose l’essentiel de la tasse ; sa minéralité transforme radicalement l’extraction.",
-      "en-GB": "Water makes up most of the cup; its mineral content can transform extraction completely.",
+      "fr-FR":
+        "L’eau compose l’essentiel de la tasse ; sa minéralité transforme radicalement l’extraction.",
+      "en-GB":
+        "Water makes up most of the cup; its mineral content can transform extraction completely.",
     },
     body: {
-      "fr-FR": ["Une eau trop dure masque l’acidité et les arômes fins, tandis qu’une eau trop douce peut produire une tasse creuse.", "Commencez par une eau faiblement minéralisée et ajustez ensuite la recette."],
-      "en-GB": ["Water that is too hard masks acidity and delicate flavours, while very soft water may taste hollow.", "Start with lightly mineralised water and adjust the recipe from there."],
+      "fr-FR": [
+        "Une eau trop dure masque l’acidité et les arômes fins, tandis qu’une eau trop douce peut produire une tasse creuse.",
+        "Commencez par une eau faiblement minéralisée et ajustez ensuite la recette.",
+      ],
+      "en-GB": [
+        "Water that is too hard masks acidity and delicate flavours, while very soft water may taste hollow.",
+        "Start with lightly mineralised water and adjust the recipe from there.",
+      ],
     },
   },
 ];

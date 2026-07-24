@@ -57,6 +57,15 @@ export type ProductMedia = Readonly<{
   position: number;
 }>;
 
+export type ProductEditorialBlock = Readonly<{
+  id: string;
+  position: 1 | 2;
+  imageUrl: string;
+  imageAlt: Record<Locale, string>;
+  title: Record<Locale, string>;
+  body: Record<Locale, string>;
+}>;
+
 export type VariantOffer = Readonly<{
   id: string;
   audience: Audience;
@@ -87,6 +96,7 @@ export type Product = Readonly<{
   featured: boolean;
   translations: Record<Locale, ProductTranslation>;
   media: readonly ProductMedia[];
+  editorialBlocks: readonly ProductEditorialBlock[];
   variants: readonly ProductVariant[];
 }>;
 
