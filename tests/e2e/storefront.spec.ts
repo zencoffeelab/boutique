@@ -58,5 +58,5 @@ test("Zone 2 checkout offers Mondial Relay only after pickup-point selection", a
   await page.getByRole("button", { name: "Rechercher les points relais" }).click();
   await page.locator(".pickup-option input").first().check();
   await page.getByRole("button", { name: "Calculer la livraison" }).click();
-  await expect(page.locator(".rate-option > span > strong")).toHaveText("Mondial Relay");
+  await expect(page.locator(".rate-option__details > strong")).toHaveText("Mondial Relay");
 });

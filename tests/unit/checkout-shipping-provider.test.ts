@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shippingRateLabel } from "~/domain/shipping-rate-label";
+import { shippingRateLabel, shippingRatePromotionLabel } from "~/domain/shipping-rate-label";
 import type { ShippingRate } from "~/domain/types";
 
 function rate(carrier: string, signatureRequired = false): ShippingRate {
@@ -18,5 +18,11 @@ describe("checkout shipping rate labels", () => {
   it("keeps only the signature qualifier when required", () => {
     expect(shippingRateLabel(rate("FedEx", true))).toBe("FedEx - Signature");
     expect(shippingRateLabel(rate("Colissimo", true))).toBe("Colissimo - Signature");
+  });
+
+  it("labels only rates receiving free shipping", () => {
+    expect(shippingRatePromotionLabel(rate("Mondial Relay"), "fr-FR")).toBeNull();
+    expect(shippingRatePromotionLabel({ ...rate("Mondial Relay"), freeShippingApplied: true }, "fr-FR")).toBe("Offert");
+    expect(shippingRatePromotionLabel({ ...rate("Mondial Relay"), freeShippingApplied: true }, "en-GB")).toBe("Free");
   });
 });

@@ -227,6 +227,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .pickup-distance { color: var(--green); font-size: .72rem; font-weight: 750; white-space: nowrap; }
 .rate-list { display: grid; gap: .65rem; }
 .rate-option { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .8rem; padding: .9rem; border: 1px solid var(--line); background: white; }
+.rate-option__price, .summary-shipping-price { display: inline-flex; align-items: center; justify-content: flex-end; gap: .5rem; }
+.shipping-free-label { display: inline-flex; align-items: center; min-height: 1.45rem; padding: .2rem .5rem; border-radius: 999px; background: var(--green-deep); color: white; font-size: .62rem; font-weight: 750; letter-spacing: .06em; line-height: 1; text-transform: uppercase; }
 .shipping-rates { margin-top: 2rem; }
 
 .professional-banner { padding: 5rem 1rem; background: var(--green-deep); color: white; text-align: center; }
