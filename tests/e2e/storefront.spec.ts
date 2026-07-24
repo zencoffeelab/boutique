@@ -20,7 +20,7 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   const quoteResponse = page.waitForResponse((response) => response.url().endsWith("/api/shipping/quote") && response.request().method() === "POST");
   await page.getByRole("button", { name: "Calculer la livraison" }).click();
   await expect((await quoteResponse).status()).toBe(200);
-  await expect(page.getByText(/Colissimo · Domicile/)).toBeVisible();
+  await expect(page.getByText(/Mondial Relay · Livraison à domicile/)).toBeVisible();
   await page.getByRole("button", { name: "Payer en toute sécurité" }).click();
   await expect(page.getByRole("heading", { name: "Merci." })).toBeVisible();
   await expect(page.getByRole("link", { name: /Panier \(0\)/ })).toBeVisible();

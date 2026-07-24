@@ -101,7 +101,7 @@ export async function searchPickupPoints(input: { locale: Locale; address: { lin
   if (!response.ok || !Array.isArray(data)) throw new Error(`Sendcloud service-point search failed (${response.status}).`);
   return data
     .map((point) => mapPoint(point, input.locale))
-    .filter((point): point is PickupPoint => point !== null && point.countryCode === input.address.countryCode)
+    .filter((point): point is PickupPoint => point !== null && point.countryCode === input.address.countryCode && point.network === "mondial_relay")
     .toSorted((left, right) => (left.distanceMeters ?? Number.MAX_SAFE_INTEGER) - (right.distanceMeters ?? Number.MAX_SAFE_INTEGER))
     .slice(0, 12);
 }
@@ -123,7 +123,7 @@ export async function getPickupPointById(input: { id: string; locale: Locale; co
     availabilityResponse.json().catch(() => false),
   ]);
   const point = mapPoint(detail, input.locale);
-  if (!detailResponse.ok || !availabilityResponse.ok || available !== true || !point || point.id !== input.id || point.countryCode !== input.countryCode) {
+  if (!detailResponse.ok || !availabilityResponse.ok || available !== true || !point || point.id !== input.id || point.countryCode !== input.countryCode || point.network !== "mondial_relay") {
     throw new Error("Pickup point is not available.");
   }
   return point;

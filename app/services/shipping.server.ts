@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { Audience, Locale, PackedParcel, PickupPoint, ResolvedCartLine, ShippingRate } from "~/domain/types";
 import { packCartByWeight } from "~/domain/packing";
 import { freeShippingThresholdCents } from "~/domain/money";
+import { configuredShippingServices, customerShippingPriceCents, type ConfiguredShippingService } from "~/domain/shipping-zones";
 import { getPackagingPresets, resolveCartLines } from "~/lib/catalog.server";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
@@ -18,6 +19,7 @@ type StoredRate = ShippingRate & {
   sendcloudParcelAmountsCents?: number[];
   shippoRateIds?: string[];
   serviceToken?: string;
+  configuredService?: ConfiguredShippingService;
 };
 export type ShippingQuoteRecord = {
   id: string; cartId: string; locale: Locale; audience: Audience; address: QuoteAddress;
@@ -28,7 +30,7 @@ type SendcloudOption = {
   code?: unknown;
   name?: unknown;
   carrier?: { code?: unknown; name?: unknown };
-  functionalities?: { last_mile?: unknown; tracked?: unknown; form_factor?: unknown };
+  functionalities?: { last_mile?: unknown; tracked?: unknown; form_factor?: unknown; signature?: unknown };
   quotes?: Array<{ price?: { total?: { value?: unknown; currency?: unknown } }; lead_time?: unknown }>;
 };
 
@@ -36,72 +38,29 @@ const localQuotes = new Map<string, ShippingQuoteRecord>();
 
 function mockRates(parcels: PackedParcel[], subtotalCents: number, countryCode: string, pickupPoint?: PickupPoint): StoredRate[] {
   const totalWeight = parcels.reduce((sum, parcel) => sum + parcel.shippingWeightGrams, 0);
-  const parcelSupplement = Math.max(0, parcels.length - 1) * 390;
-  const baseEconomy = 490 + Math.ceil(totalWeight / 1000) * 110 + parcelSupplement;
-  const config = env();
-  const threshold = freeShippingThresholdCents(countryCode, { fr: config.FREE_SHIPPING_FR_CENTS, euUk: config.FREE_SHIPPING_EU_UK_CENTS });
-  const free = threshold !== null && subtotalCents >= threshold;
-  if (pickupPoint) return [{
-    id: randomUUID(), provider: "mock", carrier: "Mondial Relay", service: pickupPoint.type === "locker" ? "Consigne" : "Point Relais",
-    deliveryMethod: "pickup", pickupPoint, amountCents: free ? 0 : Math.max(0, baseEconomy - 150), currency: "EUR",
-    estimatedDays: 3, freeShippingApplied: free, sendcloudShippingOptionCodes: parcels.map(() => "mock:pickup"),
-    sendcloudParcelAmountsCents: parcels.map((_, index) => index === 0 ? baseEconomy - parcelSupplement - 150 : 390),
-  }];
-  return [
-    {
-      id: randomUUID(), provider: "mock", carrier: "Colissimo", service: "Domicile", deliveryMethod: "home",
-      amountCents: free ? 0 : baseEconomy, currency: "EUR", estimatedDays: countryCode === "FR" ? 2 : 5,
-      freeShippingApplied: free, sendcloudShippingOptionCodes: parcels.map(() => "mock:home"),
-      sendcloudParcelAmountsCents: parcels.map((_, index) => index === 0 ? baseEconomy - parcelSupplement : 390),
-    },
-    {
-      id: randomUUID(), provider: "mock", carrier: "Mondial Relay", service: "Domicile", deliveryMethod: "home",
-      amountCents: baseEconomy + 80, currency: "EUR", estimatedDays: 3, freeShippingApplied: false,
-      sendcloudShippingOptionCodes: parcels.map(() => "mock:mondial-relay-home"),
-      sendcloudParcelAmountsCents: parcels.map((_, index) => index === 0 ? baseEconomy - parcelSupplement + 80 : 390),
-    },
-    {
-      id: randomUUID(), provider: "mock", carrier: "FedEx", service: "Priority", deliveryMethod: "home",
-      amountCents: baseEconomy + 750, currency: "EUR", estimatedDays: 1, freeShippingApplied: false,
-      sendcloudShippingOptionCodes: parcels.map(() => "mock:fedex-priority"),
-      sendcloudParcelAmountsCents: parcels.map((_, index) => index === 0 ? baseEconomy - parcelSupplement + 750 : 390),
-    },
-  ];
+  const services = pickupPoint ? configuredShippingServices(countryCode).filter((service) => service === "mondial_relay") : configuredShippingServices(countryCode);
+  const metadata: Record<ConfiguredShippingService, { carrier: string; service: string; days: number }> = {
+    mondial_relay: { carrier: "Mondial Relay", service: pickupPoint ? (pickupPoint.type === "locker" ? "Consigne" : "Point Relais") : "Livraison à domicile", days: 3 },
+    fedex: { carrier: "FedEx", service: countryCode === "FR" ? "Priority" : "International Connect Plus", days: 2 },
+    fedex_signature: { carrier: "FedEx", service: "International Connect Plus · avec signature", days: 2 },
+    colissimo: { carrier: "Colissimo", service: "International", days: 5 },
+  };
+  const rates = services.flatMap((service) => {
+    const amountCents = customerShippingPriceCents(countryCode, service, totalWeight);
+    if (amountCents === null) return [];
+    const details = metadata[service];
+    return [{
+      id: randomUUID(), provider: "mock" as const, carrier: details.carrier, service: details.service,
+      deliveryMethod: pickupPoint ? "pickup" as const : "home" as const, ...(pickupPoint ? { pickupPoint } : {}),
+      amountCents, currency: "EUR" as const, estimatedDays: details.days, freeShippingApplied: false, configuredService: service,
+      sendcloudShippingOptionCodes: parcels.map(() => `mock:${service}`),
+      sendcloudParcelAmountsCents: parcels.map((_, index) => index === 0 ? amountCents : 0),
+    }];
+  });
+  return applyFreeShipping(rates, countryCode, subtotalCents);
 }
 
 function asText(value: unknown) { return typeof value === "string" ? value.trim() : ""; }
-function normalizedCarrier(value: unknown) { return asText(value).toLocaleLowerCase("fr-FR").replaceAll(/[^a-z0-9]+/g, ""); }
-export function isColissimoCarrier(input: { code?: unknown; name?: unknown; serviceToken?: unknown }) {
-  return [input.code, input.name, input.serviceToken].some((value) => normalizedCarrier(value).includes("colissimo"));
-}
-
-type SendcloudSenderAddress = {
-  is_active?: unknown; name?: unknown; company_name?: unknown; address_line_1?: unknown; address_line_2?: unknown;
-  house_number?: unknown; city?: unknown; postal_code?: unknown; country_code?: unknown; phone_number?: unknown; email?: unknown;
-};
-
-async function fromAddress() {
-  const config = env();
-  if (config.SHIP_FROM_STREET1 && config.SHIP_FROM_POSTAL_CODE && config.SHIP_FROM_PHONE) {
-    return { name: config.SHIP_FROM_NAME, company: config.SHIP_FROM_COMPANY, street1: config.SHIP_FROM_STREET1, street2: config.SHIP_FROM_STREET2 ?? "", city: config.SHIP_FROM_CITY, zip: config.SHIP_FROM_POSTAL_CODE, country: config.SHIP_FROM_COUNTRY, phone: config.SHIP_FROM_PHONE, email: config.SHIP_FROM_EMAIL };
-  }
-  const response = await fetch("https://panel.sendcloud.sc/api/v3/addresses/sender-addresses", {
-    headers: { authorization: sendcloudAuthorization(), accept: "application/json" },
-    signal: AbortSignal.timeout(10_000),
-  });
-  const result = await response.json().catch(() => null) as { data?: SendcloudSenderAddress[] } | null;
-  const sender = result?.data?.find((address) => address.is_active !== false) ?? result?.data?.[0];
-  const street1 = [asText(sender?.house_number), asText(sender?.address_line_1)].filter(Boolean).join(" ");
-  const postalCode = asText(sender?.postal_code);
-  const phone = asText(sender?.phone_number);
-  if (!response.ok || !sender || !street1 || !postalCode || !phone) throw new Error("The Shippo sender address is incomplete in Sendcloud.");
-  return {
-    name: asText(sender.name) || config.SHIP_FROM_NAME, company: asText(sender.company_name) || config.SHIP_FROM_COMPANY,
-    street1, street2: asText(sender.address_line_2), city: asText(sender.city) || config.SHIP_FROM_CITY,
-    zip: postalCode, country: asText(sender.country_code) || config.SHIP_FROM_COUNTRY, phone,
-    email: asText(sender.email) || config.SHIP_FROM_EMAIL,
-  };
-}
 
 function sendcloudAuthorization() {
   const config = env();
@@ -111,6 +70,19 @@ function sendcloudAuthorization() {
 
 function pickupLastMile(point: PickupPoint): "locker" | "service_point" {
   return point.type === "locker" ? "locker" : "service_point";
+}
+
+function configuredServiceForOption(option: SendcloudOption, countryCode: string): ConfiguredShippingService | null {
+  const carrierCode = asText(option.carrier?.code).toLowerCase();
+  const code = asText(option.code).toLowerCase();
+  let service: ConfiguredShippingService | null = null;
+  if (carrierCode === "mondial_relay") service = "mondial_relay";
+  else if (carrierCode === "colissimo") service = "colissimo";
+  else if (carrierCode === "fedex") {
+    if (countryCode === "FR" && code !== "fedex:domestic") return null;
+    service = option.functionalities?.signature === true ? "fedex_signature" : "fedex";
+  }
+  return service && configuredShippingServices(countryCode).includes(service) ? service : null;
 }
 
 async function sendcloudOptionsForParcel(parcel: PackedParcel, address: QuoteAddress, pickupPoint?: PickupPoint): Promise<SendcloudOption[]> {
@@ -151,12 +123,12 @@ async function sendcloudOptionsForParcel(parcel: PackedParcel, address: QuoteAdd
     const carrierCode = asText(option.carrier?.code);
     return Boolean(code) && code !== "sendcloud:letter" && lastMile === expectedLastMile
       && option.functionalities?.tracked !== false && option.functionalities?.form_factor !== "mailbox"
-      && (address.countryCode !== "FR" || config.COLISSIMO_FR_MODE !== "shippo_only" || !isColissimoCarrier({ code: carrierCode, name: option.carrier?.name }))
+      && configuredServiceForOption(option, address.countryCode) !== null
       && (!pickupPoint || carrierCode === pickupPoint.network);
   });
 }
 
-async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, subtotalCents: number, pickupPoint?: PickupPoint): Promise<StoredRate[]> {
+async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, pickupPoint?: PickupPoint): Promise<StoredRate[]> {
   const optionsByParcel = await Promise.all(parcels.map((parcel) => sendcloudOptionsForParcel(parcel, address, pickupPoint)));
   if (optionsByParcel.some((options) => options.length === 0)) throw new Error("No matching Sendcloud service is available for this parcel.");
 
@@ -186,70 +158,27 @@ async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, su
       currency: "EUR" as const,
       estimatedDays: leadTimes.length ? Math.max(...leadTimes.map((hours) => Math.ceil(hours / 24))) : null,
       freeShippingApplied: false,
+      configuredService: configuredServiceForOption(parcelOptions[0], address.countryCode)!,
       sendcloudShippingOptionCodes: parcels.map(() => code),
       sendcloudParcelAmountsCents: parcelAmounts,
     }];
   });
 
-  return rates;
-}
-
-type ShippoRate = { object_id?: unknown; amount?: unknown; currency?: unknown; provider?: unknown; estimated_days?: unknown; servicelevel?: { name?: unknown; token?: unknown } };
-
-async function shippoColissimoRates(parcels: PackedParcel[], address: QuoteAddress, pickupPoint?: PickupPoint): Promise<StoredRate[]> {
-  const config = env();
-  if (!config.SHIPPO_API_TOKEN) throw new Error("Shippo is not configured.");
-  const senderAddress = await fromAddress();
-  const shipments = await Promise.all(parcels.map(async (parcel) => {
-    const payload: Record<string, unknown> = {
-      address_from: senderAddress,
-      address_to: { name: `${address.firstName} ${address.lastName}`, company: address.company ?? "", street1: address.line1, street2: address.line2 ?? "", city: address.city, zip: address.postalCode, country: address.countryCode, phone: address.phone, email: address.email },
-      parcels: [{ length: String(parcel.lengthCm), width: String(parcel.widthCm), height: String(parcel.heightCm), distance_unit: "cm", weight: String(parcel.shippingWeightGrams), mass_unit: "g" }],
-      async: false,
-      ...(pickupPoint ? { extra: { location_external_id: pickupPoint.id } } : {}),
-    };
-    const response = await fetch("https://api.goshippo.com/shipments/", {
-      method: "POST",
-      headers: { authorization: `ShippoToken ${config.SHIPPO_API_TOKEN}`, "content-type": "application/json", "shippo-api-version": "2018-02-08" },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(12_000),
-    });
-    if (!response.ok) throw new Error(`Shippo rate request failed (${response.status}).`);
-    const data = await response.json() as { rates?: ShippoRate[] };
-    return (data.rates ?? []).filter((rate) => {
-      const token = asText(rate.servicelevel?.token);
-      const pickupService = token === "colissimo_pick_up_point";
-      return asText(rate.currency).toUpperCase() === "EUR"
-        && isColissimoCarrier({ name: rate.provider, serviceToken: token })
-        && (pickupPoint ? pickupService : !pickupService);
-    });
-  }));
-  if (shipments.some((rates) => rates.length === 0)) return [];
-
-  const byService = new Map<string, ShippoRate[][]>();
-  shipments.forEach((rates, parcelIndex) => rates.forEach((rate) => {
-    const token = asText(rate.servicelevel?.token);
-    const key = `${asText(rate.provider)}:${token || asText(rate.servicelevel?.name)}`;
-    const groups = byService.get(key) ?? Array.from({ length: parcels.length }, () => [] as ShippoRate[]);
-    groups[parcelIndex].push(rate);
-    byService.set(key, groups);
-  }));
-  return [...byService.values()].flatMap((groups) => {
-    if (!groups.every((rates) => rates[0])) return [];
-    const selected = groups.map((rates) => rates[0]);
-    const amounts = selected.map((rate) => Math.round(Number(rate.amount) * 100));
-    const rateIds = selected.map((rate) => asText(rate.object_id));
-    if (amounts.some((amount) => !Number.isFinite(amount) || amount < 0) || rateIds.some((id) => !id)) return [];
-    const token = asText(selected[0].servicelevel?.token);
-    const days = selected.map((rate) => Number(rate.estimated_days)).filter(Number.isFinite);
-    return [{
-      id: randomUUID(), provider: "shippo" as const, carrier: "Colissimo",
-      service: asText(selected[0].servicelevel?.name) || (pickupPoint ? "Point Retrait" : "Domicile"),
-      serviceToken: token, deliveryMethod: pickupPoint ? "pickup" as const : "home" as const,
-      ...(pickupPoint ? { pickupPoint } : {}), amountCents: amounts.reduce((sum, amount) => sum + amount, 0),
-      currency: "EUR" as const, estimatedDays: days.length ? Math.max(...days) : null,
-      freeShippingApplied: false, shippoRateIds: rateIds,
-    }];
+  const totalWeight = parcels.reduce((sum, parcel) => sum + parcel.shippingWeightGrams, 0);
+  const selectedByService = new Map<ConfiguredShippingService, StoredRate>();
+  for (const rate of rates) {
+    const service = rate.configuredService;
+    if (!service || customerShippingPriceCents(address.countryCode, service, totalWeight) === null) continue;
+    const selected = selectedByService.get(service);
+    const actualCost = rate.sendcloudParcelAmountsCents?.reduce((sum, amount) => sum + amount, 0) ?? Number.POSITIVE_INFINITY;
+    const selectedCost = selected?.sendcloudParcelAmountsCents?.reduce((sum, amount) => sum + amount, 0) ?? Number.POSITIVE_INFINITY;
+    if (!selected || actualCost < selectedCost) selectedByService.set(service, rate);
+  }
+  const orderedServices = pickupPoint ? configuredShippingServices(address.countryCode).filter((service) => service === "mondial_relay") : configuredShippingServices(address.countryCode);
+  return orderedServices.flatMap((service) => {
+    const rate = selectedByService.get(service);
+    const amountCents = customerShippingPriceCents(address.countryCode, service, totalWeight);
+    return rate && amountCents !== null ? [{ ...rate, amountCents }] : [];
   });
 }
 
@@ -276,16 +205,7 @@ export async function createShippingQuote(input: { cartId: string; locale: Local
   let rates: StoredRate[];
   if (env().SHIPPING_MOCK) rates = mockRates(parcels, subtotalCents, input.address.countryCode, pickupPoint);
   else {
-    const config = env();
-    const useShippoColissimo = config.COLISSIMO_FR_MODE !== "sendcloud_only"
-      && input.address.countryCode === "FR"
-      && (!pickupPoint || isColissimoCarrier({ code: pickupPoint.network }));
-    const providers = await Promise.allSettled([
-      sendcloudRates(parcels, input.address, subtotalCents, pickupPoint),
-      ...(useShippoColissimo ? [shippoColissimoRates(parcels, input.address, pickupPoint)] : []),
-    ]);
-    rates = applyFreeShipping(providers.flatMap((result) => result.status === "fulfilled" ? result.value : []), input.address.countryCode, subtotalCents);
-    providers.filter((result) => result.status === "rejected").forEach((result) => console.error("shipping_provider_quote_failed", { message: result.reason instanceof Error ? result.reason.message : String(result.reason) }));
+    rates = applyFreeShipping(await sendcloudRates(parcels, input.address, pickupPoint), input.address.countryCode, subtotalCents);
   }
   if (rates.length === 0) throw new Error("No matching shipping service is available for all parcels.");
   const quote: ShippingQuoteRecord = { id: randomUUID(), cartId: input.cartId, locale: input.locale, audience: input.audience, address: input.address, lines, parcels, rates, subtotalCents, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() };
@@ -315,6 +235,6 @@ export function publicQuote(quote: ShippingQuoteRecord) {
     expiresAt: quote.expiresAt,
     subtotalCents: quote.subtotalCents,
     parcels: quote.parcels.map(({ presetName, shippingWeightGrams }) => ({ presetName, shippingWeightGrams })),
-    rates: quote.rates.map(({ sendcloudShippingOptionCodes: _, sendcloudParcelAmountsCents: __, shippoRateIds: ___, serviceToken: ____, ...rate }) => rate),
+    rates: quote.rates.map(({ sendcloudShippingOptionCodes: _, sendcloudParcelAmountsCents: __, shippoRateIds: ___, serviceToken: ____, configuredService: _____, ...rate }) => rate),
   };
 }

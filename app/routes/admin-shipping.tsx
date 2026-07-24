@@ -40,12 +40,12 @@ export function canDeletePackagingPreset(presetActive: boolean, activePresetCoun
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
   const config = env();
-  if (admin.demo) return { demo: true, presets: [] as PackagingPresetRow[], thresholds: { fr: config.FREE_SHIPPING_FR_CENTS, euUk: config.FREE_SHIPPING_EU_UK_CENTS }, colissimoMode: config.COLISSIMO_FR_MODE };
+  if (admin.demo) return { demo: true, presets: [] as PackagingPresetRow[], thresholds: { fr: config.FREE_SHIPPING_FR_CENTS, euUk: config.FREE_SHIPPING_EU_UK_CENTS } };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
   const { data, error } = await client.from("packaging_presets").select("*").order("max_net_weight_grams");
   if (error) throw new Response(error.message, { status: 500 });
-  return { demo: false, presets: (data ?? []) as PackagingPresetRow[], thresholds: { fr: config.FREE_SHIPPING_FR_CENTS, euUk: config.FREE_SHIPPING_EU_UK_CENTS }, colissimoMode: config.COLISSIMO_FR_MODE };
+  return { demo: false, presets: (data ?? []) as PackagingPresetRow[], thresholds: { fr: config.FREE_SHIPPING_FR_CENTS, euUk: config.FREE_SHIPPING_EU_UK_CENTS } };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -104,7 +104,7 @@ function PresetForm({ preset, demo }: { preset?: PackagingPresetRow; demo: boole
   </Form>;
 }
 
-export function ShippingHelp({ presets, thresholds, colissimoMode }: { presets: PackagingPresetRow[]; thresholds: { fr: number; euUk: number }; colissimoMode: "compare" | "shippo_only" | "sendcloud_only" }) {
+export function ShippingHelp({ presets, thresholds }: { presets: PackagingPresetRow[]; thresholds: { fr: number; euUk: number } }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const euros = (cents: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(cents / 100);
   return <>
@@ -115,8 +115,8 @@ export function ShippingHelp({ presets, thresholds, colissimoMode }: { presets: 
         <div className="admin-help-dialog__content">
           <section><h3>À quoi servent les emballages ?</h3><p>Le site transforme automatiquement le panier en un ou plusieurs colis avant d’interroger les services de livraison.</p><dl className="admin-help-definitions"><div><dt>Poids net maximal</dt><dd>Quantité maximale de café dans le carton, sans l’emballage.</dd></div><div><dt>Tare</dt><dd>Poids du carton vide et du calage, ajouté au poids du café.</dd></div><div><dt>Dimensions</dt><dd>Longueur, largeur et hauteur extérieures transmises au transporteur.</dd></div><div><dt>Actif</dt><dd>Autorise l’utilisation de cet emballage dans les nouveaux devis.</dd></div></dl><p><strong>Exemple :</strong> quatre paquets de 200 g représentent 800 g de café. Avec un carton de 180 g, le transporteur reçoit un colis de 980 g.</p></section>
           <section><h3>Emballages actuellement configurés</h3><div className="admin-help-table-wrap"><table className="admin-help-table"><thead><tr><th>Emballage</th><th>Café maximal</th><th>Tare</th><th>Dimensions</th><th>État</th></tr></thead><tbody>{presets.length > 0 ? presets.map((preset) => <tr key={preset.id}><td>{preset.name}</td><td>{preset.max_net_weight_grams} g</td><td>{preset.tare_weight_grams} g</td><td>{preset.length_cm} × {preset.width_cm} × {preset.height_cm} cm</td><td>{preset.active ? "Actif" : "Inactif"}</td></tr>) : <tr><td colSpan={5}>Aucun emballage configuré.</td></tr>}</tbody></table></div><p>Le site choisit le plus petit emballage adapté. Si le panier dépasse la capacité maximale, il crée plusieurs colis.</p></section>
-          <section><h3>Calcul des tarifs transporteur</h3><ol><li>Le poids des paquets est additionné.</li><li>La commande est répartie dans les emballages actifs.</li><li>La tare et les dimensions de chaque colis sont ajoutées.</li><li>Les nouveaux devis, y compris Colissimo France, sont demandés uniquement à Sendcloud.</li><li>Shippo reste disponible uniquement pour gérer l’historique des anciennes étiquettes.</li><li>Pour plusieurs colis, les tarifs du même service sont additionnés.</li></ol><p>Mode actif : <strong>{colissimoMode === "sendcloud_only" ? "Sendcloud seul" : colissimoMode === "compare" ? "comparaison Shippo / Sendcloud" : "Shippo seul"}</strong>. Le devis est valable 15 minutes.</p></section>
-          <section><h3>Franco de port</h3><p>La livraison est offerte à partir de <strong>{euros(thresholds.fr)} en France</strong> et de <strong>{euros(thresholds.euUk)} dans l’Union européenne et au Royaume-Uni</strong>, selon le sous-total des cafés.</p><p>Le service compatible le moins cher passe à 0 € pour le client. Shippo ou Sendcloud facture toujours l’étiquette à Zen Coffee Lab : son coût reste donc à votre charge. Les seuils sont configurés dans les variables Cloudflare et ne sont pas modifiables sur cet écran.</p></section>
+          <section><h3>Calcul des tarifs transporteur</h3><ol><li>Le poids des paquets est additionné.</li><li>La commande est répartie dans les emballages actifs.</li><li>La tare et les dimensions de chaque colis sont ajoutées.</li><li>Sendcloud renvoie les services techniquement disponibles.</li><li>Le site conserve uniquement les transporteurs autorisés dans la zone et applique la grille commerciale selon le poids total expédié.</li><li>Le coût réel Sendcloud reste enregistré séparément lors de l’achat de l’étiquette.</li></ol><p>Shippo sert uniquement à l’historique des anciennes étiquettes. Le devis est valable 15 minutes.</p></section>
+          <section><h3>Franco de port</h3><p>La livraison est offerte à partir de <strong>{euros(thresholds.fr)} en France</strong> et de <strong>{euros(thresholds.euUk)} dans l’Union européenne et au Royaume-Uni</strong>, selon le sous-total des cafés.</p><p>Le service compatible le moins cher passe à 0 € pour le client. Sendcloud facture toujours l’étiquette à Zen Coffee Lab : son coût reste donc à votre charge. Les seuils sont configurés dans les variables Cloudflare et ne sont pas modifiables sur cet écran.</p></section>
           <section><h3>Après le paiement</h3><ol><li>Stripe confirme le paiement.</li><li>La commande apparaît dans le back-office.</li><li>Vous ouvrez la commande et cliquez sur « Acheter les étiquettes ».</li><li>Une étiquette PDF est achetée pour chaque colis.</li><li>Le suivi et le coût réel sont enregistrés.</li></ol><p>L’achat des étiquettes n’est jamais automatique. Une modification d’emballage s’applique uniquement aux nouveaux devis.</p></section>
         </div>
       </div>
@@ -125,11 +125,11 @@ export function ShippingHelp({ presets, thresholds, colissimoMode }: { presets: 
 }
 
 export default function AdminShipping() {
-  const { demo, presets, thresholds, colissimoMode } = useLoaderData<typeof loader>();
+  const { demo, presets, thresholds } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const activePresetCount = presets.filter((preset) => preset.active).length;
   return <AdminShell active="shipping">
-    <header className="admin-heading"><div><p className="eyebrow">Shippo · Sendcloud</p><div className="admin-title-with-help"><h1>Emballages & franco</h1><ShippingHelp presets={presets} thresholds={thresholds} colissimoMode={colissimoMode} /></div></div></header>
+    <header className="admin-heading"><div><p className="eyebrow">Sendcloud</p><div className="admin-title-with-help"><h1>Emballages & franco</h1><ShippingHelp presets={presets} thresholds={thresholds} /></div></div></header>
     {demo ? <p className="admin-notice">Connectez Supabase pour modifier les emballages.</p> : null}
     {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
     <section className="ui-card admin-editor"><h2>Seuils de livraison gratuite</h2><p>France : <strong>{thresholds.fr / 100} €</strong> · UE et Royaume-Uni : <strong>{thresholds.euUk / 100} €</strong></p><p><small>Ces seuils sont configurés par environnement avec <code>FREE_SHIPPING_FR_CENTS</code> et <code>FREE_SHIPPING_EU_UK_CENTS</code>.</small></p></section>

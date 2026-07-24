@@ -3,7 +3,7 @@ import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Link, useLoaderData } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
 import { formatMoney } from "~/domain/money";
-import { EU_SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
+import { EU_SHIPPING_COUNTRY_CODES, NON_EU_SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
 import type { PickupPoint, ShippingRate } from "~/domain/types";
 import { getAudience } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
@@ -161,7 +161,7 @@ export default function Checkout() {
             <div className="field field--wide"><label htmlFor="line2">{english ? "Address line 2" : "Complément"}</label><input id="line2" name="line2" autoComplete="address-line2" /></div>
             <div className="field"><label htmlFor="postalCode">{english ? "Postcode" : "Code postal"}</label><input id="postalCode" name="postalCode" required autoComplete="postal-code" /></div>
             <div className="field"><label htmlFor="city">{english ? "City" : "Ville"}</label><input id="city" name="city" required autoComplete="address-level2" /></div>
-            <div className="field"><label htmlFor="countryCode">{english ? "Country" : "Pays"}</label><select id="countryCode" name="countryCode" value={countryCode} onChange={(event) => { const country = event.currentTarget.value; setCountryCode(country); if (country !== "FR") { setDeliveryMethod("home"); resetPickup(); } }}><optgroup label={english ? "European Union" : "Union européenne"}>{EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup><optgroup label={english ? "Outside the EU" : "Hors Union européenne"}><option value="GB">{shippingCountryLabel("GB", locale)}</option></optgroup></select></div>
+            <div className="field"><label htmlFor="countryCode">{english ? "Country" : "Pays"}</label><select id="countryCode" name="countryCode" value={countryCode} onChange={(event) => { const country = event.currentTarget.value; setCountryCode(country); if (country !== "FR") { setDeliveryMethod("home"); resetPickup(); } }}><optgroup label={english ? "European Union" : "Union européenne"}>{EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup><optgroup label={english ? "Outside the EU" : "Hors Union européenne"}>{NON_EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup></select></div>
           </div>
         </section>
 
@@ -169,7 +169,7 @@ export default function Checkout() {
           <h2>3. {english ? "Delivery preference" : "Préférence de livraison"}</h2>
           <div className="delivery-methods" role="radiogroup" aria-label={english ? "Delivery preference" : "Préférence de livraison"}>
             <label className={deliveryMethod === "home" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="deliveryMethod" value="home" checked={deliveryMethod === "home"} onChange={() => { setDeliveryMethod("home"); invalidateQuote(); }} /><span><strong>{english ? "Home delivery" : "Livraison à domicile"}</strong><small>{english ? "Delivered to the address above" : "Livraison à l’adresse indiquée"}</small></span></label>
-            <label className={deliveryMethod === "pickup" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="deliveryMethod" value="pickup" checked={deliveryMethod === "pickup"} onChange={() => { setDeliveryMethod("pickup"); invalidateQuote(); }} /><span><strong>{english ? "Pickup point" : "Point relais"}</strong><small>{english ? "Choose a nearby Sendcloud location" : "Choisissez un relais Mondial Relay ou Colissimo"}</small></span></label>
+            <label className={deliveryMethod === "pickup" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="deliveryMethod" value="pickup" checked={deliveryMethod === "pickup"} onChange={() => { setDeliveryMethod("pickup"); invalidateQuote(); }} /><span><strong>{english ? "Pickup point" : "Point relais"}</strong><small>{english ? "Choose a nearby Mondial Relay location" : "Choisissez un relais Mondial Relay"}</small></span></label>
           </div>
           {deliveryMethod === "pickup" ? <div className="pickup-search">
             <button className="button button--light" type="button" onClick={searchForPickupPoints} disabled={pickupBusy}>{pickupBusy ? (english ? "Searching…" : "Recherche…") : (english ? "Find pickup points" : "Rechercher les points relais")}</button>
