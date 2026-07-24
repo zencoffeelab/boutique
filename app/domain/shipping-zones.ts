@@ -1,5 +1,8 @@
 export type ShippingZone = 1 | 2 | 3 | 4 | 5;
 export type ConfiguredShippingService = "mondial_relay" | "fedex" | "fedex_signature" | "colissimo";
+export type ShippingDeliveryMethod = "home" | "pickup";
+
+export const PICKUP_SHIPPING_COUNTRY_CODES = ["FR", "DE", "BE", "LU", "NL"] as const;
 
 const countryZones: Readonly<Record<string, ShippingZone>> = {
   FR: 1,
@@ -30,6 +33,16 @@ export function shippingZoneForCountry(countryCode: string): ShippingZone | null
 export function configuredShippingServices(countryCode: string): readonly ConfiguredShippingService[] {
   const zone = shippingZoneForCountry(countryCode);
   return zone === null ? [] : zoneServices[zone];
+}
+
+export function supportsPickupDelivery(countryCode: string) {
+  return (PICKUP_SHIPPING_COUNTRY_CODES as readonly string[]).includes(countryCode.toUpperCase());
+}
+
+export function configuredShippingServicesForDelivery(countryCode: string, deliveryMethod: ShippingDeliveryMethod): readonly ConfiguredShippingService[] {
+  const services = configuredShippingServices(countryCode);
+  if (deliveryMethod === "pickup") return supportsPickupDelivery(countryCode) && services.includes("mondial_relay") ? ["mondial_relay"] : [];
+  return shippingZoneForCountry(countryCode) === 2 ? services.filter((service) => service !== "mondial_relay") : services;
 }
 
 export function customerShippingPriceCents(countryCode: string, service: ConfiguredShippingService, weightGrams: number): number | null {

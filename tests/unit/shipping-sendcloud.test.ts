@@ -55,7 +55,7 @@ describe("Sendcloud zoned shipping quotes", () => {
     expect(fetchMock.mock.calls.every(([input]) => String(input).includes("sendcloud.sc"))).toBe(true);
   });
 
-  it("returns the three configured Zone 2 services and distinguishes signature", async () => {
+  it("keeps only FedEx home services in Zone 2 and distinguishes signature", async () => {
     useRealShippingEnvironment();
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ data: [
       option({ code: "mondial_relay:home_international_dualapi/c2c", carrierCode: "mondial_relay", carrier: "Mondial Relay", name: "Mondial Relay Home International", amount: "10.43" }),
@@ -67,10 +67,28 @@ describe("Sendcloud zoned shipping quotes", () => {
     const { createShippingQuote } = await import("~/services/shipping.server");
     const quote = await createShippingQuote({ cartId: crypto.randomUUID(), locale: "fr-FR", audience: "retail", address: { ...address, countryCode: "DE", postalCode: "10115", city: "Berlin" }, lines: [await cartLine()] });
 
-    expect(quote.rates.map(({ carrier, amountCents }) => [carrier, amountCents])).toEqual([
-      ["Mondial Relay", 450], ["FedEx", 850], ["FedEx", 1_150],
+    expect(quote.rates.map(({ carrier, amountCents, signatureRequired }) => [carrier, amountCents, signatureRequired])).toEqual([
+      ["FedEx", 850, false], ["FedEx", 1_150, true],
     ]);
-    expect(quote.rates[2].service).toMatch(/Signature/i);
+  });
+
+  it("uses Mondial Relay Point Relais International for Zone 2 pickup delivery", async () => {
+    useRealShippingEnvironment();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/check-availability")) return new Response("true", { status: 200, headers: { "content-type": "application/json" } });
+      if (url.includes("servicepoints.sendcloud.sc")) return new Response(JSON.stringify({ id: 10445088, is_active: true, name: "Berlin PaketShop", street: "Hauptstrasse", house_number: "1", postal_code: "10115", city: "Berlin", country: "DE", carrier: "mondial_relay", general_shop_type: "servicepoint" }), { status: 200 });
+      expect(JSON.parse(String(init?.body))).toMatchObject({ carrier_code: "mondial_relay", functionalities: { last_mile: "service_point" }, to_service_point: { id: 10445088 } });
+      return new Response(JSON.stringify({ data: [
+        option({ code: "mondial_relay:service_point,international_dualapi/c2c", carrierCode: "mondial_relay", carrier: "Mondial Relay", name: "Mondial Relay Point Relais International", lastMile: "service_point", amount: "6.25" }),
+      ] }), { status: 200 });
+    }));
+    vi.resetModules();
+    const { createShippingQuote } = await import("~/services/shipping.server");
+    const quote = await createShippingQuote({ cartId: crypto.randomUUID(), locale: "fr-FR", audience: "retail", address: { ...address, countryCode: "DE", postalCode: "10115", city: "Berlin" }, pickupPointId: "10445088", lines: [await cartLine()] });
+
+    expect(quote.rates).toHaveLength(1);
+    expect(quote.rates[0]).toMatchObject({ provider: "sendcloud", carrier: "Mondial Relay", service: "Mondial Relay Point Relais International", deliveryMethod: "pickup", amountCents: 450, pickupPoint: { id: "10445088" } });
   });
 
   it("keeps only standard FedEx in Zone 4", async () => {
@@ -98,7 +116,7 @@ describe("Sendcloud zoned shipping quotes", () => {
     const quote = await createShippingQuote({ cartId: crypto.randomUUID(), locale: "fr-FR", audience: "retail", address: { ...address, countryCode: "CY", postalCode: "1010", city: "Nicosia" }, lines: [await cartLine()] });
 
     expect(quote.rates).toHaveLength(1);
-    expect(quote.rates[0]).toMatchObject({ provider: "sendcloud", carrier: "Colissimo", amountCents: 1_650 });
+    expect(quote.rates[0]).toMatchObject({ provider: "sendcloud", carrier: "Colissimo", amountCents: 1_650, signatureRequired: true });
   });
 
   it("returns only Mondial Relay pickup points and applies the Zone 1 price", async () => {

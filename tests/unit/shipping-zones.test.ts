@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { configuredShippingServices, customerShippingPriceCents, shippingZoneForCountry } from "~/domain/shipping-zones";
+import { configuredShippingServices, configuredShippingServicesForDelivery, customerShippingPriceCents, shippingZoneForCountry, supportsPickupDelivery } from "~/domain/shipping-zones";
 
 describe("commercial shipping zones", () => {
   it("maps every configured country to the requested zone", () => {
@@ -17,6 +17,14 @@ describe("commercial shipping zones", () => {
     expect(configuredShippingServices("ES")).toEqual(["mondial_relay", "fedex", "fedex_signature"]);
     expect(configuredShippingServices("CZ")).toEqual(["fedex"]);
     expect(configuredShippingServices("CY")).toEqual(["colissimo"]);
+  });
+
+  it("replaces Mondial Relay home with pickup delivery in Zone 2", () => {
+    expect(configuredShippingServicesForDelivery("DE", "home")).toEqual(["fedex", "fedex_signature"]);
+    expect(configuredShippingServicesForDelivery("DE", "pickup")).toEqual(["mondial_relay"]);
+    expect(configuredShippingServicesForDelivery("FR", "home")).toEqual(["mondial_relay", "fedex"]);
+    expect(["FR", "DE", "BE", "LU", "NL"].every(supportsPickupDelivery)).toBe(true);
+    expect(supportsPickupDelivery("ES")).toBe(false);
   });
 
   it("applies every weight tier and flat price in cents", () => {

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { Audience, Locale, PackedParcel, PickupPoint, ResolvedCartLine, ShippingRate } from "~/domain/types";
 import { packCartByWeight } from "~/domain/packing";
 import { freeShippingThresholdCents } from "~/domain/money";
-import { configuredShippingServices, customerShippingPriceCents, type ConfiguredShippingService } from "~/domain/shipping-zones";
+import { configuredShippingServicesForDelivery, customerShippingPriceCents, type ConfiguredShippingService } from "~/domain/shipping-zones";
 import { getPackagingPresets, resolveCartLines } from "~/lib/catalog.server";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
@@ -38,7 +38,8 @@ const localQuotes = new Map<string, ShippingQuoteRecord>();
 
 function mockRates(parcels: PackedParcel[], subtotalCents: number, countryCode: string, pickupPoint?: PickupPoint): StoredRate[] {
   const totalWeight = parcels.reduce((sum, parcel) => sum + parcel.shippingWeightGrams, 0);
-  const services = pickupPoint ? configuredShippingServices(countryCode).filter((service) => service === "mondial_relay") : configuredShippingServices(countryCode);
+  const deliveryMethod = pickupPoint ? "pickup" : "home";
+  const services = configuredShippingServicesForDelivery(countryCode, deliveryMethod);
   const metadata: Record<ConfiguredShippingService, { carrier: string; service: string; days: number }> = {
     mondial_relay: { carrier: "Mondial Relay", service: pickupPoint ? (pickupPoint.type === "locker" ? "Consigne" : "Point Relais") : "Livraison à domicile", days: 3 },
     fedex: { carrier: "FedEx", service: countryCode === "FR" ? "Priority" : "International Connect Plus", days: 2 },
@@ -52,7 +53,8 @@ function mockRates(parcels: PackedParcel[], subtotalCents: number, countryCode: 
     return [{
       id: randomUUID(), provider: "mock" as const, carrier: details.carrier, service: details.service,
       deliveryMethod: pickupPoint ? "pickup" as const : "home" as const, ...(pickupPoint ? { pickupPoint } : {}),
-      amountCents, currency: "EUR" as const, estimatedDays: details.days, freeShippingApplied: false, configuredService: service,
+      amountCents, currency: "EUR" as const, estimatedDays: details.days, freeShippingApplied: false,
+      signatureRequired: service === "fedex_signature" || service === "colissimo", configuredService: service,
       sendcloudShippingOptionCodes: parcels.map(() => `mock:${service}`),
       sendcloudParcelAmountsCents: parcels.map((_, index) => index === 0 ? amountCents : 0),
     }];
@@ -82,7 +84,8 @@ function configuredServiceForOption(option: SendcloudOption, countryCode: string
     if (countryCode === "FR" && code !== "fedex:domestic") return null;
     service = option.functionalities?.signature === true ? "fedex_signature" : "fedex";
   }
-  return service && configuredShippingServices(countryCode).includes(service) ? service : null;
+  const deliveryMethod = asText(option.functionalities?.last_mile) === "home_delivery" ? "home" : "pickup";
+  return service && configuredShippingServicesForDelivery(countryCode, deliveryMethod).includes(service) ? service : null;
 }
 
 async function sendcloudOptionsForParcel(parcel: PackedParcel, address: QuoteAddress, pickupPoint?: PickupPoint): Promise<SendcloudOption[]> {
@@ -158,6 +161,7 @@ async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, pi
       currency: "EUR" as const,
       estimatedDays: leadTimes.length ? Math.max(...leadTimes.map((hours) => Math.ceil(hours / 24))) : null,
       freeShippingApplied: false,
+      signatureRequired: parcelOptions[0].functionalities?.signature === true,
       configuredService: configuredServiceForOption(parcelOptions[0], address.countryCode)!,
       sendcloudShippingOptionCodes: parcels.map(() => code),
       sendcloudParcelAmountsCents: parcelAmounts,
@@ -174,7 +178,7 @@ async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, pi
     const selectedCost = selected?.sendcloudParcelAmountsCents?.reduce((sum, amount) => sum + amount, 0) ?? Number.POSITIVE_INFINITY;
     if (!selected || actualCost < selectedCost) selectedByService.set(service, rate);
   }
-  const orderedServices = pickupPoint ? configuredShippingServices(address.countryCode).filter((service) => service === "mondial_relay") : configuredShippingServices(address.countryCode);
+  const orderedServices = configuredShippingServicesForDelivery(address.countryCode, pickupPoint ? "pickup" : "home");
   return orderedServices.flatMap((service) => {
     const rate = selectedByService.get(service);
     const amountCents = customerShippingPriceCents(address.countryCode, service, totalWeight);

@@ -3,7 +3,9 @@ import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Link, useLoaderData } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
 import { formatMoney } from "~/domain/money";
+import { shippingRateLabel } from "~/domain/shipping-rate-label";
 import { EU_SHIPPING_COUNTRY_CODES, NON_EU_SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
+import { supportsPickupDelivery } from "~/domain/shipping-zones";
 import type { PickupPoint, ShippingRate } from "~/domain/types";
 import { getAudience } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
@@ -46,12 +48,6 @@ function pickupCarrierLabel(code: string) {
   return code.replaceAll("_", " ");
 }
 
-export function shippingProviderLabel(rate: ShippingRate, english: boolean) {
-  if (!/colissimo/i.test(rate.carrier) || rate.provider === "mock") return null;
-  const provider = rate.provider === "shippo" ? "Shippo" : "Sendcloud";
-  return `${english ? "via" : "via"} ${provider}`;
-}
-
 export default function Checkout() {
   const { locale, audience, pickupConfigured, products } = useLoaderData<typeof loader>(); const english = locale === "en-GB";
   const { lines, hydrated } = useCart(); const formRef = useRef<HTMLFormElement>(null);
@@ -60,6 +56,7 @@ export default function Checkout() {
   const [countryCode, setCountryCode] = useState("FR"); const [deliveryMethod, setDeliveryMethod] = useState<"home" | "pickup">("home");
   const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([]); const [selectedPickupPointId, setSelectedPickupPointId] = useState("");
   const [pickupBusy, setPickupBusy] = useState(false); const [pickupError, setPickupError] = useState("");
+  const pickupAvailable = pickupConfigured && supportsPickupDelivery(countryCode);
 
   useEffect(() => {
     const key = "zcl:cart-id:v1"; let id = window.localStorage.getItem(key);
@@ -86,7 +83,7 @@ export default function Checkout() {
   const searchForPickupPoints = async () => {
     const form = formRef.current; if (!form || !form.reportValidity()) return;
     const address = getAddress(form);
-    if (address.countryCode !== "FR") return;
+    if (!supportsPickupDelivery(address.countryCode)) return;
     setPickupBusy(true); setPickupError(""); setPickupPoints([]); setSelectedPickupPointId(""); invalidateQuote();
     try {
       const response = await fetch("/api/shipping/pickup-points", {
@@ -161,11 +158,11 @@ export default function Checkout() {
             <div className="field field--wide"><label htmlFor="line2">{english ? "Address line 2" : "Complément"}</label><input id="line2" name="line2" autoComplete="address-line2" /></div>
             <div className="field"><label htmlFor="postalCode">{english ? "Postcode" : "Code postal"}</label><input id="postalCode" name="postalCode" required autoComplete="postal-code" /></div>
             <div className="field"><label htmlFor="city">{english ? "City" : "Ville"}</label><input id="city" name="city" required autoComplete="address-level2" /></div>
-            <div className="field"><label htmlFor="countryCode">{english ? "Country" : "Pays"}</label><select id="countryCode" name="countryCode" value={countryCode} onChange={(event) => { const country = event.currentTarget.value; setCountryCode(country); if (country !== "FR") { setDeliveryMethod("home"); resetPickup(); } }}><optgroup label={english ? "European Union" : "Union européenne"}>{EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup><optgroup label={english ? "Outside the EU" : "Hors Union européenne"}>{NON_EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup></select></div>
+            <div className="field"><label htmlFor="countryCode">{english ? "Country" : "Pays"}</label><select id="countryCode" name="countryCode" value={countryCode} onChange={(event) => { setCountryCode(event.currentTarget.value); setDeliveryMethod("home"); resetPickup(); }}><optgroup label={english ? "European Union" : "Union européenne"}>{EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup><optgroup label={english ? "Outside the EU" : "Hors Union européenne"}>{NON_EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup></select></div>
           </div>
         </section>
 
-        {pickupConfigured && countryCode === "FR" ? <section className="checkout-section pickup-section">
+        {pickupAvailable ? <section className="checkout-section pickup-section">
           <h2>3. {english ? "Delivery preference" : "Préférence de livraison"}</h2>
           <div className="delivery-methods" role="radiogroup" aria-label={english ? "Delivery preference" : "Préférence de livraison"}>
             <label className={deliveryMethod === "home" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="deliveryMethod" value="home" checked={deliveryMethod === "home"} onChange={() => { setDeliveryMethod("home"); invalidateQuote(); }} /><span><strong>{english ? "Home delivery" : "Livraison à domicile"}</strong><small>{english ? "Delivered to the address above" : "Livraison à l’adresse indiquée"}</small></span></label>
@@ -182,7 +179,7 @@ export default function Checkout() {
         {hasUnavailableItems ? <p className="form-message form-error" role="alert">{english ? "The stock for an item has changed." : "Le stock d’un produit a changé."} <Link to={english ? "/en/cart" : "/panier"}>{english ? "Update cart" : "Mettre à jour le panier"}</Link></p> : null}
         <button className="button button--dark" type="submit" disabled={busy || !cartId || hasUnavailableItems}>{busy ? (english ? "Calculating…" : "Calcul…") : (english ? "Calculate shipping" : "Calculer la livraison")}</button>
         {error ? <p className="form-message form-error" role="alert">{error}</p> : null}
-        {quote?.rates?.length ? <section className="checkout-section shipping-rates"><h2>{pickupConfigured && countryCode === "FR" ? "4" : "3"}. {english ? "Delivery service" : "Mode de livraison"}</h2><div className="rate-list">{quote.rates.map((rate) => { const providerLabel = shippingProviderLabel(rate, english); return <label className="rate-option" key={rate.id}><input type="radio" name="shippingRate" checked={selectedRate === rate.id} onChange={() => setSelectedRate(rate.id)} /><span><span className="rate-option__heading"><strong>{rate.carrier} · {rate.service}</strong>{providerLabel ? <small className={`shipping-provider shipping-provider--${rate.provider}`}>{providerLabel}</small> : null}</span><small>{rate.estimatedDays ? `${rate.estimatedDays} ${english ? "business days" : "jours ouvrés"}` : ""}{rate.pickupPoint ? `${rate.estimatedDays ? " · " : ""}${rate.pickupPoint.name}` : ""}</small></span><strong>{formatMoney(rate.amountCents, locale)}</strong></label>; })}</div></section> : null}
+        {quote?.rates?.length ? <section className="checkout-section shipping-rates"><h2>{pickupAvailable ? "4" : "3"}. {english ? "Delivery service" : "Mode de livraison"}</h2><div className="rate-list">{quote.rates.map((rate) => <label className="rate-option" key={rate.id}><input type="radio" name="shippingRate" checked={selectedRate === rate.id} onChange={() => setSelectedRate(rate.id)} /><span><strong>{shippingRateLabel(rate)}</strong><br /><small>{rate.estimatedDays ? `${rate.estimatedDays} ${english ? "business days" : "jours ouvrés"}` : ""}{rate.pickupPoint ? `${rate.estimatedDays ? " · " : ""}${rate.pickupPoint.name}` : ""}</small></span><strong>{formatMoney(rate.amountCents, locale)}</strong></label>)}</div></section> : null}
       </form>
 
       <aside className="summary-card"><h2>{english ? "Your order" : "Votre commande"}</h2>{resolved.map(({ line, product, variant, offer }) => <div className="summary-row" key={variant.id}><span>{line.quantity} × {product.translations[locale].name} · {variant.label}</span><strong>{formatMoney(line.quantity * offer.price.amount, locale)}</strong></div>)}<div className="summary-row"><span>{english ? "Subtotal" : "Sous-total"}</span><strong>{formatMoney(subtotal, locale)}</strong></div><div className="summary-row"><span>{english ? "Shipping" : "Livraison"}</span><strong>{selectedRate ? formatMoney(quote?.rates?.find((rate) => rate.id === selectedRate)?.amountCents ?? 0, locale) : "—"}</strong></div><div className="summary-row summary-total"><span>Total</span><strong>{formatMoney(subtotal + (quote?.rates?.find((rate) => rate.id === selectedRate)?.amountCents ?? 0), locale)}</strong></div><p><small>{english ? "By paying, you accept the terms and acknowledge that UK duties remain payable by the recipient." : "En payant, vous acceptez les CGV. Les éventuels droits au Royaume-Uni restent à la charge du destinataire."}</small></p><button className="button button--dark" type="button" onClick={pay} disabled={!selectedRate || busy}>{english ? "Pay securely" : "Payer en toute sécurité"}</button></aside>

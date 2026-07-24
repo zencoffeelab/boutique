@@ -1,22 +1,22 @@
 import { describe, expect, it } from "vitest";
+import { shippingRateLabel } from "~/domain/shipping-rate-label";
 import type { ShippingRate } from "~/domain/types";
-import { shippingProviderLabel } from "~/routes/checkout";
 
-function rate(provider: ShippingRate["provider"], carrier = "Colissimo"): ShippingRate {
+function rate(carrier: string, signatureRequired = false): ShippingRate {
   return {
-    id: "rate-1", provider, carrier, service: "Domicile", deliveryMethod: "home",
-    amountCents: 625, currency: "EUR", estimatedDays: 2, freeShippingApplied: false,
+    id: "rate-1", provider: "sendcloud", carrier, service: "Internal Sendcloud service", deliveryMethod: "home",
+    amountCents: 625, currency: "EUR", estimatedDays: 2, freeShippingApplied: false, signatureRequired,
   };
 }
 
-describe("checkout shipping provider labels", () => {
-  it("distinguishes both Colissimo providers", () => {
-    expect(shippingProviderLabel(rate("shippo"), false)).toBe("via Shippo");
-    expect(shippingProviderLabel(rate("sendcloud"), false)).toBe("via Sendcloud");
+describe("checkout shipping rate labels", () => {
+  it("keeps only the carrier brand", () => {
+    expect(shippingRateLabel(rate("Mondial Relay"))).toBe("Mondial Relay");
+    expect(shippingRateLabel(rate("FedEx"))).toBe("FedEx");
   });
 
-  it("does not add an internal provider label to other carriers or mock rates", () => {
-    expect(shippingProviderLabel(rate("sendcloud", "FedEx"), false)).toBeNull();
-    expect(shippingProviderLabel(rate("mock"), false)).toBeNull();
+  it("keeps only the signature qualifier when required", () => {
+    expect(shippingRateLabel(rate("FedEx", true))).toBe("FedEx - Signature");
+    expect(shippingRateLabel(rate("Colissimo", true))).toBe("Colissimo - Signature");
   });
 });

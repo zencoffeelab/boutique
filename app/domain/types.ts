@@ -167,6 +167,7 @@ export type ShippingRate = Readonly<{
   currency: "EUR";
   estimatedDays: number | null;
   freeShippingApplied: boolean;
+  signatureRequired?: boolean;
 }>;
 
 export type AdviceArticle = Readonly<{
