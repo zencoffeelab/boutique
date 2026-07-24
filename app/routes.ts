@@ -22,6 +22,7 @@ export default [
   route("mon-compte", "routes/account.tsx"),
   route("auth/confirm", "routes/auth-confirm.ts"),
   route("admin", "routes/admin.tsx"),
+  route("admin/produits", "routes/admin-products.tsx"),
   route("admin/produits/:id", "routes/admin-product.tsx"),
   route("admin/commandes", "routes/admin-orders.tsx"),
   route("admin/commandes.csv", "routes/admin-orders-csv.ts"),

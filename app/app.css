@@ -263,6 +263,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .admin-main { min-width: 0; padding: clamp(1.5rem, 4vw, 4rem); }
 .admin-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
 .admin-heading h1 { margin: 0; font: 600 clamp(2rem, 4vw, 3.5rem)/1 var(--sans); letter-spacing: -.04em; }
+.admin-heading__description { max-width: 42rem; margin: .65rem 0 0; color: #667062; }
+.admin-heading__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .65rem; }
 .admin-title-with-help { display: flex; align-items: center; gap: .75rem; }
 .admin-info-button { display: grid; flex: none; width: 2.35rem; height: 2.35rem; place-items: center; padding: 0; border: 1px solid #cfd4cb; border-radius: 50%; background: white; }
 .admin-info-button:hover { border-color: var(--green-deep); background: #edf0e9; }
@@ -291,7 +293,28 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .ui-card__header { border-bottom: 1px solid #e7e9e3; }
 .stat-label { color: #667062; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .stat-value { margin: .5rem 0 0; font: 650 2rem/1 var(--sans); }
+.stat-detail { margin: .45rem 0 0; color: #667062; font-size: .72rem; }
 .admin-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1rem; }
+.admin-dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, .85fr); gap: 1rem; }
+.admin-dashboard-sidebar { display: grid; align-content: start; gap: 1rem; }
+.admin-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.admin-card-heading h2, .admin-dashboard-sidebar h2 { margin: .2rem 0 0; font: 650 1.3rem/1.1 var(--sans); }
+.admin-card-heading .text-link { display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
+.admin-card-heading .text-link svg { width: 1rem; height: 1rem; }
+.admin-task-list, .admin-quick-links { display: grid; gap: .35rem; }
+.admin-task-list > a { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .75rem 0; border-bottom: 1px solid #e7e9e3; }
+.admin-task-list > a:first-child { padding-top: 0; }
+.admin-task-list > a:last-child { padding-bottom: 0; border-bottom: 0; }
+.admin-task-list > a > span { display: flex; align-items: center; gap: .6rem; }
+.admin-task-list svg { width: 1.1rem; height: 1.1rem; color: #667062; }
+.admin-quick-links > a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .8rem; border-radius: .3rem; background: #f3f5f0; }
+.admin-quick-links > a:hover { background: #e9ede5; }
+.admin-quick-links > a > svg { width: 1.15rem; height: 1.15rem; }
+.admin-quick-links span { display: grid; gap: .15rem; }
+.admin-quick-links small { color: #667062; }
+.admin-stock-warning { color: #a33d20; font-weight: 750; }
+.admin-muted { color: #667062; }
+.admin-footer { margin-top: 3rem; }
 .ui-table-wrap { width: 100%; overflow-x: auto; }
 .ui-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
 .ui-table th { color: #677063; font-size: .67rem; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
@@ -374,7 +397,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
   .delivery-methods { grid-template-columns: 1fr; }
   .summary-card { position: static; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .admin-grid { grid-template-columns: 1fr; }
+  .admin-grid, .admin-dashboard-grid { grid-template-columns: 1fr; }
   .admin-professional-filter { grid-template-columns: 1fr 220px auto; }
 }
 
@@ -390,6 +413,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
   .admin-member-actions, .admin-member-actions .admin-activation-link { min-width: 0; }
   .admin-activation-link { align-items: stretch; flex-direction: column; }
   .section-header { display: block; }
+  .admin-heading { align-items: flex-start; flex-direction: column; gap: 1rem; }
+  .admin-heading__actions { width: 100%; justify-content: flex-start; }
   .section-header .text-link { margin-top: 1rem; }
   .product-grid, .value-grid, .split-feature, .article-grid, .steps { grid-template-columns: 1fr; }
   .product-grid { gap: 3rem; }

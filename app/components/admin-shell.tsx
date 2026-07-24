@@ -8,13 +8,13 @@ export type AdminSection = "dashboard" | "orders" | "products" | "stocks" | "shi
 const navigation = [
   { section: "dashboard", label: "Tableau de bord", href: "/admin", icon: LayoutDashboard },
   { section: "orders", label: "Commandes", href: "/admin/commandes", icon: ShoppingCart },
-  { section: "products", label: "Produits", href: "/admin#catalogue", icon: Package },
-  { section: "stocks", label: "Stocks", href: "/admin#catalogue", icon: Boxes },
+  { section: "products", label: "Produits", href: "/admin/produits", icon: Package },
+  { section: "stocks", label: "Stocks", href: "/admin/produits#catalogue", icon: Boxes },
   { section: "shipping", label: "Expédition", href: "/admin/expedition", icon: Boxes },
   { section: "professionals", label: "Professionnels", href: "/admin/professionnels", icon: Users },
   { section: "content", label: "Pages", href: "/admin/contenus", icon: FileText },
   { section: "editorial", label: "FAQ & Conseils", href: "/admin/editorial", icon: FileText },
-  { section: "archives", label: "Archives", href: "/admin#catalogue", icon: Archive },
+  { section: "archives", label: "Archives", href: "/admin/produits#catalogue", icon: Archive },
 ] as const;
 
 export function AdminShell({ active, children }: { active: AdminSection; children: ReactNode }) {

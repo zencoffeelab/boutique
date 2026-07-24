@@ -12,5 +12,7 @@ describe("admin navigation", () => {
     }
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
     expect(html).toContain('aria-current="page" href="/admin/editorial"');
+    expect(html).toContain('href="/admin/produits"');
+    expect(html).not.toContain('href="/admin#catalogue"');
   });
 });
