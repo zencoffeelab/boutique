@@ -3,17 +3,9 @@ import { professionalDecisionSchema } from "~/domain/schemas";
 import { requireAdmin } from "~/lib/auth.server";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
-import { enqueueNotification, escapeEmailHtml, processNotificationQueue } from "~/services/notifications.server";
+import { professionalDecisionEmail } from "~/services/email-templates.server";
+import { dispatchNotificationQueue, enqueueNotification } from "~/services/notifications.server";
 import { generateProfessionalAccessLink, professionalDecisionFeedback, ProfessionalAccessError } from "~/services/professional-access.server";
-
-function processQueuedEmail(context: ActionFunctionArgs["context"]) {
-  const task = processNotificationQueue(10).catch((cause) => {
-    console.error("professional_access_notification_failed", { message: cause instanceof Error ? cause.message : String(cause) });
-  });
-  const cloudflare = (context as { cloudflare?: { ctx?: { waitUntil(promise: Promise<unknown>): void } } }).cloudflare;
-  if (cloudflare?.ctx) cloudflare.ctx.waitUntil(task);
-  else void task;
-}
 
 export async function action({ request, params, context }: ActionFunctionArgs) {
   if (request.method !== "POST") return Response.json({ ok: false, message: "Méthode non autorisée." }, { status: 405 });
@@ -74,18 +66,17 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
   const emailConfigured = Boolean(env().RESEND_API_KEY);
   let emailQueued = false;
   try {
+    const content = professionalDecisionEmail({ locale: application.locale, approved, activationUrl: invitationLink, accessLabel, note: parsed.data.note });
     const queued = await enqueueNotification({
       kind: approved ? "invitation" : "pro_decision",
       to: application.email,
       locale: application.locale,
-      subject: approved ? (english ? "Your professional access is ready" : "Votre accès professionnel est prêt") : (english ? "Your professional application" : "Votre demande professionnelle"),
-      html: approved
-        ? `<h1>${english ? "Welcome to Zen Coffee Lab" : "Bienvenue chez Zen Coffee Lab"}</h1><p>${english ? "Your application has been approved by our team." : "Votre demande a été validée par notre équipe."}</p><p><a href="${escapeEmailHtml(invitationLink)}">${accessLabel}</a></p><p>${english ? "This secure link is temporary." : "Ce lien sécurisé est temporaire."}</p>`
-        : `<h1>${english ? "Your application has been reviewed" : "Votre demande a été étudiée"}</h1>${parsed.data.note ? `<p>${escapeEmailHtml(parsed.data.note)}</p>` : ""}`,
+      ...content,
       payload: { applicationId: application.id, invitedUserId, existingUser },
+      dedupeKey: `pro-decision/${application.id}/${parsed.data.decision}`,
     });
     emailQueued = queued.queued;
-    if (emailConfigured && emailQueued) processQueuedEmail(context);
+    if (emailConfigured && emailQueued) dispatchNotificationQueue(context, "professional_access_notification_failed", 10);
   } catch (cause) {
     console.error("professional_access_notification_queue_failed", { message: cause instanceof Error ? cause.message : String(cause) });
   }

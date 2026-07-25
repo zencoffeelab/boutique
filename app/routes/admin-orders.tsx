@@ -19,10 +19,12 @@ import { formatMoney, formatSignedMoney } from "~/domain/money";
 import { orderStatuses } from "~/domain/types";
 import { requireAdmin } from "~/lib/auth.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
+import { orderStatusEmail } from "~/services/email-templates.server";
 import {
   getLabelRefundStates,
   type LabelRefundState,
 } from "~/services/label-refunds.server";
+import { dispatchNotificationQueue, enqueueNotification } from "~/services/notifications.server";
 
 const updateSchema = z.object({
   intent: z.literal("update_order"),
@@ -98,7 +100,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   };
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   const admin = await requireAdmin(request);
   if (admin.demo)
     return { ok: false, message: "Lecture seule en démonstration." };
@@ -110,7 +112,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!client) return { ok: false, message: "Base indisponible." };
   const { data: before } = await client
     .from("orders")
-    .select("status,notes")
+    .select("status,notes,email,locale,order_number")
     .eq("id", parsed.data.orderId)
     .single();
   const { error } = await client
@@ -122,6 +124,11 @@ export async function action({ request }: ActionFunctionArgs) {
     })
     .eq("id", parsed.data.orderId);
   if (error) return { ok: false, message: error.message };
+  if (before?.email && before.status !== parsed.data.status && ["preparing", "ready_to_ship", "canceled"].includes(parsed.data.status)) {
+    const content = orderStatusEmail({ locale: before.locale, orderNumber: before.order_number, status: parsed.data.status as "preparing" | "ready_to_ship" | "canceled" });
+    await enqueueNotification({ kind: "order_status", to: before.email, locale: before.locale, ...content, payload: { orderId: parsed.data.orderId, status: parsed.data.status }, dedupeKey: `order-status/${parsed.data.orderId}/${parsed.data.status}` });
+    dispatchNotificationQueue(context, "order_status_notification_delivery_failed");
+  }
   await client
     .from("audit_log")
     .insert({

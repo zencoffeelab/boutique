@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~
 import { requireAdmin } from "~/lib/auth.server";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
-import { enqueueNotification, escapeEmailHtml, processNotificationQueue } from "~/services/notifications.server";
+import { professionalDecisionEmail } from "~/services/email-templates.server";
+import { dispatchNotificationQueue, enqueueNotification } from "~/services/notifications.server";
 import { generateProfessionalAccessLink, ProfessionalAccessError } from "~/services/professional-access.server";
 
 const memberActionSchema = z.object({
@@ -25,13 +26,6 @@ type ProfessionalApplication = {
   decision_note: string | null; decided_at: string | null; invited_user_id: string | null; created_at: string;
 };
 const ADMIN_DATE_FORMATTER = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" });
-
-function processQueuedEmail(context: ActionFunctionArgs["context"]) {
-  const task = processNotificationQueue(10).catch((cause) => console.error("professional_member_notification_failed", { message: cause instanceof Error ? cause.message : String(cause) }));
-  const cloudflare = (context as { cloudflare?: { ctx?: { waitUntil(promise: Promise<unknown>): void } } }).cloudflare;
-  if (cloudflare?.ctx) cloudflare.ctx.waitUntil(task);
-  else void task;
-}
 
 function includesSearch(values: unknown[], query: string) {
   if (!query) return true;
@@ -153,14 +147,14 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const emailConfigured = Boolean(env().RESEND_API_KEY);
   let emailQueued = false;
   try {
+    const locale = application?.locale ?? "fr-FR";
+    const content = professionalDecisionEmail({ locale, approved: true, activationUrl, accessLabel: locale === "en-GB" ? "Choose a new password" : "Choisir un nouveau mot de passe" });
     const queued = await enqueueNotification({
-      kind: "invitation", to: email, locale: application?.locale ?? "fr-FR",
-      subject: application?.locale === "en-GB" ? "Your professional access" : "Votre accès professionnel",
-      html: `<h1>${application?.locale === "en-GB" ? "Your professional access" : "Votre accès professionnel"}</h1><p><a href="${escapeEmailHtml(activationUrl)}">${application?.locale === "en-GB" ? "Choose a new password" : "Choisir un nouveau mot de passe"}</a></p>`,
+      kind: "invitation", to: email, locale, ...content,
       payload: { applicationId: application?.id, invitedUserId: profile.id, regeneratedBy: admin.id },
     });
     emailQueued = queued.queued;
-    if (emailConfigured && emailQueued) processQueuedEmail(context);
+    if (emailConfigured && emailQueued) dispatchNotificationQueue(context, "professional_member_notification_failed", 10);
   } catch (cause) {
     console.error("professional_member_access_queue_failed", { message: cause instanceof Error ? cause.message : String(cause) });
   }

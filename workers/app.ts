@@ -1,6 +1,9 @@
 import { createRequestHandler } from "react-router";
 
-interface CloudflareRuntimeEnv {}
+interface CloudflareRuntimeEnv {
+  VITE_SITE_URL?: string;
+  CRON_SECRET?: string;
+}
 
 interface CloudflareRuntimeContext {
   passThroughOnException(): void;
@@ -41,5 +44,15 @@ export default {
     return requestHandler(request, {
       cloudflare: { env, ctx },
     });
+  },
+  async scheduled(_controller: unknown, env: CloudflareRuntimeEnv, ctx: CloudflareRuntimeContext) {
+    if (!env.VITE_SITE_URL || !env.CRON_SECRET) {
+      console.error("commerce_cron_not_configured");
+      return;
+    }
+    const endpoint = new URL("/api/cron/commerce", env.VITE_SITE_URL);
+    ctx.waitUntil(fetch(endpoint, { headers: { authorization: `Bearer ${env.CRON_SECRET}` } }).then(async (response) => {
+      if (!response.ok) throw new Error(`Commerce cron returned ${response.status}: ${await response.text()}`);
+    }));
   },
 };

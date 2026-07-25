@@ -1,17 +1,26 @@
 import { Resend } from "resend";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
+export { escapeEmailHtml } from "~/services/email-templates.server";
 
-export type NotificationKind = "pro_application" | "pro_decision" | "invitation" | "order_confirmation" | "invoice" | "shipped" | "tracking" | "delivered" | "password_reset";
+export type NotificationKind = "pro_application" | "pro_application_confirmation" | "pro_decision" | "invitation" | "order_confirmation" | "invoice" | "order_status" | "shipped" | "tracking" | "delivered" | "refund" | "password_reset";
 
-export function escapeEmailHtml(value: unknown) { return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;"); }
-
-export async function enqueueNotification(input: { kind: NotificationKind; to: string; locale: "fr-FR" | "en-GB"; subject: string; html: string; payload?: Record<string, unknown> }) {
+export async function enqueueNotification(input: { kind: NotificationKind; to: string; locale: "fr-FR" | "en-GB"; subject: string; html: string; payload?: Record<string, unknown>; dedupeKey?: string }) {
   const client = createServiceSupabase();
   if (!client) return { queued: false, demo: true };
-  const { error } = await client.from("notification_outbox").insert({ kind: input.kind, recipient: input.to, locale: input.locale, subject: input.subject, html: input.html, payload: input.payload ?? {} });
+  const { error } = await client.from("notification_outbox").insert({ kind: input.kind, recipient: input.to, locale: input.locale, subject: input.subject, html: input.html, payload: input.payload ?? {}, dedupe_key: input.dedupeKey ?? null });
+  if (error?.code === "23505" && input.dedupeKey) return { queued: false, duplicate: true, demo: false };
   if (error) throw new Error(`Unable to queue notification: ${error.message}`);
   return { queued: true, demo: false };
+}
+
+export function dispatchNotificationQueue(context: unknown, logLabel: string, limit = 25) {
+  const task = processNotificationQueue(limit).catch((cause) => {
+    console.error(logLabel, { message: cause instanceof Error ? cause.message : String(cause) });
+  });
+  const cloudflare = (context as { cloudflare?: { ctx?: { waitUntil(promise: Promise<unknown>): void } } })?.cloudflare;
+  if (cloudflare?.ctx) cloudflare.ctx.waitUntil(task);
+  else void task;
 }
 
 export async function processNotificationQueue(limit = 25) {
@@ -27,7 +36,7 @@ export async function processNotificationQueue(limit = 25) {
       const { data: invoice } = await client.from("invoices").select("invoice_number,storage_path").eq("order_id", String(item.payload.orderId)).maybeSingle();
       if (invoice?.storage_path) { const { data: file } = await client.storage.from("invoices").download(invoice.storage_path); if (file) attachments = [{ filename: `${invoice.invoice_number}.pdf`, content: Buffer.from(await file.arrayBuffer()) }]; }
     }
-    const result = await resend.emails.send({ from: config.RESEND_FROM_EMAIL, to: item.recipient, subject: item.subject, html: item.html, attachments });
+    const result = await resend.emails.send({ from: config.RESEND_FROM_EMAIL, to: item.recipient, subject: item.subject, html: item.html, attachments }, { idempotencyKey: item.dedupe_key || `notification/${item.id}` });
     if (result.error) {
       const minutes = Math.min(24 * 60, 2 ** claimedAttempts);
       await client.from("notification_outbox").update({ last_error: result.error.message, next_attempt_at: new Date(Date.now() + minutes * 60_000).toISOString() }).eq("id", item.id);

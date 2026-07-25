@@ -2,6 +2,8 @@ import type { ActionFunctionArgs } from "react-router";
 import { requireAdmin } from "~/lib/auth.server";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
+import { orderStatusEmail } from "~/services/email-templates.server";
+import { dispatchNotificationQueue, enqueueNotification } from "~/services/notifications.server";
 import { createSendcloudLabel, SendcloudAmbiguousPurchaseError } from "~/services/sendcloud-labels.server";
 import { createShippoLabel, ShippoLabelError } from "~/services/shippo-labels.server";
 
@@ -9,12 +11,12 @@ export function labelProviderForRate(rate: { provider?: unknown; shippoRateIds?:
   return rate.provider === "shippo" && Array.isArray(rate.shippoRateIds) ? "shippo" as const : "sendcloud" as const;
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params, context }: ActionFunctionArgs) {
   const admin = await requireAdmin(request);
   if (request.method !== "POST" || !params.id) return Response.json({ ok: false }, { status: 405 });
   const client = createServiceSupabase();
   if (!client) return Response.json({ ok: false, message: "Database unavailable." }, { status: 503 });
-  const { data: order } = await client.from("orders").select("id, order_number, status, paid_at, shipping_quote_id, shipping_rate_id").eq("id", params.id).maybeSingle();
+  const { data: order } = await client.from("orders").select("id, order_number, email, locale, status, paid_at, shipping_quote_id, shipping_rate_id").eq("id", params.id).maybeSingle();
   if (!order || !order.paid_at || !["paid", "preparing", "ready_to_ship"].includes(order.status)) return Response.json({ ok: false, message: "Order is not ready for label purchase." }, { status: 409 });
   const { data: quote } = await client.from("shipping_quotes").select("rates,address,lines,parcels").eq("id", order.shipping_quote_id).single();
   const rate = (quote?.rates as any[])?.find((item) => item.id === order.shipping_rate_id);
@@ -106,6 +108,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { data: shipmentCosts } = await client.from("shipments").select("actual_cost_cents").eq("order_id", order.id);
   const actualShippingCostCents = (shipmentCosts ?? []).reduce((sum, shipment) => sum + shipment.actual_cost_cents, 0);
   await client.from("orders").update({ status: "ready_to_ship", actual_shipping_cost_cents: actualShippingCostCents, updated_at: new Date().toISOString() }).eq("id", order.id);
+  if (order.email) {
+    const content = orderStatusEmail({ locale: order.locale, orderNumber: order.order_number, status: "ready_to_ship" });
+    await enqueueNotification({ kind: "order_status", to: order.email, locale: order.locale, ...content, payload: { orderId: order.id, status: "ready_to_ship" }, dedupeKey: `order-status/${order.id}/ready_to_ship` });
+    dispatchNotificationQueue(context, "label_ready_notification_delivery_failed");
+  }
   await client.from("audit_log").insert({ actor_id: admin.id === "demo-admin" ? null : admin.id, action: "order.labels_purchased", entity_type: "order", entity_id: order.id, after_data: { count: labels.length, actualShippingCostCents, provider } });
   return Response.json({ ok: true, labels, fallbackParcels: [] });
 }

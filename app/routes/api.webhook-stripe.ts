@@ -3,10 +3,11 @@ import type { ActionFunctionArgs } from "react-router";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { constructStripeEvent, createStripe } from "~/lib/stripe.server";
-import { enqueueNotification } from "~/services/notifications.server";
+import { invoiceEmail, orderConfirmationEmail, refundEmail } from "~/services/email-templates.server";
+import { dispatchNotificationQueue, enqueueNotification } from "~/services/notifications.server";
 import { generateInvoicePdf } from "~/services/invoice.server";
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   const config = env();
   if (!config.STRIPE_SECRET_KEY || !config.STRIPE_WEBHOOK_SECRET) return new Response("Stripe webhook is not configured.", { status: 503 });
   const signature = request.headers.get("stripe-signature"); if (!signature) return new Response("Missing signature.", { status: 400 });
@@ -42,14 +43,32 @@ export async function action({ request }: ActionFunctionArgs) {
       }
       await generateInvoicePdf(orderId);
       if (order?.email) {
-        const english = order.locale === "en-GB";
-        await enqueueNotification({ kind: "order_confirmation", to: order.email, locale: order.locale, subject: english ? `Order confirmed · ${order.order_number}` : `Commande confirmée · ${order.order_number}`, html: `<h1>${english ? "Thank you for your order" : "Merci pour votre commande"}</h1><p>${order.order_number}</p>`, payload: { orderId } });
-        await enqueueNotification({ kind: "invoice", to: order.email, locale: order.locale, subject: english ? `Your invoice · ${order.order_number}` : `Votre facture · ${order.order_number}`, html: `<h1>${english ? "Your invoice is ready" : "Votre facture est disponible"}</h1><p>${english ? "The PDF invoice is attached to this message." : "La facture PDF est jointe à ce message."}</p>`, payload: { orderId } });
+        const { data: snapshot } = await client.from("orders").select("order_number,locale,email,shipping_address,shipping_carrier,shipping_service,subtotal_cents,shipping_charged_cents,total_cents,order_lines(product_name,variant_label,quantity,line_total_cents)").eq("id", orderId).single();
+        if (!snapshot) throw new Error("Order confirmation snapshot is unavailable.");
+        const confirmation = orderConfirmationEmail(snapshot as never);
+        const invoice = invoiceEmail({ locale: order.locale, orderNumber: order.order_number });
+        await enqueueNotification({ kind: "order_confirmation", to: order.email, locale: order.locale, ...confirmation, payload: { orderId }, dedupeKey: `order-confirmation/${orderId}` });
+        await enqueueNotification({ kind: "invoice", to: order.email, locale: order.locale, ...invoice, payload: { orderId }, dedupeKey: `invoice/${orderId}` });
+        dispatchNotificationQueue(context, "order_confirmation_delivery_failed");
       }
     }
     if (event.type === "checkout.session.expired") { const orderId = event.data.object.metadata?.order_id; if (orderId) await client.rpc("release_order_reservation", { p_order_id: orderId, p_reason: "stripe_session_expired" }); }
     if (event.type === "checkout.session.async_payment_failed") { const orderId = event.data.object.metadata?.order_id; if (orderId) await client.rpc("release_order_reservation", { p_order_id: orderId, p_reason: "stripe_async_payment_failed" }); }
-    if (event.type === "charge.refunded") { const charge = event.data.object; await client.rpc("apply_stripe_refund", { p_payment_intent_id: String(charge.payment_intent ?? ""), p_amount_refunded_cents: charge.amount_refunded, p_provider_event_id: event.id }); }
+    if (event.type === "charge.refunded") {
+      const charge = event.data.object;
+      const paymentIntentId = String(charge.payment_intent ?? "");
+      const { data: previousPayment } = await client.from("payments").select("order_id,amount_cents,refunded_cents").eq("provider_payment_intent_id", paymentIntentId).maybeSingle();
+      await client.rpc("apply_stripe_refund", { p_payment_intent_id: paymentIntentId, p_amount_refunded_cents: charge.amount_refunded, p_provider_event_id: event.id });
+      const refundedNow = Math.max(0, charge.amount_refunded - (previousPayment?.refunded_cents ?? 0));
+      if (previousPayment?.order_id && refundedNow > 0) {
+        const { data: refundedOrder } = await client.from("orders").select("email,locale,order_number,total_cents").eq("id", previousPayment.order_id).maybeSingle();
+        if (refundedOrder?.email) {
+          const content = refundEmail({ locale: refundedOrder.locale, orderNumber: refundedOrder.order_number, amountCents: refundedNow, fullyRefunded: charge.amount_refunded >= refundedOrder.total_cents });
+          await enqueueNotification({ kind: "refund", to: refundedOrder.email, locale: refundedOrder.locale, ...content, payload: { orderId: previousPayment.order_id, amountCents: refundedNow }, dedupeKey: `refund/${event.id}` });
+          dispatchNotificationQueue(context, "refund_confirmation_delivery_failed");
+        }
+      }
+    }
     await client.from("webhook_events").update({ processed_at: new Date().toISOString() }).eq("provider", "stripe").eq("provider_event_id", event.id);
   } catch (cause) { await client.from("webhook_events").update({ processing_error: cause instanceof Error ? cause.message : String(cause) }).eq("provider", "stripe").eq("provider_event_id", event.id); return new Response("Webhook processing failed.", { status: 500 }); }
   return Response.json({ received: true });
