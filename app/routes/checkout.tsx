@@ -7,15 +7,15 @@ import { shippingRateLabel, shippingRatePromotionLabel } from "~/domain/shipping
 import { EU_SHIPPING_COUNTRY_CODES, NON_EU_SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
 import { supportsPickupDelivery } from "~/domain/shipping-zones";
 import type { PickupPoint, ShippingRate } from "~/domain/types";
-import { getAudience } from "~/lib/auth.server";
+import { getViewer } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
 import { pickupPointsConfigured } from "~/services/pickup-points.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const locale = getLocale(request); const audience = await getAudience(request);
-  return { locale, audience, pickupConfigured: pickupPointsConfigured(), products: await getProducts({ status: "published", audience }) };
+  const locale = getLocale(request); const viewer = await getViewer(request); const audience = viewer?.profile?.professional_status === "approved" ? "professional" : "retail";
+  return { locale, audience, account: viewer ? { email: viewer.user.email ?? "", firstName: viewer.profile?.first_name ?? "", lastName: viewer.profile?.last_name ?? "" } : null, pickupConfigured: pickupPointsConfigured(), products: await getProducts({ status: "published", audience }) };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(
@@ -49,13 +49,14 @@ function pickupCarrierLabel(code: string) {
 }
 
 export default function Checkout() {
-  const { locale, audience, pickupConfigured, products } = useLoaderData<typeof loader>(); const english = locale === "en-GB";
+  const { locale, audience, account, pickupConfigured, products } = useLoaderData<typeof loader>(); const english = locale === "en-GB";
   const { lines, hydrated } = useCart(); const formRef = useRef<HTMLFormElement>(null);
   const [cartId, setCartId] = useState(""); const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [selectedRate, setSelectedRate] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const [countryCode, setCountryCode] = useState("FR"); const [deliveryMethod, setDeliveryMethod] = useState<"home" | "pickup">("home");
   const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([]); const [selectedPickupPointId, setSelectedPickupPointId] = useState("");
   const [pickupBusy, setPickupBusy] = useState(false); const [pickupError, setPickupError] = useState("");
+  const [createAccount, setCreateAccount] = useState(false);
   const pickupAvailable = pickupConfigured && supportsPickupDelivery(countryCode);
 
   useEffect(() => {
@@ -126,7 +127,7 @@ export default function Checkout() {
     try {
       const response = await fetch("/api/checkout/payment-intent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(formRef.current), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, shippingRateId: selectedRate, acceptTerms: true }),
+        body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(formRef.current), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, shippingRateId: selectedRate, acceptTerms: true, createAccount: !account && createAccount, accountPassword: !account && createAccount ? String(new FormData(formRef.current).get("accountPassword") ?? "") : undefined }),
       });
       const data = await response.json() as CheckoutResponse;
       if (!response.ok || !data.ok) throw new Error(data.message || "Checkout unavailable");
@@ -145,11 +146,12 @@ export default function Checkout() {
         <section className="checkout-section" onChange={invalidateQuote}>
           <h2>1. {english ? "Contact" : "Coordonnées"}</h2>
           <div className="form-grid">
-            <div className="field"><label htmlFor="firstName">{english ? "First name" : "Prénom"}</label><input id="firstName" name="firstName" required autoComplete="given-name" /></div>
-            <div className="field"><label htmlFor="lastName">{english ? "Last name" : "Nom"}</label><input id="lastName" name="lastName" required autoComplete="family-name" /></div>
-            <div className="field"><label htmlFor="email">Email</label><input id="email" name="email" type="email" required autoComplete="email" /></div>
+            <div className="field"><label htmlFor="firstName">{english ? "First name" : "Prénom"}</label><input id="firstName" name="firstName" defaultValue={account?.firstName} required autoComplete="given-name" /></div>
+            <div className="field"><label htmlFor="lastName">{english ? "Last name" : "Nom"}</label><input id="lastName" name="lastName" defaultValue={account?.lastName} required autoComplete="family-name" /></div>
+            <div className="field"><label htmlFor="email">Email</label><input id="email" name="email" type="email" defaultValue={account?.email} readOnly={Boolean(account)} required autoComplete="email" /></div>
             <div className="field"><label htmlFor="phone">{english ? "Phone" : "Téléphone"}</label><input id="phone" name="phone" type="tel" required autoComplete="tel" /></div>
           </div>
+          {!account ? <div className="checkout-account-option"><label><input type="checkbox" checked={createAccount} onChange={(event) => setCreateAccount(event.currentTarget.checked)} /> <span><strong>{english ? "Create my customer account" : "Créer mon compte client"}</strong><small>{english ? "Find your orders, invoices, addresses and tracking in one place." : "Retrouvez vos commandes, factures, adresses et suivis au même endroit."}</small></span></label>{createAccount ? <div className="field"><label htmlFor="accountPassword">{english ? "Choose a password" : "Choisissez un mot de passe"}</label><input id="accountPassword" name="accountPassword" type="password" minLength={10} maxLength={200} required autoComplete="new-password" /><small>{english ? "At least 10 characters. You will receive an email to confirm your address." : "10 caractères minimum. Vous recevrez un e-mail pour confirmer votre adresse."}</small></div> : null}</div> : <p className="checkout-account-connected">{english ? "This order will be added to your customer account." : "Cette commande sera ajoutée à votre compte client."}</p>}
         </section>
         <section className="checkout-section" onChange={invalidateQuote}>
           <h2>2. {english ? "Shipping address" : "Adresse de livraison"}</h2>

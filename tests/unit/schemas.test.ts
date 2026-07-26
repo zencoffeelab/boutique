@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickupPointIdSchema, professionalApplicationSchema, shippingAddressSchema, shippingQuoteSchema } from "~/domain/schemas";
+import { checkoutSchema, contactFormSchema, pickupPointIdSchema, professionalApplicationSchema, shippingAddressSchema, shippingQuoteSchema } from "~/domain/schemas";
 import { EU_SHIPPING_COUNTRY_CODES, NON_EU_SHIPPING_COUNTRY_CODES, SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
 
 describe("shipping countries", () => {
@@ -27,6 +27,39 @@ describe("professional application", () => {
   it("accepts every planned field and volume", () => expect(professionalApplicationSchema.safeParse(valid).success).toBe(true));
   it("rejects unknown business and volume values", () => expect(professionalApplicationSchema.safeParse({ ...valid, businessType: "Influencer", monthlyVolume: "500 kg" }).success).toBe(false));
   it("accepts the honeypot field so bots receive a neutral response", () => expect(professionalApplicationSchema.safeParse({ ...valid, website: "spam.example" }).success).toBe(true));
+});
+
+describe("customer account at checkout", () => {
+  const checkout = {
+    cartId: "00000000-0000-4000-8000-000000000001",
+    locale: "fr-FR" as const,
+    lines: [{ productId: "product", variantId: "variant", audience: "retail" as const, quantity: 1 }],
+    address: { firstName: "Ada", lastName: "Lovelace", company: "", email: "ada@example.com", phone: "0600000000", line1: "1 rue du Café", line2: "", postalCode: "37000", city: "Tours", countryCode: "FR" as const },
+    shippingRateId: "sendcloud:rate",
+    acceptTerms: true as const,
+  };
+
+  it("accepts guest checkout without creating an account", () => {
+    expect(checkoutSchema.safeParse(checkout).success).toBe(true);
+  });
+
+  it("requires a strong password when account creation is selected", () => {
+    expect(checkoutSchema.safeParse({ ...checkout, createAccount: true, accountPassword: "short" }).success).toBe(false);
+    expect(checkoutSchema.safeParse({ ...checkout, createAccount: true, accountPassword: "long-password" }).success).toBe(true);
+  });
+});
+
+describe("contact form", () => {
+  const message = { name: "Ada Lovelace", email: "ada@example.com", phone: "", subject: "coffee" as const, message: "Bonjour, je souhaite en savoir plus.", locale: "fr-FR" as const, privacyConsent: true as const, website: "" };
+
+  it("accepts a complete contact request", () => {
+    expect(contactFormSchema.safeParse(message).success).toBe(true);
+  });
+
+  it("rejects a short message or missing consent", () => {
+    expect(contactFormSchema.safeParse({ ...message, message: "Bonjour" }).success).toBe(false);
+    expect(contactFormSchema.safeParse({ ...message, privacyConsent: false }).success).toBe(false);
+  });
 });
 
 describe("pickup-point checkout input", () => {

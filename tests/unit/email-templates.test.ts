@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  contactAdminAlertEmail,
+  contactMessageReceivedEmail,
   orderConfirmationEmail,
   professionalApplicationReceivedEmail,
   refundEmail,
@@ -31,5 +33,13 @@ describe("transactional email templates", () => {
     expect(trackingEmail({ locale: "en-GB", orderNumber: "ZCL-1", delivered: false, trackingUrl: "https://tracking.example/1" }).html).toContain("Track my parcel");
     expect(refundEmail({ locale: "fr-FR", orderNumber: "ZCL-1", amountCents: 1_000, fullyRefunded: false }).subject).toContain("remboursement partiel");
     expect(professionalApplicationReceivedEmail({ locale: "en-GB", firstName: "Ada" }).html).toContain("Thank you Ada");
+  });
+
+  it("renders escaped contact notifications and a bilingual confirmation", () => {
+    const admin = contactAdminAlertEmail({ name: "Ada <script>", email: "ada@example.com", subject: "Un café", message: "Bonjour\n<script>alert(1)</script>" });
+    expect(admin.subject).toContain("Un café");
+    expect(admin.html).toContain("Bonjour<br>&lt;script&gt;");
+    expect(admin.html).not.toContain("<script>alert(1)</script>");
+    expect(contactMessageReceivedEmail({ locale: "en-GB", name: "Ada", subject: "A coffee" }).html).toContain("Thank you Ada");
   });
 });

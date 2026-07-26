@@ -3,7 +3,7 @@ import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 export { escapeEmailHtml } from "~/services/email-templates.server";
 
-export type NotificationKind = "pro_application" | "pro_application_confirmation" | "pro_decision" | "invitation" | "order_confirmation" | "invoice" | "order_status" | "shipped" | "tracking" | "delivered" | "refund" | "password_reset";
+export type NotificationKind = "pro_application" | "pro_application_confirmation" | "pro_decision" | "invitation" | "order_confirmation" | "invoice" | "order_status" | "shipped" | "tracking" | "delivered" | "refund" | "password_reset" | "contact_message" | "contact_confirmation";
 
 export async function enqueueNotification(input: { kind: NotificationKind; to: string; locale: "fr-FR" | "en-GB"; subject: string; html: string; payload?: Record<string, unknown>; dedupeKey?: string }) {
   const client = createServiceSupabase();
@@ -26,7 +26,8 @@ export function dispatchNotificationQueue(context: unknown, logLabel: string, li
 export async function processNotificationQueue(limit = 25) {
   const config = env(); const client = createServiceSupabase();
   if (!client || !config.RESEND_API_KEY) return { processed: 0, skipped: true };
-  const { data, error } = await client.from("notification_outbox").select("*").is("sent_at", null).lte("next_attempt_at", new Date().toISOString()).order("created_at").limit(limit);
+  const dueBefore = new Date(Date.now() + 5_000).toISOString();
+  const { data, error } = await client.from("notification_outbox").select("*").is("sent_at", null).lte("next_attempt_at", dueBefore).order("created_at").limit(limit);
   if (error) throw new Error(`Unable to read notification queue: ${error.message}`);
   const resend = new Resend(config.RESEND_API_KEY); let processed = 0;
   for (const item of data ?? []) {

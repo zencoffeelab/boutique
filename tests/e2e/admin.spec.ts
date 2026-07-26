@@ -43,6 +43,17 @@ test("dashboard and product management use distinct pages", async ({
   ).toBeVisible();
 });
 
+test("site changes have a dedicated back-office history", async ({ page }) => {
+  await page.goto("/admin/modifications");
+  await expect(page.getByRole("heading", { name: "Journal des modifications", exact: true })).toBeVisible();
+  await expect(page.getByText("modifications recensées")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Éditeur enrichi pour les conseils" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Paiement Stripe sécurisé sur Cloudflare" })).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Modifications" }),
+  ).toHaveAttribute("aria-current", "page");
+});
+
 test("product editor provides a save action at the top", async ({ page }) => {
   await page.goto("/admin/produits/nouveau");
   await expect(
@@ -61,10 +72,25 @@ test("product editor provides two editable editorial blocks", async ({
   page,
 }) => {
   await page.goto("/admin/produits/ethiopia-aricha");
+  const contentForm = page.locator("form#product-editor-form");
+  await expect(contentForm.getByRole("heading", { name: "Contenu", exact: true })).toBeVisible();
+  const contentTabs = contentForm.getByRole("tablist", { name: "Langue du contenu produit" });
+  await expect(contentTabs.getByRole("tab", { name: "Français" })).toHaveAttribute("aria-selected", "true");
+  await contentTabs.getByRole("tab", { name: "English" }).click();
+  await expect(contentForm.locator('input[name="nameEn"]')).toBeVisible();
+  await expect(contentForm.locator('input[name="nameFr"]')).toBeHidden();
   await expect(
     page.getByRole("heading", { name: "Blocs éditoriaux" }),
   ).toBeVisible();
+  expect(await contentForm.evaluate((form) => {
+    const editorialSection = document.querySelector(".admin-editorial-section");
+    return editorialSection ? Boolean(form.compareDocumentPosition(editorialSection) & Node.DOCUMENT_POSITION_FOLLOWING) : false;
+  })).toBe(true);
   await expect(page.locator("form.admin-editorial-block")).toHaveCount(2);
+  const firstBlockTabs = page.getByRole("tablist", { name: "Langue du bloc éditorial 1" });
+  await firstBlockTabs.getByRole("tab", { name: "English" }).click();
+  await expect(page.locator('form.admin-editorial-block').first().locator('input[name="titleEn"]')).toBeVisible();
+  await expect(page.locator('form.admin-editorial-block').first().locator('input[name="titleFr"]')).toBeHidden();
   await expect(
     page.getByRole("button", { name: "Enregistrer le bloc 1" }),
   ).toBeVisible();
@@ -94,6 +120,18 @@ test("FAQ and advice management use separate pages", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Nouvelle question" }),
   ).toHaveCount(0);
+  const richTextToolbar = page.getByRole("toolbar", { name: "Mise en forme — Paragraphes" });
+  await expect(richTextToolbar).toBeVisible();
+  await expect(richTextToolbar.getByRole("button", { name: "Gras" })).toBeVisible();
+  await expect(richTextToolbar.getByRole("button", { name: "Liste à puces" })).toBeVisible();
+  await expect(richTextToolbar.getByRole("button", { name: "Ajouter ou modifier un lien" })).toBeVisible();
+});
+
+test("retail customers have a dedicated administration page", async ({ page }) => {
+  await page.goto("/admin/clients");
+  await expect(page.getByRole("heading", { name: "Clients", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Membres particuliers" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Clients", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
 test("legacy editorial URL redirects to the FAQ page", async ({ page }) => {

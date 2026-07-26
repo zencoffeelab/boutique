@@ -12,6 +12,7 @@ import {
   useActionData,
   useLoaderData,
 } from "react-router";
+import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { AdminShell } from "~/components/admin-shell";
 import { formatMoney } from "~/domain/money";
 import type { ProductEditorialBlock, ProductVariant } from "~/domain/types";
@@ -497,6 +498,59 @@ export const meta: MetaFunction = () => [
   { name: "robots", content: "noindex,nofollow" },
 ];
 
+function LanguageTabs({
+  label,
+  french,
+  english,
+}: {
+  label: string;
+  french: ReactNode;
+  english: ReactNode;
+}) {
+  const [activeLanguage, setActiveLanguage] = useState<"fr" | "en">("fr");
+  const id = useId();
+  const tabs = [
+    { language: "fr" as const, label: "Français", content: french },
+    { language: "en" as const, label: "English", content: english },
+  ];
+  const selectFromKeyboard = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex = index;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+    else if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    setActiveLanguage(tabs[nextIndex].language);
+    const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role=tab]");
+    buttons?.[nextIndex]?.focus();
+  };
+
+  return <div className="admin-language-tabs">
+    <div className="admin-language-tabs__list" role="tablist" aria-label={label}>
+      {tabs.map((tab, index) => <button
+        key={tab.language}
+        type="button"
+        role="tab"
+        id={`${id}-${tab.language}-tab`}
+        aria-controls={`${id}-${tab.language}-panel`}
+        aria-selected={activeLanguage === tab.language}
+        tabIndex={activeLanguage === tab.language ? 0 : -1}
+        onClick={() => setActiveLanguage(tab.language)}
+        onKeyDown={(event) => selectFromKeyboard(event, index)}
+      >{tab.label}</button>)}
+    </div>
+    {tabs.map((tab) => <div
+      key={tab.language}
+      role="tabpanel"
+      id={`${id}-${tab.language}-panel`}
+      aria-labelledby={`${id}-${tab.language}-tab`}
+      hidden={activeLanguage !== tab.language}
+      onInvalidCapture={() => setActiveLanguage(tab.language)}
+    >{tab.content}</div>)}
+  </div>;
+}
+
 function TranslationFields({
   language,
   translation,
@@ -674,7 +728,9 @@ function EditorialBlockForm({
           </div>
         </div>
         <div className="admin-editorial-block__content">
-          <fieldset className="admin-editorial-block__language">
+          <LanguageTabs
+            label={`Langue du bloc éditorial ${position}`}
+            french={<fieldset className="admin-editorial-block__language">
             <legend>Français</legend>
             <div className="field">
               <label>
@@ -709,8 +765,8 @@ function EditorialBlockForm({
                 />
               </label>
             </div>
-          </fieldset>
-          <fieldset className="admin-editorial-block__language">
+          </fieldset>}
+            english={<fieldset className="admin-editorial-block__language">
             <legend>English</legend>
             <div className="field">
               <label>
@@ -745,7 +801,8 @@ function EditorialBlockForm({
                 />
               </label>
             </div>
-          </fieldset>
+          </fieldset>}
+          />
         </div>
       </div>
       <button
@@ -757,6 +814,38 @@ function EditorialBlockForm({
       </button>
     </Form>
   );
+}
+
+function EditorialBlocksSection({
+  productId,
+  blocks,
+  demo,
+}: {
+  productId: string;
+  blocks: readonly ProductEditorialBlock[];
+  demo: boolean;
+}) {
+  return <section className="ui-card admin-editor admin-editorial-section">
+    <h2>Blocs éditoriaux</h2>
+    <p>
+      Ces deux encarts apparaissent sous les informations d’origine sur la fiche
+      produit. Le second inverse automatiquement la position de l’image et du texte.
+    </p>
+    <div className="admin-editorial-blocks">
+      <EditorialBlockForm
+        productId={productId}
+        position={1}
+        block={blocks.find((block) => block.position === 1)}
+        demo={demo}
+      />
+      <EditorialBlockForm
+        productId={productId}
+        position={2}
+        block={blocks.find((block) => block.position === 2)}
+        demo={demo}
+      />
+    </div>
+  </section>;
 }
 
 function VariantList({
@@ -907,6 +996,7 @@ export default function AdminProduct() {
       >
         <input type="hidden" name="intent" value="save_product" />
         <input type="hidden" name="productId" value={product.id} />
+        <h2 className="admin-editor__title">Contenu</h2>
         <div className="form-grid">
           <div className="field">
             <label>
@@ -951,13 +1041,10 @@ export default function AdminProduct() {
             Mis en avant
           </label>
         </div>
-        <TranslationFields
-          language="Français"
-          translation={product.translations["fr-FR"]}
-        />
-        <TranslationFields
-          language="English"
-          translation={product.translations["en-GB"]}
+        <LanguageTabs
+          label="Langue du contenu produit"
+          french={<TranslationFields language="Français" translation={product.translations["fr-FR"]} />}
+          english={<TranslationFields language="English" translation={product.translations["en-GB"]} />}
         />
         <button
           className="ui-button ui-button--default"
@@ -969,6 +1056,11 @@ export default function AdminProduct() {
       </Form>
       {!isNew ? (
         <>
+          <EditorialBlocksSection
+            productId={product.id}
+            blocks={product.editorialBlocks}
+            demo={demo}
+          />
           <section className="ui-card admin-editor">
             <h2>Variantes existantes</h2>
             <p>
@@ -1101,32 +1193,6 @@ export default function AdminProduct() {
                 <Plus aria-hidden="true" /> Ajouter la variante
               </button>
             </Form>
-          </section>
-          <section className="ui-card admin-editor">
-            <h2>Blocs éditoriaux</h2>
-            <p>
-              Ces deux encarts apparaissent sous les informations d’origine sur
-              la fiche produit. Le second inverse automatiquement la position de
-              l’image et du texte.
-            </p>
-            <div className="admin-editorial-blocks">
-              <EditorialBlockForm
-                productId={product.id}
-                position={1}
-                block={product.editorialBlocks.find(
-                  (block) => block.position === 1,
-                )}
-                demo={demo}
-              />
-              <EditorialBlockForm
-                productId={product.id}
-                position={2}
-                block={product.editorialBlocks.find(
-                  (block) => block.position === 2,
-                )}
-                demo={demo}
-              />
-            </div>
           </section>
           <section className="ui-card admin-editor">
             <h2>Galerie</h2>

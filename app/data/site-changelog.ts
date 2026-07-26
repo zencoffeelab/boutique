@@ -1,0 +1,75 @@
+export type ChangelogKind = "Fonctionnalité" | "Correction" | "Design" | "Configuration" | "Sécurité" | "Maintenance";
+
+export type ChangelogEntry = Readonly<{
+  id: string;
+  date: string;
+  kind: ChangelogKind;
+  title: string;
+  description: string;
+  reference?: string;
+}>;
+
+// Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
+export const siteChangelog = [
+  { id: "2026-07-26-professional-page-modes", date: "2026-07-26", kind: "Fonctionnalité", title: "Deux affichages pour la page Professionnels", description: "Les membres professionnels connectés et validés voient uniquement le catalogue et les tarifs pro ; les autres visiteurs conservent l’introduction, les étapes, l’accès et le formulaire de demande." },
+  { id: "2026-07-26-product-editor-tabs", date: "2026-07-26", kind: "Fonctionnalité", title: "Fiche produit réorganisée par langues", description: "Ajout du titre Contenu, déplacement des blocs éditoriaux sous le premier encart et remplacement des traductions empilées par des onglets Français et English accessibles." },
+  { id: "2026-07-26-advice-card-spacing", date: "2026-07-26", kind: "Design", title: "Espacement des cartes de conseils", description: "Ajout de 12 px entre le titre et le sous-titre, puis entre le sous-titre et le lien de lecture, sur l’accueil et la page Conseils." },
+  { id: "2026-07-26-listing-spacing", date: "2026-07-26", kind: "Design", title: "Listes Boutique et Conseils rapprochées", description: "Réduction de l’espace entre les introductions des pages Boutique et Conseils et le début de leurs listes respectives, sur ordinateur comme sur mobile." },
+  { id: "2026-07-26-changelog", date: "2026-07-26", kind: "Fonctionnalité", title: "Journal des modifications dans le back-office", description: "Ajout d’une page dédiée qui recense chronologiquement les évolutions du site et leurs références techniques." },
+  { id: "2026-07-26-rich-advice", date: "2026-07-26", kind: "Fonctionnalité", title: "Éditeur enrichi pour les conseils", description: "Le champ Paragraphes accepte désormais les titres, le gras, l’italique, les listes, les liens, les citations et l’annulation, en français comme en anglais." },
+  { id: "2026-07-26-page-headings", date: "2026-07-26", kind: "Design", title: "Titres de pages plus compacts", description: "Réduction homogène des H1 sur ordinateur et mobile, y compris sur les fiches produit et la page Mon compte." },
+  { id: "2026-07-26-contact", date: "2026-07-26", kind: "Fonctionnalité", title: "Formulaire complet sur la page Contact", description: "Ajout d’un formulaire enregistré en base, avec notifications Resend pour l’équipe et confirmation au visiteur." },
+  { id: "2026-07-26-account-design", date: "2026-07-26", kind: "Design", title: "Nouvelle présentation de Mon compte", description: "Ajout d’un menu d’ancres sticky, harmonisation des largeurs et amélioration des cartes du compte client." },
+  { id: "2026-07-26-customers", date: "2026-07-26", kind: "Fonctionnalité", title: "Gestion des clients réguliers", description: "Création d’un espace Clients dans le back-office et rattachement des comptes créés depuis une commande ou la page Mon compte." },
+  { id: "2026-07-26-auth-email", date: "2026-07-26", kind: "Configuration", title: "E-mails d’authentification accordés à la marque", description: "Connexion de Supabase au domaine Resend vérifié pour envoyer les messages d’accès et d’authentification." },
+
+  { id: "7f87625", date: "2026-07-25", kind: "Fonctionnalité", title: "E-mails transactionnels avec Resend", description: "Envoi des confirmations de commande, factures et notifications commerciales via Resend.", reference: "7f87625" },
+  { id: "016ca0f", date: "2026-07-25", kind: "Fonctionnalité", title: "Blocs éditoriaux des fiches produit", description: "Ajout de deux encarts image et texte administrables pour enrichir la présentation de chaque café.", reference: "016ca0f" },
+  { id: "3623f35", date: "2026-07-25", kind: "Fonctionnalité", title: "Ajout rapide au panier depuis la boutique", description: "Les cafés peuvent être ajoutés directement au panier depuis les cartes de la page Boutique.", reference: "3623f35" },
+  { id: "f3757d2", date: "2026-07-25", kind: "Fonctionnalité", title: "Séparation de la FAQ et des conseils", description: "Création de deux espaces distincts dans le back-office et ajout de la suppression des conseils.", reference: "f3757d2" },
+  { id: "590d854", date: "2026-07-25", kind: "Design", title: "État de connexion et menu sticky", description: "L’icône de compte indique l’état de connexion et l’en-tête reste accessible pendant le défilement.", reference: "590d854" },
+
+  { id: "241f0fb", date: "2026-07-24", kind: "Design", title: "Produits archivés clairement séparés", description: "Suppression de l’entrée Archives du menu et création d’une section dédiée sous le catalogue actif.", reference: "241f0fb" },
+  { id: "a3ebec3", date: "2026-07-24", kind: "Fonctionnalité", title: "Panier latéral", description: "L’icône panier ouvre un tiroir avec les produits, le sous-total, la suppression d’articles et l’accès à la commande.", reference: "a3ebec3" },
+  { id: "34a1b69", date: "2026-07-24", kind: "Correction", title: "Mondial Relay France réservé au point relais", description: "Suppression de l’offre domicile en zone France afin d’éviter le doublon avec la préférence Point relais.", reference: "34a1b69" },
+  { id: "5ffee31", date: "2026-07-24", kind: "Design", title: "Mention livraison offerte", description: "Affichage du libellé Offert à côté des tarifs de livraison à 0 €.", reference: "5ffee31" },
+  { id: "6c22016", date: "2026-07-24", kind: "Fonctionnalité", title: "Tableau de bord et produits séparés", description: "Création de pages distinctes et enrichissement des indicateurs du tableau de bord, avec sauvegarde en haut des fiches produit.", reference: "6c22016" },
+  { id: "b360a30", date: "2026-07-24", kind: "Correction", title: "Libellés Mondial Relay normalisés", description: "Sélection des méthodes point relais standard plutôt que des offres domicile ambiguës.", reference: "b360a30" },
+  { id: "2ccb8cb", date: "2026-07-24", kind: "Configuration", title: "Point Relais International en zone 2", description: "Remplacement de Mondial Relay Home International et simplification des noms de transporteurs affichés.", reference: "2ccb8cb" },
+  { id: "5f2ab0a", date: "2026-07-24", kind: "Configuration", title: "Tarifs de livraison par zones", description: "Mise en place des cinq zones, des transporteurs autorisés et des grilles tarifaires selon le poids.", reference: "5f2ab0a" },
+  { id: "b536f2f", date: "2026-07-24", kind: "Configuration", title: "Sendcloud seul pour les nouveaux devis", description: "Retrait de Shippo du tunnel de commande au profit de Sendcloud pour tous les transporteurs.", reference: "b536f2f" },
+  { id: "1e42b00", date: "2026-07-24", kind: "Fonctionnalité", title: "Comparaison temporaire des deux Colissimo", description: "Affichage simultané des offres Shippo et Sendcloud pour comparer les tarifs avant le choix définitif.", reference: "1e42b00" },
+  { id: "5c047e4", date: "2026-07-24", kind: "Fonctionnalité", title: "Administration des membres professionnels", description: "Ajout de l’historique des demandes, de la liste des membres et des outils d’administration des comptes pro.", reference: "5c047e4" },
+  { id: "d751150", date: "2026-07-24", kind: "Configuration", title: "Règle Colissimo France via Shippo", description: "Routage temporaire de Colissimo France vers Shippo lorsque ce tarif était plus avantageux.", reference: "d751150" },
+  { id: "0c9c877", date: "2026-07-24", kind: "Fonctionnalité", title: "Accès réservé aux professionnels validés", description: "Création des comptes pro par e-mail et mot de passe après validation de la demande par un administrateur.", reference: "0c9c877" },
+  { id: "9f0e446", date: "2026-07-24", kind: "Fonctionnalité", title: "Accès au back-office depuis le pied de page", description: "Ajout d’un bouton d’administration à côté de la mention Zen Coffee Lab.", reference: "9f0e446" },
+  { id: "8925233", date: "2026-07-24", kind: "Correction", title: "Bouton de remboursement Sendcloud visible", description: "Affichage de l’action de remboursement d’étiquette dans les commandes du back-office.", reference: "8925233" },
+  { id: "57deb06", date: "2026-07-24", kind: "Correction", title: "Messages d’erreur transporteur plus précis", description: "Distinction entre une rupture de stock du panier et une indisponibilité temporaire des tarifs de livraison.", reference: "57deb06" },
+  { id: "fcf9069", date: "2026-07-24", kind: "Fonctionnalité", title: "Transporteurs et points relais Sendcloud", description: "Chargement des méthodes Sendcloud actives et sélection d’un point relais pendant la commande.", reference: "fcf9069" },
+  { id: "7c8b101", date: "2026-07-24", kind: "Sécurité", title: "Sauvegarde chiffrée des variables d’environnement", description: "Ajout d’une copie chiffrée avec age pour transférer les clés sans les exposer dans Git.", reference: "7c8b101" },
+
+  { id: "ff5c59e", date: "2026-07-23", kind: "Correction", title: "Pays triés par nom français", description: "Classement alphabétique des pays du sélecteur de commande, avec Allemagne en premier.", reference: "ff5c59e" },
+  { id: "0a7cfff", date: "2026-07-23", kind: "Fonctionnalité", title: "Livraison Sendcloud dans toute l’Union européenne", description: "Activation de Sendcloud et extension de la liste de destination aux pays européens pris en charge.", reference: "0a7cfff" },
+
+  { id: "1bb8349", date: "2026-07-22", kind: "Fonctionnalité", title: "Aide à l’expédition et suppression des emballages", description: "Ajout d’explications dans le back-office et administration complète des formats de colis.", reference: "1bb8349" },
+  { id: "08a49ba", date: "2026-07-22", kind: "Fonctionnalité", title: "Produits affichés dans les commandes", description: "Les cartes de commande du back-office indiquent désormais les cafés et quantités achetés.", reference: "08a49ba" },
+  { id: "ed9801b", date: "2026-07-22", kind: "Design", title: "Navigation et contrôles éditoriaux améliorés", description: "Réorganisation du back-office et amélioration des formulaires de gestion du contenu.", reference: "ed9801b" },
+  { id: "7e32a07", date: "2026-07-22", kind: "Correction", title: "Devis Shippo pour le Royaume-Uni", description: "Correction de la récupération des tarifs d’expédition britanniques.", reference: "7e32a07" },
+  { id: "399b4b3", date: "2026-07-22", kind: "Fonctionnalité", title: "Remboursement des étiquettes Shippo", description: "Ajout de l’annulation et du remboursement d’une étiquette non utilisée depuis le back-office.", reference: "399b4b3" },
+  { id: "4f8b005", date: "2026-07-22", kind: "Sécurité", title: "Achat d’étiquette après paiement confirmé", description: "Blocage de la génération d’étiquette tant que Stripe n’a pas confirmé le règlement.", reference: "4f8b005" },
+  { id: "45fbf1b", date: "2026-07-22", kind: "Fonctionnalité", title: "Point relais et gestion des variantes", description: "Ajout de la préférence de livraison et des outils de gestion des formats et stocks produit.", reference: "45fbf1b" },
+  { id: "41ca524", date: "2026-07-22", kind: "Sécurité", title: "Paiement Stripe sécurisé sur Cloudflare", description: "Intégration du paiement au tunnel de commande avec validation serveur et webhooks.", reference: "41ca524" },
+  { id: "1fc4d78", date: "2026-07-22", kind: "Configuration", title: "Environnement de production Cloudflare", description: "Correction de la sélection des variables et services de production lors du déploiement.", reference: "1fc4d78" },
+  { id: "28a1848", date: "2026-07-22", kind: "Sécurité", title: "Connexion administrateur avec MFA", description: "Mise en place d’un accès sécurisé et de l’enrôlement multifacteur pour le back-office.", reference: "28a1848" },
+  { id: "c013b5f", date: "2026-07-22", kind: "Design", title: "Informations produit sticky", description: "Les informations d’un café restent visibles pendant le défilement de sa galerie.", reference: "c013b5f" },
+  { id: "8169a65", date: "2026-07-22", kind: "Correction", title: "Cafés épuisés masqués de la boutique", description: "Les produits sans stock disponible ne sont plus proposés à l’achat.", reference: "8169a65" },
+  { id: "96fbd5c", date: "2026-07-22", kind: "Correction", title: "Ressources de marque servies sans configuration runtime", description: "Fiabilisation du chargement du logo, des polices et des médias de marque.", reference: "96fbd5c" },
+  { id: "7350beb", date: "2026-07-22", kind: "Configuration", title: "Déploiement Cloudflare Workers", description: "Préparation de l’application et de son build pour la production Cloudflare.", reference: "7350beb" },
+  { id: "72a558a", date: "2026-07-22", kind: "Correction", title: "Publication du contenu importé", description: "Correction du statut des contenus et produits repris de l’ancien site.", reference: "72a558a" },
+  { id: "486303f", date: "2026-07-22", kind: "Maintenance", title: "Import du catalogue WordPress", description: "Reprise du catalogue café, des images et des contenus éditoriaux existants.", reference: "486303f" },
+  { id: "463ea01", date: "2026-07-22", kind: "Sécurité", title: "Environnement Supabase de test isolé", description: "Séparation des données de test pour éviter toute écriture accidentelle en production.", reference: "463ea01" },
+  { id: "6855ebb", date: "2026-07-22", kind: "Configuration", title: "Connexion du projet Supabase", description: "Liaison de l’application à sa base de données, son stockage et son authentification.", reference: "6855ebb" },
+  { id: "520a008", date: "2026-07-22", kind: "Design", title: "Logo et typographies Zen Coffee Lab", description: "Restauration de l’identité graphique d’origine dans la nouvelle application.", reference: "520a008" },
+  { id: "de9b194", date: "2026-07-22", kind: "Fonctionnalité", title: "Reconstruction de la boutique Zen Coffee Lab", description: "Création de la nouvelle application e-commerce, du catalogue au tunnel de commande.", reference: "de9b194" },
+  { id: "0b37de4", date: "2026-07-22", kind: "Maintenance", title: "Création du dépôt de l’application", description: "Initialisation du projet et de son historique de versions.", reference: "0b37de4" },
+] as const satisfies readonly ChangelogEntry[];

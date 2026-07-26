@@ -13,6 +13,7 @@ import type {
 } from "~/domain/types";
 import { env, hasSupabaseConfig } from "./env.server";
 import { createServiceSupabase } from "./supabase.server";
+import { storedBlocksToRichTextDocument } from "./rich-text";
 
 function mapDatabaseProduct(row: any): Product {
   const translations = Object.fromEntries(
@@ -237,17 +238,14 @@ export async function getArticles(): Promise<AdviceArticle[]> {
       (item: any) => item.locale === "en-GB",
     );
     if (!fr || !en) return [];
-    const paragraphs = (translation: any) =>
-      (translation.blocks ?? [])
-        .filter((block: any) => block.type === "paragraph")
-        .map((block: any) => String(block.content));
+    const body = (translation: any) => storedBlocksToRichTextDocument(translation.blocks ?? []);
     return [
       {
         slug: article.slug,
         publishedAt: article.published_at ?? new Date(0).toISOString(),
         title: { "fr-FR": fr.title, "en-GB": en.title },
         excerpt: { "fr-FR": fr.excerpt, "en-GB": en.excerpt },
-        body: { "fr-FR": paragraphs(fr), "en-GB": paragraphs(en) },
+        body: { "fr-FR": body(fr), "en-GB": body(en) },
       },
     ];
   });

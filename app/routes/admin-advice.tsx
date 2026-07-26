@@ -3,10 +3,12 @@ import { z } from "zod";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Form, useActionData, useLoaderData } from "react-router";
 import { AdminShell } from "~/components/admin-shell";
+import { RichTextEditor } from "~/components/rich-text-editor";
 import { requireAdmin } from "~/lib/auth.server";
+import { parseRichTextInput, storedBlocksToRichTextDocument } from "~/lib/rich-text";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
-type AdviceTranslation = { locale: "fr-FR" | "en-GB"; title: string; excerpt: string; blocks: Array<{ content: string }>; seo_title: string; seo_description: string };
+type AdviceTranslation = { locale: "fr-FR" | "en-GB"; title: string; excerpt: string; blocks: Array<{ type?: string; content: unknown }>; seo_title: string; seo_description: string };
 type AdviceArticle = { id: string; slug: string; status: "draft" | "published" | "archived"; published_at: string; advice_translations: AdviceTranslation[] };
 
 const adviceSchema = z.object({
@@ -54,15 +56,17 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const parsed = adviceSchema.safeParse(form);
   if (!parsed.success) return { ok: false, message: "Les versions française et anglaise du conseil sont requises." };
+  const bodyFr = parseRichTextInput(parsed.data.bodyFr);
+  const bodyEn = parseRichTextInput(parsed.data.bodyEn);
+  if (!bodyFr || !bodyEn) return { ok: false, message: "Le contenu de chaque langue doit comporter au moins 20 caractères." };
   const articleValues = { slug: parsed.data.slug, status: parsed.data.status, published_at: new Date(parsed.data.publishedAt).toISOString() };
   const mutation = parsed.data.id
     ? await client.from("advice_articles").update(articleValues).eq("id", parsed.data.id).select("id").single()
     : await client.from("advice_articles").insert(articleValues).select("id").single();
   if (mutation.error || !mutation.data) return { ok: false, message: mutation.error?.message ?? "Conseil non enregistré." };
-  const blocks = (text: string) => text.split(/\n{2,}/).map((content) => content.trim()).filter(Boolean).map((content) => ({ type: "paragraph", content }));
   const translations = [
-    { locale: "fr-FR", title: parsed.data.titleFr, excerpt: parsed.data.excerptFr, blocks: blocks(parsed.data.bodyFr), seo_title: parsed.data.seoTitleFr, seo_description: parsed.data.seoDescriptionFr },
-    { locale: "en-GB", title: parsed.data.titleEn, excerpt: parsed.data.excerptEn, blocks: blocks(parsed.data.bodyEn), seo_title: parsed.data.seoTitleEn, seo_description: parsed.data.seoDescriptionEn },
+    { locale: "fr-FR", title: parsed.data.titleFr, excerpt: parsed.data.excerptFr, blocks: [{ type: "richText", content: bodyFr }], seo_title: parsed.data.seoTitleFr, seo_description: parsed.data.seoDescriptionFr },
+    { locale: "en-GB", title: parsed.data.titleEn, excerpt: parsed.data.excerptEn, blocks: [{ type: "richText", content: bodyEn }], seo_title: parsed.data.seoTitleEn, seo_description: parsed.data.seoDescriptionEn },
   ].map((translation) => ({ ...translation, article_id: mutation.data.id }));
   const { error } = await client.from("advice_translations").upsert(translations, { onConflict: "article_id,locale" });
   if (error) {
@@ -78,11 +82,10 @@ export const meta: MetaFunction = () => [{ title: "Conseils | Administration Zen
 function AdviceForm({ article, demo }: { article?: AdviceArticle; demo: boolean }) {
   const fr = article?.advice_translations.find((item) => item.locale === "fr-FR");
   const en = article?.advice_translations.find((item) => item.locale === "en-GB");
-  const body = (translation?: AdviceTranslation) => (translation?.blocks ?? []).map((block) => block.content).join("\n\n");
   return <Form method="post">
     <input type="hidden" name="intent" value="save_advice" /><input type="hidden" name="id" value={article?.id ?? ""} />
     <div className="form-grid"><div className="field"><label>Slug<input name="slug" defaultValue={article?.slug ?? ""} required /></label></div><div className="field"><label>Statut<select name="status" defaultValue={article?.status ?? "draft"}><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label></div><div className="field"><label>Date de publication<input name="publishedAt" type="datetime-local" defaultValue={(article?.published_at ?? new Date().toISOString()).slice(0, 16)} required /></label></div></div>
-    <div className="admin-content-columns"><fieldset><legend>Français</legend><div className="field"><label>Titre<input name="titleFr" defaultValue={fr?.title ?? ""} required /></label></div><div className="field"><label>Extrait<textarea name="excerptFr" defaultValue={fr?.excerpt ?? ""} required /></label></div><div className="field"><label>Paragraphes<textarea name="bodyFr" defaultValue={body(fr)} required /></label></div><div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? ""} required /></label></div><div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? ""} required /></label></div></fieldset><fieldset><legend>English</legend><div className="field"><label>Title<input name="titleEn" defaultValue={en?.title ?? ""} required /></label></div><div className="field"><label>Excerpt<textarea name="excerptEn" defaultValue={en?.excerpt ?? ""} required /></label></div><div className="field"><label>Paragraphs<textarea name="bodyEn" defaultValue={body(en)} required /></label></div><div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? ""} required /></label></div><div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? ""} required /></label></div></fieldset></div>
+    <div className="admin-content-columns"><fieldset><legend>Français</legend><div className="field"><label>Titre<input name="titleFr" defaultValue={fr?.title ?? ""} required /></label></div><div className="field"><label>Extrait<textarea name="excerptFr" defaultValue={fr?.excerpt ?? ""} required /></label></div><RichTextEditor name="bodyFr" label="Paragraphes" initialContent={storedBlocksToRichTextDocument(fr?.blocks)} disabled={demo} /><div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? ""} required /></label></div><div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? ""} required /></label></div></fieldset><fieldset><legend>English</legend><div className="field"><label>Title<input name="titleEn" defaultValue={en?.title ?? ""} required /></label></div><div className="field"><label>Excerpt<textarea name="excerptEn" defaultValue={en?.excerpt ?? ""} required /></label></div><RichTextEditor name="bodyEn" label="Paragraphs" initialContent={storedBlocksToRichTextDocument(en?.blocks)} disabled={demo} /><div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? ""} required /></label></div><div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? ""} required /></label></div></fieldset></div>
     <button className="ui-button ui-button--default" type="submit" disabled={demo}>{article ? "Enregistrer" : <><Plus aria-hidden="true" /> Ajouter</>}</button>
   </Form>;
 }

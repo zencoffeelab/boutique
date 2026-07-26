@@ -42,6 +42,12 @@ export const shippingQuoteSchema = z.object({
 export const checkoutSchema = shippingQuoteSchema.extend({
   shippingRateId: z.string().min(1),
   acceptTerms: z.literal(true),
+  createAccount: z.boolean().optional().default(false),
+  accountPassword: z.string().max(200).optional(),
+}).superRefine((value, context) => {
+  if (value.createAccount && (!value.accountPassword || value.accountPassword.length < 10)) {
+    context.addIssue({ code: "custom", path: ["accountPassword"], message: "Use at least 10 characters." });
+  }
 });
 
 export const professionalApplicationSchema = z.object({
@@ -60,6 +66,17 @@ export const professionalApplicationSchema = z.object({
 export const professionalDecisionSchema = z.object({
   decision: z.enum(["approved", "rejected", "suspended"]),
   note: z.string().trim().max(1_000).optional().default(""),
+});
+
+export const contactFormSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  email: z.email(),
+  phone: z.string().trim().max(30).optional().default(""),
+  subject: z.enum(["order", "coffee", "professional", "other"]),
+  message: z.string().trim().min(10).max(5_000),
+  locale: z.enum(["fr-FR", "en-GB"]),
+  privacyConsent: z.literal(true),
+  website: z.string().max(500).optional().default(""),
 });
 
 export const refundSchema = z.object({

@@ -102,6 +102,11 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   await page.getByLabel("Adresse", { exact: true }).fill("1 rue du Café");
   await page.getByLabel("Code postal").fill("37000");
   await page.getByLabel("Ville").fill("Tours");
+  const accountChoice = page.getByRole("checkbox", { name: /Créer mon compte client/ });
+  await expect(accountChoice).toBeVisible();
+  await accountChoice.check();
+  await expect(page.getByLabel("Choisissez un mot de passe")).toBeVisible();
+  await accountChoice.uncheck();
   const quoteResponse = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/shipping/quote") &&
@@ -140,6 +145,17 @@ test("cart drawer removes an item without leaving the current page", async ({
     drawer.getByText("Votre panier attend un bon café."),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Panier (0)" })).toBeVisible();
+});
+
+test("contact page provides a complete contact form", async ({ page }) => {
+  await page.goto("/contact");
+  await expect(page.getByRole("heading", { name: "Écrivez-nous" })).toBeVisible();
+  await expect(page.getByLabel("Nom *")).toBeVisible();
+  await expect(page.getByLabel("Email *")).toBeVisible();
+  await expect(page.getByLabel("Sujet *")).toBeVisible();
+  await expect(page.getByLabel("Votre message *")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Envoyer mon message" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "contact@zencoffeelab.com" })).toBeVisible();
 });
 
 test("English URLs, language switch and professional form are accessible", async ({

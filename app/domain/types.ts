@@ -192,5 +192,5 @@ export type AdviceArticle = Readonly<{
   publishedAt: string;
   title: Record<Locale, string>;
   excerpt: Record<Locale, string>;
-  body: Record<Locale, readonly string[]>;
+  body: Record<Locale, import("~/lib/rich-text").RichTextDocument | readonly string[]>;
 }>;

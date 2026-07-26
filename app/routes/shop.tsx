@@ -19,7 +19,7 @@ export default function Shop() {
   const { locale, products } = useLoaderData<typeof loader>();
   const english = locale === "en-GB";
   return <>
-    <header className="page-hero"><p className="eyebrow">Zen Coffee Lab</p><h1>{english ? "The coffee shop" : "La boutique café"}</h1><p className="lede">{english ? "Bright, traceable coffees roasted to order. Choose your origin, then your format." : "Des cafés lumineux et traçables, torréfiés à la demande. Choisissez votre origine, puis votre format."}</p></header>
+    <header className="page-hero page-hero--listing"><p className="eyebrow">Zen Coffee Lab</p><h1>{english ? "The coffee shop" : "La boutique café"}</h1><p className="lede">{english ? "Bright, traceable coffees roasted to order. Choose your origin, then your format." : "Des cafés lumineux et traçables, torréfiés à la demande. Choisissez votre origine, puis votre format."}</p></header>
     <section className="page-shell section" aria-label={english ? "Coffee catalogue" : "Catalogue de cafés"}>
       <div className="filter-bar"><span>{products.length} {english ? "coffees" : "cafés"}</span><span>{english ? "Roasted every week in Tours" : "Torréfiés chaque semaine à Tours"}</span></div>
       {products.length > 0

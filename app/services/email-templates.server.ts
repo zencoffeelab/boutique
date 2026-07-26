@@ -113,3 +113,19 @@ export function professionalDecisionEmail(input: { locale: Locale; approved: boo
   const body = `${paragraph(intro)}${input.approved && input.activationUrl ? actionLink(input.accessLabel ?? title, input.activationUrl) : ""}${input.approved ? paragraph(english ? "This secure link is temporary." : "Ce lien sécurisé est temporaire.") : ""}`;
   return { subject: title, html: emailLayout({ locale: input.locale, preheader: intro, title: input.approved ? (english ? "Welcome to Zen Coffee Lab" : "Bienvenue chez Zen Coffee Lab") : title, body }) };
 }
+
+export function contactMessageReceivedEmail(input: { locale: Locale; name: string; subject: string }): EmailContent {
+  const english = input.locale === "en-GB";
+  const title = english ? "We have received your message" : "Nous avons bien reçu votre message";
+  const details = english
+    ? `Thank you ${input.name}. Your message about “${input.subject}” has reached the roastery. We generally reply within two business days.`
+    : `Merci ${input.name}. Votre message au sujet de « ${input.subject} » est bien arrivé à la torréfaction. Nous répondons généralement sous deux jours ouvrés.`;
+  return { subject: title, html: emailLayout({ locale: input.locale, preheader: title, title, body: paragraph(details) }) };
+}
+
+export function contactAdminAlertEmail(input: { name: string; email: string; phone?: string; subject: string; message: string }): EmailContent {
+  const title = `Nouveau message · ${input.subject}`;
+  const safeMessage = escapeEmailHtml(input.message).replaceAll("\n", "<br>");
+  const body = `${paragraph(input.name)}${paragraph(input.email)}${input.phone ? paragraph(input.phone) : ""}<div style="margin:24px 0;padding:20px;background:#f5f2ef;border-left:4px solid #45503f;font-size:16px;line-height:1.65">${safeMessage}</div>${actionLink("Répondre par e-mail", `mailto:${input.email}`)}`;
+  return { subject: title, html: emailLayout({ locale: "fr-FR", preheader: `${input.name} vous a écrit depuis le site.`, title: "Nouveau message depuis le site", body }) };
+}
