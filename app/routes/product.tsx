@@ -1,10 +1,14 @@
+import { ArrowRight } from "lucide-react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Link, useLoaderData } from "react-router";
+import { ProductCard } from "~/components/product-card";
 import { ProductPurchase } from "~/components/product-purchase";
+import { ProfessionalQuoteAdd } from "~/components/professional-quote/professional-quote-add";
 import type { Audience, Locale, ProductEditorialBlock } from "~/domain/types";
 import { getAudience } from "~/lib/auth.server";
-import { getProductBySlug, getProducts } from "~/lib/catalog.server";
+import { getProducts, hasPurchasableVariant } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
+import { getRelatedProducts } from "~/lib/product-recommendations";
 import { JsonLd, pageMeta, productStructuredData } from "~/lib/seo";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -18,18 +22,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     wantsProfessional && authorizedAudience === "professional"
       ? "professional"
       : "retail";
-  const product =
-    audience === "professional"
-      ? ((
-          await getProducts({ status: "published", audience: "professional" })
-        ).find((item) => item.slug === params.slug) ?? null)
-      : await getProductBySlug(params.slug ?? "");
-  if (!product || product.status !== "published")
+  const products = await getProducts({ status: "published", audience });
+  const product = products.find((item) => item.slug === params.slug) ?? null;
+  if (!product || product.status !== "published" || (audience === "professional" && !product.professionalEnabled))
     throw new Response(
       locale === "fr-FR" ? "Café introuvable" : "Coffee not found",
       { status: 404 },
     );
-  return { locale, product, audience };
+  const relatedProducts = getRelatedProducts(
+    product,
+    products.filter((candidate) => hasPurchasableVariant(candidate, audience)),
+    locale,
+  );
+  return { locale, product, audience, relatedProducts };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) =>
@@ -95,7 +100,8 @@ function ProductStory({
 }
 
 export default function ProductDetail() {
-  const { locale, product, audience } = useLoaderData<typeof loader>();
+  const { locale, product, audience, relatedProducts } =
+    useLoaderData<typeof loader>();
   const t = product.translations[locale];
   const english = locale === "en-GB";
   return (
@@ -135,11 +141,7 @@ export default function ProductDetail() {
               <li key={note}>{note}</li>
             ))}
           </ul>
-          <ProductPurchase
-            product={product}
-            locale={locale}
-            audience={audience}
-          />
+          {audience === "professional" ? <ProfessionalQuoteAdd product={product} locale={locale} /> : <ProductPurchase product={product} locale={locale} audience={audience} />}
         </div>
       </article>
       <dl className="origin-grid">
@@ -171,6 +173,37 @@ export default function ProductDetail() {
         </p>
         <p>{t.body}</p>
       </section>
+      {relatedProducts.length > 0 ? (
+        <section
+          className="related-products"
+          aria-labelledby="related-products-title"
+        >
+          <div className="page-shell">
+            <div className="section-header">
+              <h2 id="related-products-title">
+                {english ? "You may also like" : "Vous aimerez aussi"}
+              </h2>
+              <Link
+                className="button button--ghost"
+                to={english ? "/en/shop" : "/boutique"}
+              >
+                {english ? "All coffees" : "Tous les cafés"}
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            </div>
+            <div className="product-grid">
+              {relatedProducts.map((relatedProduct) => (
+                <ProductCard
+                  key={relatedProduct.id}
+                  product={relatedProduct}
+                  locale={locale}
+                  audience={audience}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }

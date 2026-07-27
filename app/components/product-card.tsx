@@ -2,6 +2,7 @@ import { ArrowUpRight, ShoppingBag } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
+import { ProfessionalQuoteAdd } from "~/components/professional-quote/professional-quote-add";
 import { buildProductCartLine } from "~/domain/cart";
 import type { Audience, Locale, Product } from "~/domain/types";
 import { formatMoney } from "~/domain/money";
@@ -32,7 +33,7 @@ function ProductCardQuickAdd({ product, locale, audience }: { product: Product; 
   </div>;
 }
 
-export function ProductCard({ product, locale, audience, quickAdd = false }: { product: Product; locale: Locale; audience?: Audience; quickAdd?: boolean }) {
+export function ProductCard({ product, locale, audience, quickAdd = false, quoteAdd = false }: { product: Product; locale: Locale; audience?: Audience; quickAdd?: boolean; quoteAdd?: boolean }) {
   const translation = product.translations[locale];
   const resolvedAudience = audience ?? product.variants.flatMap((variant) => variant.offers)[0]?.audience ?? "retail";
   const baseHref = locale === "fr-FR" ? `/boutique/${product.slug}` : `/en/shop/${product.slug}`;
@@ -53,6 +54,7 @@ export function ProductCard({ product, locale, audience, quickAdd = false }: { p
         {translation.tastingNotes.map((note) => <li key={note}>{note}</li>)}
       </ul>
       {quickAdd ? <ProductCardQuickAdd product={product} locale={locale} audience={resolvedAudience} /> : null}
+      {quoteAdd ? <ProfessionalQuoteAdd product={product} locale={locale} /> : null}
     </article>
   );
 }

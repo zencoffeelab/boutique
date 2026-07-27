@@ -3,7 +3,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { constructStripeEvent, createStripe } from "~/lib/stripe.server";
-import { invoiceEmail, orderConfirmationEmail, refundEmail } from "~/services/email-templates.server";
+import { invoiceEmail, orderConfirmationEmail, professionalQuotePaidEmail, refundEmail } from "~/services/email-templates.server";
 import { dispatchNotificationQueue, enqueueNotification } from "~/services/notifications.server";
 import { generateInvoicePdf } from "~/services/invoice.server";
 
@@ -22,6 +22,32 @@ export async function action({ request, context }: ActionFunctionArgs) {
   }
   if (eventError && eventError.code !== "23505") return new Response("Unable to persist event.", { status: 500 });
   try {
+    if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded" || event.type === "checkout.session.async_payment_failed" || event.type === "checkout.session.expired") {
+      const session = event.data.object;
+      const professionalQuoteId = session.metadata?.professional_quote_id;
+      if (professionalQuoteId) {
+        const { data: quote } = await client.from("professional_quotes").select("id,quote_number,email,locale,status,total_cents").eq("id", professionalQuoteId).maybeSingle();
+        if (!quote) throw new Error("Professional quote linked to Stripe session was not found.");
+        if (event.type === "checkout.session.async_payment_failed") {
+          await client.from("professional_quotes").update({ status: "pending_payment", stripe_checkout_session_id: null, updated_at: new Date().toISOString() }).eq("id", quote.id).eq("status", "bank_transfer_pending");
+        } else if (event.type === "checkout.session.expired") {
+          await client.from("professional_quotes").update({ stripe_checkout_session_id: null, updated_at: new Date().toISOString() }).eq("id", quote.id).eq("status", "pending_payment");
+        } else if (session.payment_status === "paid") {
+          if (session.currency !== "eur" || session.amount_total !== quote.total_cents) throw new Error("Stripe payment amount does not match the professional quote.");
+          const { data: paidQuote, error: paidError } = await client.rpc("finalize_paid_professional_quote", { p_quote_id: quote.id, p_checkout_session_id: session.id, p_payment_intent_id: String(session.payment_intent ?? ""), p_paid_at: new Date(event.created * 1000).toISOString() });
+          if (paidError) throw paidError;
+          if (!paidQuote?.duplicate && quote.email) {
+            const content = professionalQuotePaidEmail({ locale: quote.locale, quoteNumber: quote.quote_number, totalCents: quote.total_cents });
+            await enqueueNotification({ kind: "professional_quote_paid", to: quote.email, locale: quote.locale, ...content, payload: { quoteId: quote.id }, dedupeKey: `professional-quote-paid/${quote.id}` });
+            dispatchNotificationQueue(context, "professional_quote_payment_confirmation_failed");
+          }
+        } else {
+          await client.from("professional_quotes").update({ status: "bank_transfer_pending", stripe_checkout_session_id: session.id, updated_at: new Date().toISOString() }).eq("id", quote.id).eq("status", "pending_payment");
+        }
+        await client.from("webhook_events").update({ processed_at: new Date().toISOString() }).eq("provider", "stripe").eq("provider_event_id", event.id);
+        return Response.json({ received: true, professionalQuote: true, paymentPending: session.payment_status !== "paid" });
+      }
+    }
     if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
       const session = event.data.object; const orderId = session.metadata?.order_id;
       if (!orderId) throw new Error("Stripe session is missing order metadata.");

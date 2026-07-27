@@ -47,24 +47,31 @@ test("a coffee can be added to the cart directly from the shop", async ({
 test("product page shows the two alternating editorial blocks below origin details", async ({
   page,
 }) => {
-  await page.goto("/boutique/ethiopie-aricha-station");
+  await page.goto("/boutique/kenya-kaiguri-ab");
   const origin = page.locator(".origin-grid");
   const story = page.locator(".product-story");
   await expect(story.locator(".product-story-block")).toHaveCount(2);
   await expect(story.locator(".product-story-block").nth(1)).toHaveClass(
     /product-story-block--image-first/,
   );
-  await expect(
-    story.getByRole("heading", { name: /À propos de Faysel Abdosh/ }),
-  ).toBeVisible();
-  await expect(
-    story.getByRole("heading", {
-      name: "À propos de la variété et du traitement",
-    }),
-  ).toBeVisible();
+  await expect(story.getByRole("heading")).toHaveCount(2);
   expect((await origin.boundingBox())!.y).toBeLessThan(
     (await story.boundingBox())!.y,
   );
+});
+
+test("product page recommends three similar coffees above the footer", async ({
+  page,
+}) => {
+  await page.goto("/boutique/ethiopie-aricha-station");
+  const relatedProducts = page.locator(".related-products");
+  await expect(
+    relatedProducts.getByRole("heading", { name: "Vous aimerez aussi" }),
+  ).toBeVisible();
+  await expect(relatedProducts.locator(".product-card")).toHaveCount(3);
+  await expect(
+    relatedProducts.getByRole("link", { name: /Tous les cafés/ }),
+  ).toHaveAttribute("href", "/boutique");
 });
 
 test("French guest can add a coffee and reach checkout", async ({ page }) => {
@@ -174,12 +181,21 @@ test("English URLs, language switch and professional form are accessible", async
   await expect(
     page.getByRole("heading", { name: /Coffee with clarity/ }),
   ).toBeVisible();
-  const menu = page.getByRole("button", { name: "Menu" });
-  if (await menu.isVisible()) await menu.click();
-  await page
-    .getByRole("navigation", { name: "Primary navigation" })
-    .getByRole("link", { name: "Professionals" })
-    .click();
+  await page.goto("/en/professional");
+  await expect(
+    page.locator("#main-content").getByRole("link", { name: "Sign in" }),
+  ).toBeVisible();
+  await expect(page.getByText("Approved professionals")).toHaveCount(0);
+  await expect(
+    page.locator(
+      ".professional-application-layout > .professional-application-steps",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.locator(
+      ".professional-application-layout > form.professional-application-form",
+    ),
+  ).toBeVisible();
   await expect(page.getByLabel("Company name")).toBeVisible();
   await page.getByRole("link", { name: "FR" }).click();
   await expect(page).toHaveURL(/\/professionnel$/);

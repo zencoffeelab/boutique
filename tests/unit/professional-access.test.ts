@@ -16,21 +16,32 @@ describe("professional account activation", () => {
     const result = await generateProfessionalAccessLink(clientWith(generateLink), { email: "pro@example.com", locale: "fr-FR", siteUrl: "https://coffee.example" });
     const url = new URL(result.url);
 
-    expect(result).toMatchObject({ userId: "user-new", type: "invite", existingUser: false });
+    expect(result).toMatchObject({ userId: "user-new", type: "invite", existingUser: false, requiresPasswordSetup: true });
     expect(url.pathname).toBe("/auth/confirm");
     expect(url.searchParams.get("type")).toBe("invite");
-    expect(url.searchParams.get("next")).toBe("/mon-compte?set-password=1&next=%2Fprofessionnel");
+    expect(url.searchParams.get("next")).toBe("/activation/mot-de-passe?next=%2Fprofessionnel");
   });
 
-  it("links an existing customer account through a recovery link", async () => {
+  it("sends an existing customer to the shared account login", async () => {
     const generateLink = vi.fn()
       .mockResolvedValueOnce({ data: null, error: { code: "user_already_exists", message: "User already registered" } })
       .mockResolvedValueOnce(generated("user-existing", "recovery-token"));
     const result = await generateProfessionalAccessLink(clientWith(generateLink), { email: "client@example.com", locale: "en-GB", siteUrl: "https://coffee.example/" });
 
-    expect(result).toMatchObject({ userId: "user-existing", type: "recovery", existingUser: true });
+    expect(result).toMatchObject({ userId: "user-existing", type: "recovery", existingUser: true, requiresPasswordSetup: false });
     expect(generateLink).toHaveBeenNthCalledWith(2, expect.objectContaining({ type: "recovery", email: "client@example.com" }));
-    expect(new URL(result.url).searchParams.get("next")).toBe("/en/my-account?set-password=1&next=%2Fen%2Fprofessional");
+    expect(new URL(result.url).pathname).toBe("/en/my-account");
+    expect(new URL(result.url).searchParams.get("next")).toBe("/en/professional");
+  });
+
+  it("keeps the mandatory password screen when an invitation is regenerated before activation", async () => {
+    const generateLink = vi.fn()
+      .mockResolvedValueOnce({ data: null, error: { code: "user_already_exists", message: "User already registered" } })
+      .mockResolvedValueOnce(generated("user-pending", "recovery-token"));
+    const result = await generateProfessionalAccessLink(clientWith(generateLink), { email: "pending@example.com", locale: "fr-FR", siteUrl: "https://coffee.example", forcePasswordSetup: true });
+    expect(result.requiresPasswordSetup).toBe(true);
+    expect(new URL(result.url).pathname).toBe("/auth/confirm");
+    expect(new URL(result.url).searchParams.get("next")).toBe("/activation/mot-de-passe?next=%2Fprofessionnel");
   });
 
   it("does not hide unrelated Supabase errors", async () => {

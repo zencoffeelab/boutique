@@ -40,6 +40,9 @@ function mapDatabaseProduct(row: any): Product {
     status: row.status,
     altitudeMeters: row.altitude_meters,
     featured: row.featured,
+    professionalEnabled: row.professional_enabled ?? false,
+    professionalStockKg: Number(row.professional_stock_kg ?? 0),
+    professionalStockReservedKg: Number(row.professional_stock_reserved_kg ?? 0),
     translations,
     media: row.product_media
       .toSorted((a: any, b: any) => a.position - b.position)
@@ -86,24 +89,37 @@ function mapDatabaseProduct(row: any): Product {
 async function databaseProducts(includeDrafts = false): Promise<Product[]> {
   const client = createServiceSupabase();
   if (!client) throw new Error("Supabase service configuration is incomplete.");
-  const { data, error } = await client
+  const statuses = includeDrafts
+    ? ["draft", "published", "archived"]
+    : ["published", "archived"];
+  let { data, error } = await client
     .from("products")
     .select(
       `
-      id, slug, status, altitude_meters, featured,
+      id, slug, status, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
       product_translations(*),
       product_media(*),
       product_editorial_blocks(*),
       product_variants(*, variant_offers(*))
     `,
     )
-    .in(
-      "status",
-      includeDrafts
-        ? ["draft", "published", "archived"]
-        : ["published", "archived"],
-    )
+    .in("status", statuses)
     .order("created_at", { ascending: false });
+  if (error?.code === "42703" && error.message.includes("professional_")) {
+    const legacyResult = await client
+      .from("products")
+      .select(`
+        id, slug, status, altitude_meters, featured,
+        product_translations(*),
+        product_media(*),
+        product_editorial_blocks(*),
+        product_variants(*, variant_offers(*))
+      `)
+      .in("status", statuses)
+      .order("created_at", { ascending: false });
+    if (legacyResult.error) throw new Error(`Unable to load catalog: ${legacyResult.error.message}`);
+    return (legacyResult.data ?? []).map(mapDatabaseProduct);
+  }
   if (error) throw new Error(`Unable to load catalog: ${error.message}`);
   return (data ?? []).map(mapDatabaseProduct);
 }

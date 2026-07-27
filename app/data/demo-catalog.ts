@@ -184,6 +184,9 @@ export const demoProducts: Product[] = inputs.map((input) => {
     status: "published",
     altitudeMeters: input.altitude,
     featured: input.featured ?? false,
+    professionalEnabled: true,
+    professionalStockKg: 60,
+    professionalStockReservedKg: 0,
     translations: {
       "fr-FR": {
         locale: "fr-FR",

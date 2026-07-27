@@ -4,6 +4,8 @@ import {
   contactMessageReceivedEmail,
   orderConfirmationEmail,
   professionalApplicationReceivedEmail,
+  professionalDecisionEmail,
+  professionalQuoteEmail,
   refundEmail,
   trackingEmail,
 } from "~/services/email-templates.server";
@@ -35,11 +37,26 @@ describe("transactional email templates", () => {
     expect(professionalApplicationReceivedEmail({ locale: "en-GB", firstName: "Ada" }).html).toContain("Thank you Ada");
   });
 
+  it("uses the permanent account login wording for an existing customer", () => {
+    const email = professionalDecisionEmail({ locale: "fr-FR", approved: true, activationUrl: "https://coffee.example/mon-compte", accessLabel: "Connexion", temporaryAccessLink: false });
+    expect(email.html).toContain("Connexion");
+    expect(email.html).not.toContain("lien sécurisé est temporaire");
+  });
+
   it("renders escaped contact notifications and a bilingual confirmation", () => {
     const admin = contactAdminAlertEmail({ name: "Ada <script>", email: "ada@example.com", subject: "Un café", message: "Bonjour\n<script>alert(1)</script>" });
     expect(admin.subject).toContain("Un café");
     expect(admin.html).toContain("Bonjour<br>&lt;script&gt;");
     expect(admin.html).not.toContain("<script>alert(1)</script>");
     expect(contactMessageReceivedEmail({ locale: "en-GB", name: "Ada", subject: "A coffee" }).html).toContain("Thank you Ada");
+  });
+
+  it("includes the quote amount, PDF notice and secure payment link", () => {
+    const email = professionalQuoteEmail({ locale: "fr-FR", quoteNumber: "ZCL-D-2026-001001", totalCents: 45_000, validUntil: "2026-08-26T10:00:00.000Z", paymentUrl: "https://zencoffeelab.com/devis/quote-id/paiement" });
+    expect(email.subject).toContain("ZCL-D-2026-001001");
+    expect(email.html).toContain("450,00");
+    expect(email.html).toContain("PDF est joint");
+    expect(email.html).toContain("https://zencoffeelab.com/devis/quote-id/paiement");
+    expect(email.html).toContain("virement bancaire SEPA");
   });
 });

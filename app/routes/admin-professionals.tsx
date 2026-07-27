@@ -109,7 +109,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const client = createServiceSupabase();
   if (!client) return Response.json({ ok: false, message: "Base de données indisponible." }, { status: 503 });
 
-  const { data: profile, error: profileError } = await client.from("profiles").select("id,professional_status,first_name,last_name").eq("id", parsed.data.userId).maybeSingle();
+  const { data: profile, error: profileError } = await client.from("profiles").select("id,professional_status,first_name,last_name,password_setup_required").eq("id", parsed.data.userId).maybeSingle();
   if (profileError) return Response.json({ ok: false, message: profileError.message }, { status: 500 });
   if (!profile || !["approved", "suspended"].includes(profile.professional_status ?? "")) return Response.json({ ok: false, message: "Compte professionnel introuvable." }, { status: 404 });
 
@@ -138,17 +138,22 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const email = authData.user?.email ?? application?.email;
   if (authError || !email) return Response.json({ ok: false, message: authError?.message ?? "Aucune adresse e-mail n’est associée à ce compte." }, { status: 404 });
   let activationUrl: string;
+  let requiresPasswordSetup = profile.password_setup_required === true;
   try {
-    activationUrl = (await generateProfessionalAccessLink(client, { email, locale: application?.locale ?? "fr-FR", siteUrl: env().VITE_SITE_URL })).url;
+    const access = await generateProfessionalAccessLink(client, { email, locale: application?.locale ?? "fr-FR", siteUrl: env().VITE_SITE_URL, forcePasswordSetup: requiresPasswordSetup });
+    activationUrl = access.url;
+    requiresPasswordSetup = access.requiresPasswordSetup;
   } catch (cause) {
     return Response.json({ ok: false, message: cause instanceof Error ? cause.message : "Le lien d’accès n’a pas pu être créé." }, { status: cause instanceof ProfessionalAccessError ? cause.status : 502 });
   }
+  const { error: passwordGateError } = await client.from("profiles").update({ password_setup_required: requiresPasswordSetup, updated_at: new Date().toISOString() }).eq("id", profile.id);
+  if (passwordGateError) return Response.json({ ok: false, message: passwordGateError.message }, { status: 500 });
 
   const emailConfigured = Boolean(env().RESEND_API_KEY);
   let emailQueued = false;
   try {
     const locale = application?.locale ?? "fr-FR";
-    const content = professionalDecisionEmail({ locale, approved: true, activationUrl, accessLabel: locale === "en-GB" ? "Choose a new password" : "Choisir un nouveau mot de passe" });
+    const content = professionalDecisionEmail({ locale, approved: true, activationUrl, accessLabel: requiresPasswordSetup ? (locale === "en-GB" ? "Choose a new password" : "Choisir un nouveau mot de passe") : (locale === "en-GB" ? "Sign in" : "Connexion"), temporaryAccessLink: requiresPasswordSetup });
     const queued = await enqueueNotification({
       kind: "invitation", to: email, locale, ...content,
       payload: { applicationId: application?.id, invitedUserId: profile.id, regeneratedBy: admin.id },

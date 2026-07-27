@@ -3,7 +3,7 @@ import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 export { escapeEmailHtml } from "~/services/email-templates.server";
 
-export type NotificationKind = "pro_application" | "pro_application_confirmation" | "pro_decision" | "invitation" | "order_confirmation" | "invoice" | "order_status" | "shipped" | "tracking" | "delivered" | "refund" | "password_reset" | "contact_message" | "contact_confirmation";
+export type NotificationKind = "pro_application" | "pro_application_confirmation" | "pro_decision" | "professional_quote" | "professional_quote_paid" | "invitation" | "order_confirmation" | "invoice" | "order_status" | "shipped" | "tracking" | "delivered" | "refund" | "password_reset" | "contact_message" | "contact_confirmation";
 
 export async function enqueueNotification(input: { kind: NotificationKind; to: string; locale: "fr-FR" | "en-GB"; subject: string; html: string; payload?: Record<string, unknown>; dedupeKey?: string }) {
   const client = createServiceSupabase();
@@ -36,6 +36,10 @@ export async function processNotificationQueue(limit = 25) {
     if (item.kind === "invoice" && item.payload?.orderId) {
       const { data: invoice } = await client.from("invoices").select("invoice_number,storage_path").eq("order_id", String(item.payload.orderId)).maybeSingle();
       if (invoice?.storage_path) { const { data: file } = await client.storage.from("invoices").download(invoice.storage_path); if (file) attachments = [{ filename: `${invoice.invoice_number}.pdf`, content: Buffer.from(await file.arrayBuffer()) }]; }
+    }
+    if (item.kind === "professional_quote" && item.payload?.quoteId) {
+      const { data: quote } = await client.from("professional_quotes").select("quote_number,storage_path").eq("id", String(item.payload.quoteId)).maybeSingle();
+      if (quote?.storage_path) { const { data: file } = await client.storage.from("professional-quotes").download(quote.storage_path); if (file) attachments = [{ filename: `${quote.quote_number}.pdf`, content: Buffer.from(await file.arrayBuffer()) }]; }
     }
     const result = await resend.emails.send({ from: config.RESEND_FROM_EMAIL, to: item.recipient, subject: item.subject, html: item.html, attachments }, { idempotencyKey: item.dedupe_key || `notification/${item.id}` });
     if (result.error) {

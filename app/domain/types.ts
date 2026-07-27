@@ -94,10 +94,25 @@ export type Product = Readonly<{
   status: ProductStatus;
   altitudeMeters: number;
   featured: boolean;
+  professionalEnabled: boolean;
+  professionalStockKg: number;
+  professionalStockReservedKg: number;
   translations: Record<Locale, ProductTranslation>;
   media: readonly ProductMedia[];
   editorialBlocks: readonly ProductEditorialBlock[];
   variants: readonly ProductVariant[];
+}>;
+
+export type ProfessionalQuoteCartLine = Readonly<{
+  productId: string;
+  variantId: string;
+  kilograms: number;
+  productSlug: string;
+  productNames: Readonly<Record<Locale, string>>;
+  variantLabel: string;
+  basePriceCentsPerKg: number;
+  availableKilograms: number;
+  imageUrl: string;
 }>;
 
 export type CartLine = Readonly<{

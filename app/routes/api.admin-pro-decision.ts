@@ -26,16 +26,27 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
   let invitedUserId: string | undefined;
   let invitationLink: string | undefined;
   let existingUser = false;
+  let requiresPasswordSetup = false;
 
   if (approved) {
-    try {
-      const access = await generateProfessionalAccessLink(client, { email: application.email, locale: application.locale, siteUrl: env().VITE_SITE_URL });
-      invitedUserId = access.userId;
-      invitationLink = access.url;
-      existingUser = access.existingUser;
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "La création de l’accès professionnel a échoué.";
-      return Response.json({ ok: false, message }, { status: cause instanceof ProfessionalAccessError ? cause.status : 502 });
+    if (application.invited_user_id) {
+      invitedUserId = application.invited_user_id;
+      existingUser = true;
+      const paths = application.locale === "en-GB" ? { account: "/en/my-account", professional: "/en/professional" } : { account: "/mon-compte", professional: "/professionnel" };
+      const login = new URL(paths.account, env().VITE_SITE_URL);
+      login.searchParams.set("next", paths.professional);
+      invitationLink = login.toString();
+    } else {
+      try {
+        const access = await generateProfessionalAccessLink(client, { email: application.email, locale: application.locale, siteUrl: env().VITE_SITE_URL });
+        invitedUserId = access.userId;
+        invitationLink = access.url;
+        existingUser = access.existingUser;
+        requiresPasswordSetup = access.requiresPasswordSetup;
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "La création de l’accès professionnel a échoué.";
+        return Response.json({ ok: false, message }, { status: cause instanceof ProfessionalAccessError ? cause.status : 502 });
+      }
     }
 
     const { error: profileError } = await client.from("profiles").upsert({
@@ -44,6 +55,7 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
       last_name: application.last_name,
       phone: application.phone,
       professional_status: "approved",
+      password_setup_required: requiresPasswordSetup,
       updated_at: new Date().toISOString(),
     });
     if (profileError) return Response.json({ ok: false, message: profileError.message }, { status: 500 });
@@ -61,18 +73,18 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
   if (decisionError) return Response.json({ ok: false, message: decisionError.message }, { status: 500 });
 
   const accessLabel = existingUser
-    ? (english ? "Choose a new password and open your professional space" : "Choisir un nouveau mot de passe et ouvrir votre espace professionnel")
+    ? (english ? "Sign in to my account" : "Me connecter à mon compte")
     : (english ? "Set your password and open your professional space" : "Définir votre mot de passe et ouvrir votre espace professionnel");
   const emailConfigured = Boolean(env().RESEND_API_KEY);
   let emailQueued = false;
   try {
-    const content = professionalDecisionEmail({ locale: application.locale, approved, activationUrl: invitationLink, accessLabel, note: parsed.data.note });
+    const content = professionalDecisionEmail({ locale: application.locale, approved, activationUrl: invitationLink, accessLabel, note: parsed.data.note, temporaryAccessLink: requiresPasswordSetup });
     const queued = await enqueueNotification({
       kind: approved ? "invitation" : "pro_decision",
       to: application.email,
       locale: application.locale,
       ...content,
-      payload: { applicationId: application.id, invitedUserId, existingUser },
+      payload: { applicationId: application.id, invitedUserId, existingUser, requiresPasswordSetup },
       dedupeKey: `pro-decision/${application.id}/${parsed.data.decision}`,
     });
     emailQueued = queued.queued;
@@ -87,10 +99,10 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
     entity_type: "professional_application",
     entity_id: application.id,
     before_data: { status: application.status },
-    after_data: { ...parsed.data, invitedUserId, existingUser },
+    after_data: { ...parsed.data, invitedUserId, existingUser, requiresPasswordSetup },
   });
   return Response.json({
     ok: true,
-    ...professionalDecisionFeedback({ approved, email: application.email, emailConfigured, emailQueued, activationUrl: invitationLink }),
+    ...professionalDecisionFeedback({ approved, email: application.email, emailConfigured, emailQueued, activationUrl: invitationLink, existingUser }),
   });
 }

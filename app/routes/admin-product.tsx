@@ -30,6 +30,8 @@ const productSchema = z.object({
   status: z.enum(["draft", "published", "archived"]),
   altitudeMeters: z.coerce.number().int().min(0).max(10_000),
   featured: z.string().optional().transform(Boolean),
+  professionalEnabled: z.string().optional().transform(Boolean),
+  professionalStockKg: z.coerce.number().min(0).max(1_000_000),
   nameFr: z.string().trim().min(2),
   nameEn: z.string().trim().min(2),
   shortFr: z.string().trim().min(10),
@@ -123,6 +125,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         status: "draft" as const,
         altitudeMeters: 0,
         featured: false,
+        professionalEnabled: false,
+        professionalStockKg: 0,
+        professionalStockReservedKg: 0,
         translations: {
           "fr-FR": emptyTranslation("fr-FR"),
           "en-GB": emptyTranslation("en-GB"),
@@ -420,6 +425,8 @@ export async function action({ request }: ActionFunctionArgs) {
     status: creating ? "draft" : parsed.data.status,
     altitude_meters: parsed.data.altitudeMeters,
     featured: parsed.data.featured,
+    professional_enabled: parsed.data.professionalEnabled,
+    professional_stock_kg: parsed.data.professionalStockKg + Number(before.data?.professional_stock_reserved_kg ?? 0),
     updated_at: new Date().toISOString(),
   };
   const mutation = creating
@@ -1040,6 +1047,29 @@ export default function AdminProduct() {
             />{" "}
             Mis en avant
           </label>
+          <label>
+            <input
+              name="professionalEnabled"
+              type="checkbox"
+              defaultChecked={product.professionalEnabled}
+            />{" "}
+            Activer sur la boutique professionnelle
+          </label>
+          <div className="field">
+            <label>
+              Stock professionnel disponible (kg)
+              <input
+                name="professionalStockKg"
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={Math.max(0, product.professionalStockKg - product.professionalStockReservedKg)}
+              />
+            </label>
+            {product.professionalStockReservedKg > 0 ? (
+              <small>{product.professionalStockReservedKg} kg supplémentaires sont actuellement réservés par des devis.</small>
+            ) : null}
+          </div>
         </div>
         <LanguageTabs
           label="Langue du contenu produit"

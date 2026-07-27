@@ -7,7 +7,7 @@ describe("admin navigation", () => {
   it("renders the complete shared menu and marks the active section", () => {
     const html = renderToStaticMarkup(<MemoryRouter><AdminShell active="advice"><h1>Conseils</h1></AdminShell></MemoryRouter>);
 
-    for (const label of ["Tableau de bord", "Commandes", "Produits", "Stocks", "Expédition", "Clients", "Professionnels", "Pages", "FAQ", "Conseils", "Modifications"]) {
+    for (const label of ["Tableau de bord", "Commandes", "Produits", "Expédition", "Clients", "Professionnels", "Pages", "FAQ", "Conseils", "Modifications"]) {
       expect(html).toContain(label);
     }
     expect(html).not.toContain("Archives");
@@ -17,6 +17,10 @@ describe("admin navigation", () => {
     expect(html).toContain('href="/admin/clients"');
     expect(html).toContain('href="/admin/produits"');
     expect(html).toContain('href="/admin/modifications"');
+    expect(html).not.toContain('href="/admin/produits#catalogue"');
     expect(html).not.toContain('href="/admin#catalogue"');
+    expect(html).toContain('action="/mon-compte"');
+    expect(html).toContain('name="intent" value="logout"');
+    expect(html).toContain("Se déconnecter");
   });
 });

@@ -10,17 +10,22 @@ import {
   useLoaderData,
   useLocation,
   useRouteError,
+  redirect,
 } from "react-router";
 import { CartProvider } from "~/components/cart/cart-provider";
+import { QuoteCartProvider } from "~/components/professional-quote/quote-cart-provider";
 import { CookieConsent } from "~/components/cookie-consent";
 import { SiteFooter } from "~/components/site-footer";
 import { SiteHeader } from "~/components/site-header";
 import { getSessionStatus } from "~/lib/auth.server";
+import { getProducts } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
+import { isAllowedDuringRequiredPasswordSetup, passwordSetupPath } from "~/lib/password-setup";
+import { safeInternalPath } from "~/lib/redirects";
 import "./app.css";
 
 export const links: LinksFunction = () => [
-  { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+  { rel: "icon", href: "/favicon.svg?v=2", type: "image/svg+xml" },
   { rel: "preconnect", href: "https://www.zencoffeelab.com" },
 ];
 
@@ -32,18 +37,53 @@ export const meta: MetaFunction = () => [
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const session = await getSessionStatus(request);
+  const requestUrl = new URL(request.url);
+  const locale = getLocale(request);
+  const shellHidden =
+    requestUrl.pathname === "/admin" ||
+    requestUrl.pathname.startsWith("/admin/") ||
+    requestUrl.pathname === "/activation/mot-de-passe" ||
+    requestUrl.pathname === "/en/activate/password";
+  const [session, footerProducts] = await Promise.all([
+    getSessionStatus(request),
+    shellHidden
+      ? Promise.resolve([])
+      : getProducts({ status: "published", availableOnly: true }).then(
+          (products) =>
+            products
+              .map((product) => ({
+                slug: product.slug,
+                name: product.translations[locale].name,
+              }))
+              .toSorted((first, second) =>
+                first.name.localeCompare(second.name, locale, {
+                  sensitivity: "base",
+                }),
+              ),
+        ),
+  ]);
+  const setupPath = passwordSetupPath(locale);
+  if (session.passwordSetupRequired && !isAllowedDuringRequiredPasswordSetup(requestUrl.pathname)) {
+    const next = safeInternalPath(`${requestUrl.pathname}${requestUrl.search}`, locale === "en-GB" ? "/en/professional" : "/professionnel");
+    throw redirect(`${setupPath}?next=${encodeURIComponent(next)}`, { headers: session.responseHeaders });
+  }
   return data({
-    locale: getLocale(request),
+    locale,
     gaMeasurementId: process.env.VITE_GA_MEASUREMENT_ID ?? "",
     signedIn: session.signedIn,
+    professional: session.professional,
+    professionalUserId: session.professionalUserId,
+    admin: session.admin,
+    footerProducts,
   }, { headers: session.responseHeaders });
 }
 
 export default function App() {
-  const { locale, gaMeasurementId, signedIn } = useLoaderData<typeof loader>();
+  const { locale, gaMeasurementId, signedIn, professional, professionalUserId, admin, footerProducts } = useLoaderData<typeof loader>();
   const location = useLocation();
   const isAdmin = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
+  const isPasswordSetup = location.pathname === "/activation/mot-de-passe" || location.pathname === "/en/activate/password";
+  const shellHidden = isAdmin || isPasswordSetup;
   return (
     <html lang={locale === "fr-FR" ? "fr" : "en"}>
       <head>
@@ -52,14 +92,16 @@ export default function App() {
         <Meta />
         <Links />
       </head>
-      <body className={isAdmin ? "admin-body" : undefined}>
+      <body className={isAdmin ? "admin-body" : isPasswordSetup ? "password-setup-body" : undefined}>
         <CartProvider>
-          {isAdmin ? null : <SiteHeader signedIn={signedIn} />}
-          <main id="main-content" tabIndex={-1}>
-            <Outlet />
-          </main>
-          {isAdmin ? null : <SiteFooter />}
-          {isAdmin ? null : <CookieConsent measurementId={gaMeasurementId} />}
+          <QuoteCartProvider key={professionalUserId ?? "guest"} storageNamespace={professionalUserId ?? "guest"}>
+            {shellHidden ? null : <SiteHeader signedIn={signedIn} professional={professional} />}
+            <main id="main-content" tabIndex={-1}>
+              <Outlet />
+            </main>
+            {shellHidden ? null : <SiteFooter products={footerProducts} admin={admin} />}
+            {shellHidden ? null : <CookieConsent measurementId={gaMeasurementId} />}
+          </QuoteCartProvider>
         </CartProvider>
         <ScrollRestoration />
         <Scripts />

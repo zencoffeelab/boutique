@@ -4,10 +4,30 @@ import { createRequestSupabase } from "./supabase.server";
 
 export async function getSessionStatus(request: Request) {
   const supabase = createRequestSupabase(request);
-  if (!supabase) return { signedIn: false, responseHeaders: new Headers() };
+  if (!supabase) return { signedIn: false, professional: false, professionalUserId: null, admin: false, passwordSetupRequired: false, responseHeaders: new Headers() };
   const { data, error } = await supabase.client.auth.getUser();
+  let profile: { role?: string | null; professional_status?: string | null; password_setup_required?: boolean } | null = null;
+  if (!error && data.user) {
+    const result = await supabase.client.from("profiles").select("role,professional_status,password_setup_required").eq("id", data.user.id).maybeSingle();
+    if (result.error?.code === "42703") {
+      const legacy = await supabase.client.from("profiles").select("role,professional_status").eq("id", data.user.id).maybeSingle();
+      if (legacy.error) throw new Response("Unable to verify account activation status.", { status: 503 });
+      profile = legacy.data;
+    } else if (result.error) {
+      throw new Response("Unable to verify account activation status.", { status: 503 });
+    } else {
+      profile = result.data;
+    }
+  }
+  const adminAssurance = profile?.role === "admin"
+    ? await supabase.client.auth.mfa.getAuthenticatorAssuranceLevel()
+    : null;
   return {
     signedIn: !error && Boolean(data.user),
+    professional: profile?.professional_status === "approved",
+    professionalUserId: profile?.professional_status === "approved" ? data.user?.id ?? null : null,
+    admin: profile?.role === "admin" && adminAssurance?.data?.currentLevel === "aal2",
+    passwordSetupRequired: profile?.password_setup_required === true,
     responseHeaders: supabase.responseHeaders,
   };
 }
@@ -38,7 +58,7 @@ export async function requireAdmin(request: Request) {
   }
   const aal = await createRequestSupabase(request)?.client.auth.mfa.getAuthenticatorAssuranceLevel();
   if (aal?.data?.currentLevel !== "aal2") {
-    throw redirect(`${accountPath}?mfa=1&next=${encodeURIComponent(next)}`, { headers: viewer.responseHeaders });
+    throw redirect(`${accountPath}?admin-login=2fa&next=${encodeURIComponent(next)}`, { headers: viewer.responseHeaders });
   }
   return { id: viewer.user.id, role: "admin" as const, demo: false };
 }

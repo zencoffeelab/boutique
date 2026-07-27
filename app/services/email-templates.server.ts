@@ -106,12 +106,29 @@ export function professionalAdminAlertEmail(input: { company: string; name: stri
   return { subject: title, html: emailLayout({ locale: "fr-FR", preheader: title, title: "Nouvelle demande professionnelle", body }) };
 }
 
-export function professionalDecisionEmail(input: { locale: Locale; approved: boolean; activationUrl?: string; accessLabel?: string; note?: string }): EmailContent {
+export function professionalDecisionEmail(input: { locale: Locale; approved: boolean; activationUrl?: string; accessLabel?: string; note?: string; temporaryAccessLink?: boolean }): EmailContent {
   const english = input.locale === "en-GB";
   const title = input.approved ? (english ? "Your professional access is ready" : "Votre accès professionnel est prêt") : (english ? "Your application has been reviewed" : "Votre demande a été étudiée");
   const intro = input.approved ? (english ? "Your application has been approved by our team." : "Votre demande a été validée par notre équipe.") : (input.note || (english ? "Our team has reviewed your professional application." : "Notre équipe a étudié votre demande professionnelle."));
-  const body = `${paragraph(intro)}${input.approved && input.activationUrl ? actionLink(input.accessLabel ?? title, input.activationUrl) : ""}${input.approved ? paragraph(english ? "This secure link is temporary." : "Ce lien sécurisé est temporaire.") : ""}`;
+  const body = `${paragraph(intro)}${input.approved && input.activationUrl ? actionLink(input.accessLabel ?? title, input.activationUrl) : ""}${input.approved && input.temporaryAccessLink !== false ? paragraph(english ? "This secure link is temporary." : "Ce lien sécurisé est temporaire.") : ""}`;
   return { subject: title, html: emailLayout({ locale: input.locale, preheader: intro, title: input.approved ? (english ? "Welcome to Zen Coffee Lab" : "Bienvenue chez Zen Coffee Lab") : title, body }) };
+}
+
+export function professionalQuoteEmail(input: { locale: Locale; quoteNumber: string; totalCents: number; validUntil: string; paymentUrl: string }): EmailContent {
+  const english = input.locale === "en-GB";
+  const title = english ? "Your professional quote is ready" : "Votre devis professionnel est prêt";
+  const details = english
+    ? `Quote ${input.quoteNumber}, for a total of ${formatMoney(input.totalCents, input.locale)}, is valid until ${new Date(input.validUntil).toLocaleDateString(input.locale)}.`
+    : `Le devis ${input.quoteNumber}, d’un montant total de ${formatMoney(input.totalCents, input.locale)}, est valable jusqu’au ${new Date(input.validUntil).toLocaleDateString(input.locale)}.`;
+  const body = `${paragraph(details)}${paragraph(english ? "The PDF is attached. You can pay by card or SEPA bank transfer." : "Le PDF est joint à cet e-mail. Vous pouvez régler par carte ou par virement bancaire SEPA.")}${actionLink(english ? "View and pay my quote" : "Voir et payer mon devis", input.paymentUrl)}`;
+  return { subject: `${title} · ${input.quoteNumber}`, html: emailLayout({ locale: input.locale, preheader: details, title, body }) };
+}
+
+export function professionalQuotePaidEmail(input: { locale: Locale; quoteNumber: string; totalCents: number }): EmailContent {
+  const english = input.locale === "en-GB";
+  const title = english ? "Payment received" : "Paiement reçu";
+  const details = english ? `We have received ${formatMoney(input.totalCents, input.locale)} for quote ${input.quoteNumber}.` : `Nous avons reçu le règlement de ${formatMoney(input.totalCents, input.locale)} pour le devis ${input.quoteNumber}.`;
+  return { subject: `${title} · ${input.quoteNumber}`, html: emailLayout({ locale: input.locale, preheader: details, title, body: paragraph(details) }) };
 }
 
 export function contactMessageReceivedEmail(input: { locale: Locale; name: string; subject: string }): EmailContent {

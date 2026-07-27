@@ -1,15 +1,14 @@
-import { BookOpen, Boxes, CircleHelp, FileText, History, LayoutDashboard, Package, ShoppingCart, UserRound, Users } from "lucide-react";
+import { BookOpen, Boxes, CircleHelp, FileText, History, LayoutDashboard, LogOut, Package, ShoppingCart, UserRound, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { Logo } from "~/components/logo";
 
-export type AdminSection = "dashboard" | "orders" | "products" | "stocks" | "shipping" | "customers" | "professionals" | "content" | "faq" | "advice" | "changelog";
+export type AdminSection = "dashboard" | "orders" | "products" | "shipping" | "customers" | "professionals" | "content" | "faq" | "advice" | "changelog";
 
 const navigation = [
   { section: "dashboard", label: "Tableau de bord", href: "/admin", icon: LayoutDashboard },
   { section: "orders", label: "Commandes", href: "/admin/commandes", icon: ShoppingCart },
   { section: "products", label: "Produits", href: "/admin/produits", icon: Package },
-  { section: "stocks", label: "Stocks", href: "/admin/produits#catalogue", icon: Boxes },
   { section: "shipping", label: "Expédition", href: "/admin/expedition", icon: Boxes },
   { section: "customers", label: "Clients", href: "/admin/clients", icon: UserRound },
   { section: "professionals", label: "Professionnels", href: "/admin/professionnels", icon: Users },
@@ -26,6 +25,10 @@ export function AdminShell({ active, children }: { active: AdminSection; childre
       <nav aria-label="Administration">
         {navigation.map(({ section, label, href, icon: Icon }) => <Link aria-current={section === active ? "page" : undefined} to={href} key={section}><Icon aria-hidden="true" /> {label}</Link>)}
       </nav>
+      <form className="admin-logout" method="post" action="/mon-compte">
+        <input type="hidden" name="intent" value="logout" />
+        <button type="submit"><LogOut aria-hidden="true" /> Se déconnecter</button>
+      </form>
     </aside>
     <main className="admin-main">{children}</main>
   </div>;

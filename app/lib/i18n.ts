@@ -66,6 +66,9 @@ export function alternatePath(pathname: string): string {
   if (pathname === "/en/cart") return "/panier";
   if (pathname === "/en/checkout") return "/commande";
   if (pathname === "/en/my-account") return "/mon-compte";
+  if (pathname === "/en/general-terms-and-conditions-of-sale") return "/cgv";
+  if (pathname === "/en/legal-notice") return "/mentions-legales";
+  if (pathname === "/en/privacy-policy") return "/politique-de-confidentialite";
   if (pathname.startsWith("/en/")) return pathname.slice(3) || "/";
   if (pathname.startsWith("/boutique/")) return pathname.replace("/boutique/", "/en/shop/");
   const mappings: Record<string, string> = {
@@ -77,6 +80,9 @@ export function alternatePath(pathname: string): string {
     "/panier": "/en/cart",
     "/commande": "/en/checkout",
     "/mon-compte": "/en/my-account",
+    "/cgv": "/en/general-terms-and-conditions-of-sale",
+    "/mentions-legales": "/en/legal-notice",
+    "/politique-de-confidentialite": "/en/privacy-policy",
   };
   return mappings[pathname] ?? `/en${pathname}`;
 }
