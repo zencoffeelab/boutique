@@ -1,10 +1,8 @@
 import { Upload } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { Form } from "react-router";
-import { ProductThumbnailLabel } from "~/components/product-thumbnail-label";
+import { PRODUCT_THUMBNAIL_BAG_URL, ProductThumbnailLabel } from "~/components/product-thumbnail-label";
 import { dominantLabelColor } from "~/lib/image-color";
-
-const neutralBagUrl = "/media/product-cards/zen-coffee-bag-neutral.png";
 
 async function detectFileColor(file: File) {
   const source = URL.createObjectURL(file);
@@ -89,7 +87,7 @@ export function AdminProductThumbnailForm({
         style={{ "--product-thumbnail-color": backgroundColor } as CSSProperties}
         aria-label="Aperçu de la miniature"
       >
-        <img className="admin-thumbnail-preview__bag" src={neutralBagUrl} alt="" />
+        <img className="admin-thumbnail-preview__bag" src={PRODUCT_THUMBNAIL_BAG_URL} alt="" />
         {labelPreview ? <ProductThumbnailLabel className="admin-thumbnail-preview__label" src={labelPreview} alt="Aperçu de l’étiquette" /> : null}
       </div>
       <Form method="post" encType="multipart/form-data" className="admin-thumbnail-form">

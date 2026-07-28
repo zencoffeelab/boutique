@@ -3,7 +3,7 @@ import { useId, useRef, useState, type CSSProperties } from "react";
 import { Link } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
 import { ProfessionalQuoteAdd } from "~/components/professional-quote/professional-quote-add";
-import { ProductThumbnailLabel } from "~/components/product-thumbnail-label";
+import { PRODUCT_THUMBNAIL_BAG_URL, ProductThumbnailLabel } from "~/components/product-thumbnail-label";
 import { buildProductCartLine } from "~/domain/cart";
 import type { Audience, Locale, Product } from "~/domain/types";
 import { formatMoney } from "~/domain/money";
@@ -89,7 +89,7 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
         {composedThumbnail ? <>
           <img
             className="product-card__pack"
-            src="/media/product-cards/zen-coffee-bag-neutral.png"
+            src={PRODUCT_THUMBNAIL_BAG_URL}
             alt={product.media[0]?.alt[locale] ?? translation.name}
             width={900}
             height={900}

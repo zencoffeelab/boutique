@@ -81,7 +81,7 @@ describe("product card", () => {
     const html = renderComposedCard();
     expect(html).toContain("product-card__image--composed");
     expect(html).toContain("--product-thumbnail-color:#95df73");
-    expect(html).toContain("/media/product-cards/zen-coffee-bag-neutral.png");
+    expect(html).toContain("/media/product-cards/zen-coffee-bag-resealable.png");
     expect(html).toContain("https://cdn.example.com/label.png");
     expect(html).toContain("product-thumbnail-label");
     expect(html).toContain("product-thumbnail-label__image");
