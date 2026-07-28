@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { ContentBlocks } from "~/components/content-blocks";
 import { RichTextContent } from "~/components/rich-text-content";
 import {
   parseRichTextInput,
@@ -42,5 +43,21 @@ describe("rich advice content", () => {
 
   it("rejects empty documents", () => {
     expect(parseRichTextInput(JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] }))).toBeNull();
+  });
+
+  it("renders formatted CMS page blocks on the storefront", () => {
+    const html = renderToStaticMarkup(<ContentBlocks blocks={[{
+      type: "richText",
+      content: {
+        type: "doc",
+        content: [
+          { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Le terroir" }] },
+          { type: "paragraph", content: [{ type: "text", text: "Une identité préservée.", marks: [{ type: "italic" }] }] },
+        ],
+      },
+    }]} />);
+
+    expect(html).toContain("<h2>Le terroir</h2>");
+    expect(html).toContain("<em>Une identité préservée.</em>");
   });
 });

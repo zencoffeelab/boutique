@@ -1,9 +1,9 @@
 /** @vitest-environment jsdom */
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import { CartDrawer } from "~/components/cart/cart-drawer";
 import { CartProvider, useCart } from "~/components/cart/cart-provider";
@@ -34,7 +34,10 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function showModal() { this.setAttribute("open", ""); };
   HTMLDialogElement.prototype.close = function close() { this.removeAttribute("open"); };
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("cart addition confirmation", () => {
   it("shows a temporary toast when the cart remains closed", async () => {
@@ -59,5 +62,19 @@ describe("cart addition confirmation", () => {
     expect(status).toHaveTextContent("Ajouté au panier");
     expect(status).toHaveTextContent("Kenya — Kaiguri AB · 200g");
     expect(screen.getAllByRole("status")).toHaveLength(1);
+  });
+
+  it("plays the opening animation in reverse before closing the drawer", () => {
+    vi.useFakeTimers();
+    const { rerender } = render(<MemoryRouter><CartProvider locale="fr-FR"><CartDrawer open locale="fr-FR" onClose={() => undefined} /></CartProvider></MemoryRouter>);
+    const dialog = screen.getByRole("dialog");
+
+    rerender(<MemoryRouter><CartProvider locale="fr-FR"><CartDrawer open={false} locale="fr-FR" onClose={() => undefined} /></CartProvider></MemoryRouter>);
+    expect(dialog).toHaveClass("is-closing");
+    expect(dialog).toHaveAttribute("open");
+
+    act(() => vi.advanceTimersByTime(280));
+    expect(dialog).not.toHaveAttribute("open");
+    expect(dialog).not.toHaveClass("is-closing");
   });
 });

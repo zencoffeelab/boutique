@@ -97,6 +97,8 @@ export type Product = Readonly<{
   professionalEnabled: boolean;
   professionalStockKg: number;
   professionalStockReservedKg: number;
+  thumbnailLabelUrl: string | null;
+  thumbnailBackgroundColor: string;
   translations: Record<Locale, ProductTranslation>;
   media: readonly ProductMedia[];
   editorialBlocks: readonly ProductEditorialBlock[];

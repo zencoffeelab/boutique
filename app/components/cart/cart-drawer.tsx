@@ -27,6 +27,7 @@ type PreviewResponse = {
 };
 
 const lineKey = (line: Pick<PreviewLine, "variantId" | "audience">) => `${line.variantId}:${line.audience}`;
+const CART_DRAWER_ANIMATION_MS = 280;
 
 export function CartDrawer({ open, locale, onClose }: { open: boolean; locale: Locale; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -34,13 +35,31 @@ export function CartDrawer({ open, locale, onClose }: { open: boolean; locale: L
   const [preview, setPreview] = useState<PreviewResponse>({ ok: true, lines: [], unavailableKeys: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [closing, setClosing] = useState(false);
   const english = locale === "en-GB";
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
+
+    if (open) {
+      setClosing(false);
+      if (!dialog.open) dialog.showModal();
+      return;
+    }
+
+    if (!dialog.open) {
+      setClosing(false);
+      return;
+    }
+
+    setClosing(true);
+    const closeTimer = window.setTimeout(() => {
+      if (dialog.open) dialog.close();
+      setClosing(false);
+    }, CART_DRAWER_ANIMATION_MS);
+
+    return () => window.clearTimeout(closeTimer);
   }, [open]);
 
   useEffect(() => {
@@ -107,7 +126,7 @@ export function CartDrawer({ open, locale, onClose }: { open: boolean; locale: L
     : { shop: "/en/shop", cart: "/en/cart", checkout: "/en/checkout", product: "/en/shop/" };
 
   return (
-    <dialog id="cart-drawer" ref={dialogRef} className="cart-drawer" aria-labelledby="cart-drawer-title" onClose={onClose} onCancel={onClose} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <dialog id="cart-drawer" ref={dialogRef} className={`cart-drawer${closing ? " is-closing" : ""}`} aria-labelledby="cart-drawer-title" onClose={onClose} onCancel={(event) => { event.preventDefault(); onClose(); }} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="cart-drawer__panel">
         <header className="cart-drawer__header">
           <div><p className="eyebrow">Zen Coffee Lab</p><h2 id="cart-drawer-title">{english ? "Your cart" : "Votre panier"}</h2></div>

@@ -19,4 +19,15 @@ describe("product return navigation", () => {
       label: "Tous les cafés",
     });
   });
+
+  it("returns archived coffees to the archives", () => {
+    expect(productReturnLink("fr-FR", "retail", true)).toEqual({
+      href: "/archives",
+      label: "Archives café",
+    });
+    expect(productReturnLink("en-GB", "retail", true)).toEqual({
+      href: "/en/archives",
+      label: "Coffee archives",
+    });
+  });
 });

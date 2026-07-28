@@ -1,6 +1,7 @@
 import { Check, ChevronDown, FileText, Menu, ShoppingBag, X } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
+import { AccountDrawer } from "~/components/account/account-drawer";
 import { CartDrawer } from "~/components/cart/cart-drawer";
 import { useCart } from "~/components/cart/cart-provider";
 import { QuoteCartDrawer } from "~/components/professional-quote/quote-cart-drawer";
@@ -85,12 +86,20 @@ export function SiteHeader({ signedIn, professional, accountInitials }: { signed
   const locale = location.pathname === "/en" || location.pathname.startsWith("/en/") ? "en-GB" : "fr-FR";
   const t = dictionary[locale];
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
   const { itemCount, drawerOpen, openDrawer, closeDrawer } = useCart();
   const quoteCart = useQuoteCart();
   const paths = locale === "fr-FR"
     ? { home: "/", shop: "/boutique", professional: "/professionnel", advice: "/conseils", about: "/a-propos", cart: "/panier", account: "/mon-compte" }
     : { home: "/en", shop: "/en/shop", professional: "/en/professional", advice: "/en/tips", about: "/en/about-us", cart: "/en/cart", account: "/en/my-account" };
   const closeMenu = () => setMenuOpen(false);
+  const openAccountDrawer = () => {
+    closeMenu();
+    closeDrawer();
+    quoteCart.closeDrawer();
+    setAccountDrawerOpen(true);
+  };
+  const closeAccountDrawer = () => setAccountDrawerOpen(false);
   const accountLabel = signedIn
     ? (locale === "fr-FR" ? "Mon compte" : "My account")
     : (locale === "fr-FR" ? "Connexion" : "Sign in");
@@ -112,7 +121,7 @@ export function SiteHeader({ signedIn, professional, accountInitials }: { signed
           <Link onClick={closeMenu} to={paths.professional}>{t.professional}</Link>
           <Link onClick={closeMenu} to={paths.advice}>{t.advice}</Link>
           <Link onClick={closeMenu} to={paths.about}>{t.about}</Link>
-          <Link className={`mobile-account-link${signedIn ? " is-signed-in" : ""}`} onClick={closeMenu} to={paths.account}><AccountLinkContent signedIn={signedIn} label={accountLabel} initials={accountInitials} /></Link>
+          {signedIn ? <button className="mobile-account-link is-signed-in" type="button" onClick={openAccountDrawer} aria-expanded={accountDrawerOpen} aria-controls="account-drawer"><AccountLinkContent signedIn label={accountLabel} initials={accountInitials} /></button> : <Link className="mobile-account-link" onClick={closeMenu} to={paths.account}><AccountLinkContent signedIn={false} label={accountLabel} initials={null} /></Link>}
         </nav>
         <Logo home={paths.home} />
         <div className="header-actions">
@@ -121,11 +130,12 @@ export function SiteHeader({ signedIn, professional, accountInitials }: { signed
           <button className="icon-button cart-button" type="button" onClick={() => { closeMenu(); openDrawer(); }} aria-label={`${t.cart} (${itemCount})`} aria-expanded={drawerOpen} aria-controls="cart-drawer">
             <ShoppingBag aria-hidden="true" /><span>{itemCount}</span>
           </button>
-          <Link className={`account-button${signedIn ? " is-signed-in" : ""}`} to={paths.account} aria-label={accountLabel}><AccountLinkContent signedIn={signedIn} label={accountLabel} initials={accountInitials} /></Link>
+          {signedIn ? <button className="account-button is-signed-in" type="button" onClick={openAccountDrawer} aria-label={accountLabel} aria-expanded={accountDrawerOpen} aria-controls="account-drawer"><AccountLinkContent signedIn label={accountLabel} initials={accountInitials} /></button> : <Link className="account-button" to={paths.account} aria-label={accountLabel}><AccountLinkContent signedIn={false} label={accountLabel} initials={null} /></Link>}
         </div>
       </header>
       <CartDrawer open={drawerOpen} locale={locale} onClose={closeDrawer} />
       {professional ? <QuoteCartDrawer locale={locale} /> : null}
+      {signedIn ? <AccountDrawer open={accountDrawerOpen} locale={locale} onClose={closeAccountDrawer} /> : null}
     </>
   );
 }

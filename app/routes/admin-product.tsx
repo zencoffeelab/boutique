@@ -15,6 +15,7 @@ import {
 } from "react-router";
 import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { AdminShell } from "~/components/admin-shell";
+import { AdminProductThumbnailForm } from "~/components/admin-product-thumbnail-form";
 import { formatMoney } from "~/domain/money";
 import { buildVariantOffers } from "~/domain/professional-quote";
 import type { ProductEditorialBlock, ProductVariant } from "~/domain/types";
@@ -95,7 +96,7 @@ const editorialBlockSchema = z.object({
   altEn: z.string().trim().min(2).max(240),
 });
 
-const editorialImageExtensions: Record<string, string> = {
+const productImageExtensions: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
@@ -130,6 +131,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         professionalEnabled: false,
         professionalStockKg: 0,
         professionalStockReservedKg: 0,
+        thumbnailLabelUrl: null,
+        thumbnailBackgroundColor: "#d9ddd3",
         translations: {
           "fr-FR": emptyTranslation("fr-FR"),
           "en-GB": emptyTranslation("en-GB"),
@@ -157,6 +160,61 @@ export async function action({ request }: ActionFunctionArgs) {
   const intent = String(form.get("intent"));
   const client = createServiceSupabase();
   if (!client) return { ok: false, message: "Base de données indisponible." };
+  if (intent === "upload_thumbnail_label") {
+    const productId = String(form.get("productId"));
+    const backgroundColor = String(form.get("thumbnailBackgroundColor") ?? "").trim();
+    const file = form.get("file");
+    if (!z.string().uuid().safeParse(productId).success || !/^#[0-9a-fA-F]{6}$/.test(backgroundColor))
+      return { ok: false, message: "Produit ou couleur de miniature invalide." };
+    const { data: existing, error: readError } = await client
+      .from("products")
+      .select("thumbnail_label_storage_path,thumbnail_label_public_url")
+      .eq("id", productId)
+      .maybeSingle();
+    if (readError) return { ok: false, message: readError.message };
+    if (!existing) return { ok: false, message: "Produit introuvable." };
+
+    const hasNewFile = file instanceof File && file.size > 0;
+    if (!hasNewFile && !existing.thumbnail_label_public_url)
+      return { ok: false, message: "Ajoutez un fichier d’étiquette." };
+    if (hasNewFile && (file.size > 8_000_000 || !productImageExtensions[file.type]))
+      return { ok: false, message: "L’étiquette doit être au format PNG, WebP ou JPEG et peser au maximum 8 Mo." };
+
+    let storagePath = existing.thumbnail_label_storage_path as string | null;
+    let publicUrl = existing.thumbnail_label_public_url as string | null;
+    let uploadedPath: string | null = null;
+    if (hasNewFile) {
+      uploadedPath = `thumbnails/${productId}/label-${crypto.randomUUID()}.${productImageExtensions[file.type]}`;
+      const { error: uploadError } = await client.storage
+        .from("product-media")
+        .upload(uploadedPath, await file.arrayBuffer(), { contentType: file.type });
+      if (uploadError) return { ok: false, message: uploadError.message };
+      storagePath = uploadedPath;
+      publicUrl = client.storage.from("product-media").getPublicUrl(uploadedPath).data.publicUrl;
+    }
+
+    const { error: updateError } = await client.from("products").update({
+      thumbnail_label_storage_path: storagePath,
+      thumbnail_label_public_url: publicUrl,
+      thumbnail_background_color: backgroundColor.toLowerCase(),
+      updated_at: new Date().toISOString(),
+    }).eq("id", productId);
+    if (updateError) {
+      if (uploadedPath) await client.storage.from("product-media").remove([uploadedPath]);
+      return { ok: false, message: updateError.message };
+    }
+    if (uploadedPath && existing.thumbnail_label_storage_path && existing.thumbnail_label_storage_path !== uploadedPath)
+      await client.storage.from("product-media").remove([existing.thumbnail_label_storage_path]);
+    await client.from("audit_log").insert({
+      actor_id: admin.id,
+      action: "product.thumbnail_updated",
+      entity_type: "product",
+      entity_id: productId,
+      before_data: existing,
+      after_data: { storagePath, publicUrl, backgroundColor: backgroundColor.toLowerCase() },
+    });
+    return { ok: true, message: "Miniature du produit enregistrée." };
+  }
   if (intent === "upload_media") {
     const productId = String(form.get("productId"));
     const file = form.get("file");
@@ -230,7 +288,7 @@ export async function action({ request }: ActionFunctionArgs) {
       return { ok: false, message: "Ajoutez une image pour publier ce bloc." };
     if (
       hasNewImage &&
-      (file.size > 8_000_000 || !editorialImageExtensions[file.type])
+      (file.size > 8_000_000 || !productImageExtensions[file.type])
     ) {
       return {
         ok: false,
@@ -243,7 +301,7 @@ export async function action({ request }: ActionFunctionArgs) {
     let publicUrl = existing?.public_url as string | undefined;
     let uploadedPath: string | null = null;
     if (hasNewImage) {
-      uploadedPath = `editorial/${parsed.data.productId}/${parsed.data.position}-${crypto.randomUUID()}.${editorialImageExtensions[file.type]}`;
+      uploadedPath = `editorial/${parsed.data.productId}/${parsed.data.position}-${crypto.randomUUID()}.${productImageExtensions[file.type]}`;
       const { error: uploadError } = await client.storage
         .from("product-media")
         .upload(uploadedPath, await file.arrayBuffer(), {
@@ -971,6 +1029,7 @@ export function adminProductProgressMessage(intent: string) {
     create_variant: "Ajout de la variante…",
     delete_variant: "Suppression de la variante…",
     upload_media: "Import de l’image…",
+    upload_thumbnail_label: "Création de la miniature…",
   };
   return messages[intent] ?? "Modification en cours…";
 }
@@ -1251,6 +1310,12 @@ export default function AdminProduct() {
               </button>
             </Form>
           </section>
+          <AdminProductThumbnailForm
+            productId={product.id}
+            currentLabelUrl={product.thumbnailLabelUrl}
+            currentBackgroundColor={product.thumbnailBackgroundColor}
+            demo={demo}
+          />
           <section className="ui-card admin-editor">
             <h2>Galerie</h2>
             <div className="admin-media-grid">

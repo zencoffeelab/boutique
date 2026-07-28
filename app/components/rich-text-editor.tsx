@@ -20,7 +20,7 @@ import Link from "@tiptap/extension-link";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import type { ReactNode } from "react";
-import { useRef } from "react";
+import { useId, useRef } from "react";
 import type { RichTextDocument } from "~/lib/rich-text";
 
 type RichTextEditorProps = {
@@ -31,6 +31,7 @@ type RichTextEditorProps = {
 };
 
 export function RichTextEditor({ name, initialContent, disabled = false, label }: RichTextEditorProps) {
+  const labelId = useId();
   const hiddenInput = useRef<HTMLInputElement>(null);
   const editor = useEditor({
     immediatelyRender: false,
@@ -49,7 +50,7 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
       attributes: {
         role: "textbox",
         "aria-multiline": "true",
-        "aria-labelledby": `${name}-label`,
+        "aria-labelledby": labelId,
       },
     },
     onUpdate: ({ editor: currentEditor }) => {
@@ -86,9 +87,9 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
   };
 
   return <div className="rich-text-field">
-    <span className="rich-text-field__label" id={`${name}-label`}>{label}</span>
+    <span className="rich-text-field__label" id={labelId}>{label}</span>
     <input ref={hiddenInput} type="hidden" name={name} defaultValue={JSON.stringify(initialContent)} />
-    <div className="rich-text-editor" aria-labelledby={`${name}-label`}>
+    <div className="rich-text-editor" aria-labelledby={labelId}>
       <div className="rich-text-editor__toolbar" role="toolbar" aria-label={`Mise en forme — ${label}`}>
         <ToolbarButton label="Paragraphe" active={state?.paragraph} disabled={disabled || !editor} onClick={() => editor?.chain().focus().setParagraph().run()}><Pilcrow /></ToolbarButton>
         <ToolbarButton label="Titre 2" active={state?.heading2} disabled={disabled || !editor} onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}><Heading2 /></ToolbarButton>

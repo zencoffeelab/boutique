@@ -59,7 +59,7 @@ export default function Home() {
           <Link className="text-link" to={english ? "/en/shop" : "/boutique"}>{english ? "View all coffees" : "Voir tous les cafés"}<ArrowRight aria-hidden="true" /></Link>
         </div>
         {products.length > 0
-          ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} />)}</div>
+          ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} quickAdd />)}</div>
           : <div className="empty-state"><p>{english ? "Our next coffees are being prepared." : "Nos prochains cafés sont en préparation."}</p></div>}
       </section>
 

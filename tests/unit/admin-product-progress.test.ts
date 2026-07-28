@@ -6,6 +6,7 @@ describe("admin product progress", () => {
     expect(adminProductProgressMessage("save_product")).toBe("Enregistrement du produit…");
     expect(adminProductProgressMessage("upload_media")).toBe("Import de l’image…");
     expect(adminProductProgressMessage("save_editorial_block")).toBe("Enregistrement du bloc éditorial…");
+    expect(adminProductProgressMessage("upload_thumbnail_label")).toBe("Création de la miniature…");
     expect(adminProductProgressMessage("unknown")).toBe("Modification en cours…");
   });
 });

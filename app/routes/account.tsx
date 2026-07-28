@@ -1,9 +1,8 @@
-import { ChevronRight, MapPin, Package, ShieldCheck, ShoppingBag, UserRound } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Form, Link, redirect, useActionData, useLoaderData } from "react-router";
 import { z } from "zod";
-import { ProfessionalQuotePreview } from "~/components/professional-quote/quote-preview-modal";
-import { formatMoney } from "~/domain/money";
+import { AccountDashboard } from "~/components/account/account-dashboard";
 import { getViewer } from "~/lib/auth.server";
 import { getLocale } from "~/lib/i18n";
 import { safeInternalPath } from "~/lib/redirects";
@@ -78,7 +77,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const parsed = addressSchema.safeParse(Object.fromEntries(form)); if (!parsed.success) return { ok: false, message: locale === "en-GB" ? "Please complete the address." : "Veuillez compléter l’adresse." };
     const { error } = await supabase.client.from("addresses").insert({ profile_id: user.id, label: parsed.data.label, company: parsed.data.company, first_name: parsed.data.firstName, last_name: parsed.data.lastName, line1: parsed.data.line1, line2: parsed.data.line2, postal_code: parsed.data.postalCode, city: parsed.data.city, country_code: parsed.data.countryCode, phone: parsed.data.phone }); return { ok: !error, message: error?.message ?? (locale === "en-GB" ? "Address saved." : "Adresse enregistrée.") };
   }
-  if (intent === "logout") { await supabase.client.auth.signOut(); return redirect(accountPath, { headers: supabase.responseHeaders }); }
+  if (intent === "logout") { await supabase.client.auth.signOut(); return redirect(safeInternalPath(form.get("next"), accountPath), { headers: supabase.responseHeaders }); }
   const email = String(form.get("email") ?? ""); const password = String(form.get("password") ?? "");
   if (intent === "register" && password.length < 10) return { ok: false, message: locale === "en-GB" ? "Use at least 10 characters to create an account." : "Utilisez au moins 10 caractères pour créer un compte." };
   if (intent === "reset") { const next = safeInternalPath(form.get("next"), accountPath); const confirm = `${new URL(request.url).origin}/auth/confirm?next=${encodeURIComponent(`${accountPath}?set-password=1&next=${encodeURIComponent(next)}`)}`; const { error } = await supabase.client.auth.resetPasswordForEmail(email, { redirectTo: confirm }); return { ok: !error, message: error?.message ?? (locale === "en-GB" ? "Reset email sent." : "E-mail de réinitialisation envoyé.") }; }
@@ -127,82 +126,17 @@ export function AdminLoginGate({ email, mfa, enrollment, next, english, message,
   </>;
 }
 
-export function AccountNavigation({ english, orderCount, addressCount, quoteCount, professional }: { english: boolean; orderCount: number; addressCount: number; quoteCount: number; professional: boolean }) {
-  return <nav className="account-anchor-nav" aria-label={english ? "My account sections" : "Sections de mon compte"}>
-    <a href="#account-orders"><Package aria-hidden="true" /><span><strong>{english ? "Orders" : "Commandes"}</strong><small>{english ? "Invoices and tracking" : "Factures et suivis"}</small></span><em>{orderCount}</em><ChevronRight aria-hidden="true" /></a>
-    <a href="#account-addresses"><MapPin aria-hidden="true" /><span><strong>{english ? "Addresses" : "Adresses"}</strong><small>{english ? "Saved delivery details" : "Coordonnées enregistrées"}</small></span><em>{addressCount}</em><ChevronRight aria-hidden="true" /></a>
-    <a href="#account-settings"><ShieldCheck aria-hidden="true" /><span><strong>{english ? "Settings" : "Paramètres"}</strong><small>{english ? "Access and security" : "Accès et sécurité"}</small></span><ChevronRight aria-hidden="true" /></a>
-    {professional ? <a className="account-anchor-nav__professional" href="#account-professional-quotes"><ShoppingBag aria-hidden="true" /><span><strong>{english ? "Professional shop" : "Boutique pro"}</strong><small>{english ? "Quotes and payments" : "Devis et paiements"}</small></span><em>{quoteCount}</em><ChevronRight aria-hidden="true" /></a> : null}
-  </nav>;
-}
-
-function orderStatusLabel(status: string, english: boolean) {
-  const labels: Record<string, [string, string]> = {
-    pending_payment: ["En attente de paiement", "Awaiting payment"], paid: ["Payée", "Paid"], preparing: ["En préparation", "Preparing"],
-    ready_to_ship: ["Prête à expédier", "Ready to ship"], shipped: ["Expédiée", "Shipped"], delivered: ["Livrée", "Delivered"],
-    canceled: ["Annulée", "Cancelled"], partially_refunded: ["Partiellement remboursée", "Partially refunded"], refunded: ["Remboursée", "Refunded"],
-  };
-  return labels[status]?.[english ? 1 : 0] ?? status;
-}
-
-function professionalQuoteStatusLabel(status: string, english: boolean) {
-  const labels: Record<string, [string, string]> = {
-    pending_payment: ["À régler", "Awaiting payment"],
-    bank_transfer_pending: ["Virement en attente", "Bank transfer pending"],
-    paid: ["Payé", "Paid"],
-    expired: ["Expiré", "Expired"],
-    canceled: ["Annulé", "Cancelled"],
-  };
-  return labels[status]?.[english ? 1 : 0] ?? status;
-}
+export { AccountNavigation } from "~/components/account/account-dashboard";
 
 export default function Account() {
   const { locale, viewer, orders, addresses, professionalQuotes, setPassword, authError, next, mfa } = useLoaderData<typeof loader>(); const result = useActionData<typeof action>(); const english = locale === "en-GB";
   const enrollment = result && "mfaEnrollment" in result ? result.mfaEnrollment : undefined;
   const mfaResult = result && "scope" in result && result.scope === "mfa" ? result : null;
-  const professionalPath = english ? "/en/professional" : "/professionnel";
   if (viewer?.profile?.role === "admin" && mfa && mfa.currentLevel !== "aal2") {
     return <AdminLoginGate email={viewer.user.email ?? ""} mfa={mfa} enrollment={enrollment} next={next} english={english} message={mfaResult?.message} messageIsError={mfaResult?.ok === false} />;
   }
   if (viewer) {
-    const displayName = [viewer.profile?.first_name, viewer.profile?.last_name].filter(Boolean).join(" ");
-    const initial = (viewer.profile?.first_name || viewer.user.email || "Z").slice(0, 1).toLocaleUpperCase(locale);
-    const professional = viewer.profile?.professional_status === "approved";
-    return <>
-      <header className="page-hero account-hero"><p className="eyebrow">{english ? "Private space" : "Espace privé"}</p><h1>{displayName ? (english ? `Welcome, ${displayName}` : `Bienvenue, ${displayName}`) : (english ? "Welcome back" : "Bienvenue")}</h1><p className="lede">{english ? "Your orders, addresses and preferences, all in one place." : "Vos commandes, vos adresses et vos préférences, réunies au même endroit."}</p></header>
-      <div className="page-shell account-page-shell">
-        <aside className="account-sidebar">
-          <div className="account-profile-card"><span aria-hidden="true">{initial}</span><div><small>{english ? "Signed in as" : "Connecté en tant que"}</small><strong>{displayName || viewer.user.email}</strong>{displayName ? <small>{viewer.user.email}</small> : null}</div></div>
-          <AccountNavigation english={english} orderCount={orders.length} addressCount={addresses.length} quoteCount={professionalQuotes.length} professional={professional} />
-        </aside>
-        <main className="account-sections">
-          {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
-          {professional ? <section className="account-section" id="account-professional-quotes" aria-labelledby="account-professional-quotes-title">
-            <div className="account-section__heading"><div><p className="eyebrow">{english ? "Professional purchasing" : "Achats professionnels"}</p><h2 id="account-professional-quotes-title">{english ? "Professional shop" : "Boutique pro"}</h2></div><div className="account-section__actions"><span>{professionalQuotes.length} {english ? (professionalQuotes.length === 1 ? "quote" : "quotes") : (professionalQuotes.length === 1 ? "devis" : "devis")}</span><Link className="ui-button ui-button--outline" to={professionalPath}>{english ? "Open the pro shop" : "Voir la boutique pro"}</Link></div></div>
-            {professionalQuotes.length ? <div className="account-panel account-table-wrap"><table className="ui-table"><thead><tr><th>{english ? "Quote" : "Devis"}</th><th>Date</th><th>{english ? "Status" : "Statut"}</th><th>{english ? "Weight" : "Poids"}</th><th>Total</th><th>{english ? "Documents" : "Documents"}</th></tr></thead><tbody>{professionalQuotes.map((quote) => {
-              const canPay = quote.status === "pending_payment" && new Date(quote.valid_until).getTime() > Date.now();
-              return <tr key={quote.id}><td><strong>{quote.quote_number}</strong></td><td>{new Date(quote.created_at).toLocaleDateString(locale)}</td><td><span className={`ui-badge account-quote-status account-quote-status--${quote.status}`}>{professionalQuoteStatusLabel(quote.status, english)}</span></td><td>{Number(quote.total_weight_kg).toLocaleString(locale, { maximumFractionDigits: 2 })} kg</td><td><strong>{formatMoney(quote.total_cents, locale)}</strong></td><td><div className="account-order-links"><ProfessionalQuotePreview quoteId={quote.id} locale={locale} /><a className="text-link" href={`/api/professional-quotes/${quote.id}/pdf`}>{english ? "Quote PDF" : "Devis PDF"}</a>{canPay ? <Link className="text-link" to={`${english ? "/en/quotes" : "/devis"}/${quote.id}/${english ? "payment" : "paiement"}`}>{english ? "Pay" : "Payer"}</Link> : null}</div></td></tr>;
-            })}</tbody></table></div> : <div className="account-panel account-empty-state"><ShoppingBag aria-hidden="true" /><div><h3>{english ? "No quotes yet" : "Aucun devis pour le moment"}</h3><p>{english ? "Select your coffees by the kilogram to generate your first quote." : "Sélectionnez vos cafés au kilo pour générer votre premier devis."}</p></div><Link className="button button--dark" to={professionalPath}>{english ? "Open the pro shop" : "Voir la boutique pro"}</Link></div>}
-          </section> : null}
-          <section className="account-section" id="account-orders" aria-labelledby="account-orders-title">
-            <div className="account-section__heading"><div><p className="eyebrow">{english ? "History" : "Historique"}</p><h2 id="account-orders-title">{english ? "Your orders" : "Vos commandes"}</h2></div><span>{orders.length} {english ? (orders.length === 1 ? "order" : "orders") : (orders.length === 1 ? "commande" : "commandes")}</span></div>
-            {orders.length ? <div className="account-panel account-table-wrap"><table className="ui-table"><thead><tr><th>{english ? "Order" : "Commande"}</th><th>{english ? "Date" : "Date"}</th><th>{english ? "Status" : "Statut"}</th><th>Total</th><th>{english ? "Documents" : "Documents"}</th></tr></thead><tbody>{orders.map((order) => <tr key={order.id}><td><strong>{order.order_number}</strong></td><td>{new Date(order.created_at).toLocaleDateString(locale)}</td><td><span className="ui-badge account-order-status">{orderStatusLabel(order.status, english)}</span></td><td><strong>{formatMoney(order.total_cents, locale)}</strong></td><td><div className="account-order-links">{order.paid_at ? <a className="text-link" href={`/api/orders/${order.id}/invoice`}>{english ? "Invoice PDF" : "Facture PDF"}</a> : "—"}{order.shipments?.[0]?.tracking_url ? <a className="text-link" href={order.shipments[0].tracking_url} target="_blank" rel="noreferrer">{english ? "Track" : "Suivre"}</a> : null}</div></td></tr>)}</tbody></table></div> : <div className="account-panel account-empty-state"><Package aria-hidden="true" /><div><h3>{english ? "No orders yet" : "Aucune commande pour le moment"}</h3><p>{english ? "Your paid orders, invoices and tracking will appear here." : "Vos commandes payées, factures et suivis apparaîtront ici."}</p></div><Link className="button button--dark" to={english ? "/en/shop" : "/boutique"}>{english ? "Discover our coffees" : "Découvrir nos cafés"}</Link></div>}
-          </section>
-
-          <section className="account-section" id="account-addresses" aria-labelledby="account-addresses-title">
-            <div className="account-section__heading"><div><p className="eyebrow">{english ? "Saved details" : "Coordonnées enregistrées"}</p><h2 id="account-addresses-title">{english ? "Your addresses" : "Vos adresses"}</h2></div><span>{addresses.length} {english ? (addresses.length === 1 ? "address" : "addresses") : (addresses.length === 1 ? "adresse" : "adresses")}</span></div>
-            {addresses.length ? <div className="account-address-grid">{addresses.map((address) => <article className="account-panel account-address-card" key={address.id}><div className="account-address-card__icon"><MapPin aria-hidden="true" /></div><div><p className="eyebrow">{address.label || (english ? "Delivery address" : "Adresse de livraison")}</p><h3>{address.first_name} {address.last_name}</h3><p>{address.company ? <>{address.company}<br /></> : null}{address.line1}<br />{address.line2 ? <>{address.line2}<br /></> : null}{address.postal_code} {address.city}<br />{address.country_code}{address.phone ? <> · {address.phone}</> : null}</p></div><Form method="post"><input type="hidden" name="intent" value="delete_address" /><input type="hidden" name="addressId" value={address.id} /><button className="ui-button ui-button--ghost ui-button--sm" type="submit">{english ? "Delete" : "Supprimer"}</button></Form></article>)}</div> : null}
-            <Form method="post" className="account-panel account-form"><input type="hidden" name="intent" value="save_address" /><div className="account-form__heading"><div><p className="eyebrow">{english ? "New delivery address" : "Nouvelle adresse de livraison"}</p><h3>{english ? "Add an address" : "Ajouter une adresse"}</h3></div><MapPin aria-hidden="true" /></div><div className="form-grid"><div className="field"><label>{english ? "Label" : "Libellé"}<input name="label" placeholder={english ? "Home" : "Maison"} /></label></div><div className="field"><label>{english ? "Company" : "Société"}<input name="company" /></label></div><div className="field"><label>{english ? "First name" : "Prénom"}<input name="firstName" required autoComplete="given-name" /></label></div><div className="field"><label>{english ? "Last name" : "Nom"}<input name="lastName" required autoComplete="family-name" /></label></div><div className="field field--wide"><label>{english ? "Address" : "Adresse"}<input name="line1" required autoComplete="address-line1" /></label></div><div className="field field--wide"><label>{english ? "Address line 2" : "Complément"}<input name="line2" autoComplete="address-line2" /></label></div><div className="field"><label>{english ? "Postcode" : "Code postal"}<input name="postalCode" required autoComplete="postal-code" /></label></div><div className="field"><label>{english ? "City" : "Ville"}<input name="city" required autoComplete="address-level2" /></label></div><div className="field"><label>{english ? "Country code" : "Code pays"}<input name="countryCode" defaultValue="FR" maxLength={2} required autoComplete="country" /></label></div><div className="field"><label>{english ? "Phone" : "Téléphone"}<input name="phone" type="tel" autoComplete="tel" /></label></div></div><button className="button button--dark" type="submit">{english ? "Save address" : "Enregistrer l’adresse"}</button></Form>
-          </section>
-
-          <section className="account-section" id="account-settings" aria-labelledby="account-settings-title">
-            <div className="account-section__heading"><div><p className="eyebrow">{english ? "Access" : "Accès"}</p><h2 id="account-settings-title">{english ? "Settings & security" : "Paramètres & sécurité"}</h2></div></div>
-            {setPassword ? <Form method="post" className="account-panel account-form account-password-form"><input type="hidden" name="intent" value="update_password" /><input type="hidden" name="next" value={next} /><div className="account-form__heading"><div><p className="eyebrow">{english ? "Password" : "Mot de passe"}</p><h3>{english ? "Choose your password" : "Choisissez votre mot de passe"}</h3></div><ShieldCheck aria-hidden="true" /></div><div className="field"><label>{english ? "New password" : "Nouveau mot de passe"}<input name="password" type="password" minLength={10} required autoComplete="new-password" /></label></div><button className="button button--dark" type="submit">{english ? "Save password" : "Enregistrer le mot de passe"}</button></Form> : null}
-            <div className="account-panel account-settings-card"><div className="account-settings-card__identity"><span><UserRound aria-hidden="true" /></span><div><small>{english ? "Login email" : "E-mail de connexion"}</small><strong>{viewer.user.email}</strong><small>{professional ? (english ? "Approved professional account" : "Compte professionnel validé") : (english ? "Customer account" : "Compte client")}</small></div></div><div className="account-settings-actions"><Form method="post"><input type="hidden" name="intent" value="reset" /><input type="hidden" name="email" value={viewer.user.email ?? ""} /><input type="hidden" name="next" value="#account-settings" /><button className="ui-button ui-button--outline" type="submit">{english ? "Change password by email" : "Modifier le mot de passe par e-mail"}</button></Form><Form method="post"><input type="hidden" name="intent" value="logout" /><button className="ui-button ui-button--ghost" type="submit">{english ? "Sign out" : "Se déconnecter"}</button></Form></div></div>
-          </section>
-        </main>
-      </div>
-    </>;
+    return <AccountDashboard data={{ locale, viewer, orders, addresses, professionalQuotes, setPassword, next }} result={result} />;
   }
   return <>
     <header className="page-hero"><p className="eyebrow">{english ? "Private space" : "Espace privé"}</p><h1>{english ? "Your account" : "Votre compte"}</h1><p className="lede">{english ? "Find your orders, invoices, addresses and tracking." : "Retrouvez vos commandes, factures, adresses et suivis."}</p></header>

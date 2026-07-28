@@ -1,7 +1,12 @@
 import type { Locale } from "~/domain/types";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
-export type ContentPage = { title: string; seoTitle: string; seoDescription: string; blocks: Array<{ type: "paragraph"; content: string }> };
+export type ContentPage = {
+  title: string;
+  seoTitle: string;
+  seoDescription: string;
+  blocks: Array<{ type?: unknown; content?: unknown }>;
+};
 export async function getContentPage(pageKey: string, locale: Locale): Promise<ContentPage | null> {
   const client = createServiceSupabase(); if (!client) return null;
   const { data } = await client.from("content_pages").select("status,content_page_translations(title,seo_title,seo_description,blocks,locale)").eq("page_key", pageKey).eq("status", "published").maybeSingle();

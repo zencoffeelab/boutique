@@ -22,19 +22,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     wantsProfessional && authorizedAudience === "professional"
       ? "professional"
       : "retail";
-  const products = await getProducts({ status: "published", audience });
+  const products = await getProducts({ audience });
   const product = products.find((item) => item.slug === params.slug) ?? null;
-  if (!product || product.status !== "published" || (audience === "professional" && !product.professionalEnabled))
+  if (!product || (product.status !== "published" && product.status !== "archived") || (product.status === "published" && audience === "professional" && !product.professionalEnabled))
     throw new Response(
       locale === "fr-FR" ? "Café introuvable" : "Coffee not found",
       { status: 404 },
     );
+  const archived = product.status === "archived";
   const relatedProducts = getRelatedProducts(
     product,
-    products.filter((candidate) => hasPurchasableVariant(candidate, audience)),
+    products.filter((candidate) => candidate.status === "published" && hasPurchasableVariant(candidate, audience)),
     locale,
   );
-  return { locale, product, audience, relatedProducts };
+  return { locale, product, audience, archived, relatedProducts };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) =>
@@ -49,7 +50,12 @@ export const meta: MetaFunction<typeof loader> = ({ data }) =>
       )
     : [{ title: "Café introuvable | Zen Coffee Lab" }];
 
-export function productReturnLink(locale: Locale, audience: Audience) {
+export function productReturnLink(locale: Locale, audience: Audience, archived = false) {
+  if (archived) {
+    return locale === "en-GB"
+      ? { href: "/en/archives", label: "Coffee archives" }
+      : { href: "/archives", label: "Archives café" };
+  }
   if (audience === "professional") {
     return locale === "en-GB"
       ? { href: "/en/professional", label: "Professional coffees" }
@@ -111,11 +117,11 @@ function ProductStory({
 }
 
 export default function ProductDetail() {
-  const { locale, product, audience, relatedProducts } =
+  const { locale, product, audience, archived, relatedProducts } =
     useLoaderData<typeof loader>();
   const t = product.translations[locale];
   const english = locale === "en-GB";
-  const returnLink = productReturnLink(locale, audience);
+  const returnLink = productReturnLink(locale, audience, archived);
   return (
     <>
       <JsonLd value={productStructuredData(product, locale)} />
@@ -153,7 +159,10 @@ export default function ProductDetail() {
               <li key={note}>{note}</li>
             ))}
           </ul>
-          {audience === "professional" ? <ProfessionalQuoteAdd product={product} locale={locale} /> : <ProductPurchase product={product} locale={locale} audience={audience} />}
+          {archived ? <section className="product-archive-notice" aria-label={english ? "Archived coffee" : "Café archivé"}>
+            <p className="eyebrow">{english ? "Coffee archives" : "Archives café"}</p>
+            <p>{english ? "This limited lot is no longer available for purchase, but its complete story remains available to read." : "Ce lot éphémère n’est plus disponible à l’achat, mais son histoire complète reste accessible."}</p>
+          </section> : audience === "professional" ? <ProfessionalQuoteAdd product={product} locale={locale} /> : <ProductPurchase product={product} locale={locale} audience={audience} />}
         </div>
       </article>
       <dl className="origin-grid">

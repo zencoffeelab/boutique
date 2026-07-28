@@ -43,6 +43,8 @@ function mapDatabaseProduct(row: any): Product {
     professionalEnabled: row.professional_enabled ?? false,
     professionalStockKg: Number(row.professional_stock_kg ?? 0),
     professionalStockReservedKg: Number(row.professional_stock_reserved_kg ?? 0),
+    thumbnailLabelUrl: row.thumbnail_label_public_url ?? null,
+    thumbnailBackgroundColor: row.thumbnail_background_color ?? "#d9ddd3",
     translations,
     media: row.product_media
       .toSorted((a: any, b: any) => a.position - b.position)
@@ -97,6 +99,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     .select(
       `
       id, slug, status, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
+      thumbnail_label_public_url, thumbnail_background_color,
       product_translations(*),
       product_media(*),
       product_editorial_blocks(*),
@@ -105,6 +108,21 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     )
     .in("status", statuses)
     .order("created_at", { ascending: false });
+  if (error?.code === "42703" && error.message.includes("thumbnail_")) {
+    const compatibleResult = await client
+      .from("products")
+      .select(`
+        id, slug, status, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
+        product_translations(*),
+        product_media(*),
+        product_editorial_blocks(*),
+        product_variants(*, variant_offers(*))
+      `)
+      .in("status", statuses)
+      .order("created_at", { ascending: false });
+    if (compatibleResult.error) throw new Error(`Unable to load catalog: ${compatibleResult.error.message}`);
+    return (compatibleResult.data ?? []).map(mapDatabaseProduct);
+  }
   if (error?.code === "42703" && error.message.includes("professional_")) {
     const legacyResult = await client
       .from("products")

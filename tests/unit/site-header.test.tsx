@@ -1,16 +1,16 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 import { CartProvider } from "~/components/cart/cart-provider";
 import { QuoteCartProvider } from "~/components/professional-quote/quote-cart-provider";
 import { SiteHeader } from "~/components/site-header";
 
 function renderHeader(signedIn: boolean, professional = false, accountInitials: string | null = null, initialPath = "/") {
-  return renderToStaticMarkup(
-    <MemoryRouter initialEntries={[initialPath]}>
-      <CartProvider><QuoteCartProvider><SiteHeader signedIn={signedIn} professional={professional} accountInitials={accountInitials} /></QuoteCartProvider></CartProvider>
-    </MemoryRouter>,
-  );
+  const router = createMemoryRouter([{
+    path: "*",
+    element: <CartProvider><QuoteCartProvider><SiteHeader signedIn={signedIn} professional={professional} accountInitials={accountInitials} /></QuoteCartProvider></CartProvider>,
+  }], { initialEntries: [initialPath] });
+  return renderToStaticMarkup(<RouterProvider router={router} />);
 }
 
 describe("public account navigation", () => {

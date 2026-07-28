@@ -25,7 +25,7 @@ export function pageMeta(title: string, description: string, pathname: string, i
 
 export function productStructuredData(product: Product, locale: Locale) {
   const translation = product.translations[locale];
-  const offers = product.variants.flatMap((variant) => variant.offers
+  const offers = product.status === "published" ? product.variants.flatMap((variant) => variant.offers
     .filter((offer) => offer.audience === "retail" && offer.active)
     .map((offer) => ({
       "@type": "Offer",
@@ -35,7 +35,7 @@ export function productStructuredData(product: Product, locale: Locale) {
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
       sku: variant.sku,
-    })));
+    }))) : [];
   return {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -43,7 +43,7 @@ export function productStructuredData(product: Product, locale: Locale) {
     description: translation.shortDescription,
     image: product.media.map((media) => media.url),
     brand: { "@type": "Brand", name: "Zen Coffee Lab" },
-    offers,
+    ...(offers.length ? { offers } : {}),
   };
 }
 
