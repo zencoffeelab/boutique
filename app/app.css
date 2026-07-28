@@ -1086,8 +1086,8 @@ button:disabled {
 .admin-thumbnail-preview::before {
   position: absolute;
   z-index: 0;
-  top: 77%;
-  left: 51.2%;
+  top: 78%;
+  left: 54%;
   width: 52%;
   height: 11%;
   border-radius: 50%;
@@ -1102,8 +1102,8 @@ button:disabled {
 .admin-thumbnail-preview::after {
   position: absolute;
   z-index: 0;
-  top: 75.45%;
-  left: 50%;
+  top: 76.9%;
+  left: 52.8%;
   width: 32%;
   height: 2.8%;
   border-radius: 50%;
@@ -1118,7 +1118,7 @@ button:disabled {
   position: absolute;
   z-index: 1;
   top: 13%;
-  left: 51.4%;
+  left: 50.1%;
   width: 73%;
   height: 76%;
   object-fit: contain;
@@ -1179,7 +1179,7 @@ button:disabled {
   position: absolute;
   z-index: 3;
   top: -235.8%;
-  left: -75.36%;
+  left: -80%;
   width: 260.72%;
   height: 463.64%;
   background: url("/media/product-cards/zen-coffee-bag-resealable.png") center / 100% 100% no-repeat;
@@ -3697,7 +3697,7 @@ button:disabled {
   position: absolute;
   z-index: 1;
   top: 13%;
-  left: 51.4%;
+  left: 50.1%;
   width: 73%;
   height: 76%;
   object-fit: contain;
