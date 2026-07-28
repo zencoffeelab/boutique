@@ -85,6 +85,7 @@ export function AdminProductThumbnailForm({
       <div
         className="admin-thumbnail-preview"
         style={{ "--product-thumbnail-color": backgroundColor } as CSSProperties}
+        role="img"
         aria-label="Aperçu de la miniature"
       >
         <img className="admin-thumbnail-preview__bag" src={PRODUCT_THUMBNAIL_BAG_URL} alt="" />

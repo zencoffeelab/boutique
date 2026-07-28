@@ -109,6 +109,15 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
           height={640}
           loading="lazy"
         />}
+        {product.hoverImageUrl ? <img
+          className="product-card__hover-image"
+          src={product.hoverImageUrl}
+          alt=""
+          width={900}
+          height={900}
+          loading="lazy"
+          decoding="async"
+        /> : null}
         {product.status === "archived" ? <p className="product-card__archive-label">{locale === "fr-FR" ? "Archivé" : "Archived"}</p> : null}
       </div>
       <div className="product-card__body">

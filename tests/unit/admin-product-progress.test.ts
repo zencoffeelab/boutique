@@ -7,6 +7,8 @@ describe("admin product progress", () => {
     expect(adminProductProgressMessage("upload_media")).toBe("Import de l’image…");
     expect(adminProductProgressMessage("save_editorial_block")).toBe("Enregistrement du bloc éditorial…");
     expect(adminProductProgressMessage("upload_thumbnail_label")).toBe("Création de la miniature…");
+    expect(adminProductProgressMessage("upload_hover_image")).toBe("Import de l’image de survol…");
+    expect(adminProductProgressMessage("delete_hover_image")).toBe("Suppression de l’image de survol…");
     expect(adminProductProgressMessage("unknown")).toBe("Modification en cours…");
   });
 });

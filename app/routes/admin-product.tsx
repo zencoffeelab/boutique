@@ -133,6 +133,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         professionalStockReservedKg: 0,
         thumbnailLabelUrl: null,
         thumbnailBackgroundColor: "#d9ddd3",
+        hoverImageUrl: null,
         translations: {
           "fr-FR": emptyTranslation("fr-FR"),
           "en-GB": emptyTranslation("en-GB"),
@@ -214,6 +215,77 @@ export async function action({ request }: ActionFunctionArgs) {
       after_data: { storagePath, publicUrl, backgroundColor: backgroundColor.toLowerCase() },
     });
     return { ok: true, message: "Miniature du produit enregistrée." };
+  }
+  if (intent === "upload_hover_image") {
+    const productId = String(form.get("productId"));
+    const file = form.get("file");
+    if (!z.string().uuid().safeParse(productId).success)
+      return { ok: false, message: "Produit invalide." };
+    if (!(file instanceof File) || file.size === 0 || file.size > 8_000_000 || !productImageExtensions[file.type])
+      return { ok: false, message: "L’image de survol doit être au format JPEG, PNG ou WebP et peser au maximum 8 Mo." };
+
+    const { data: existing, error: readError } = await client
+      .from("products")
+      .select("hover_image_storage_path,hover_image_public_url")
+      .eq("id", productId)
+      .maybeSingle();
+    if (readError) return { ok: false, message: readError.message };
+    if (!existing) return { ok: false, message: "Produit introuvable." };
+
+    const uploadedPath = `hover-images/${productId}/image-${crypto.randomUUID()}.${productImageExtensions[file.type]}`;
+    const { error: uploadError } = await client.storage
+      .from("product-media")
+      .upload(uploadedPath, await file.arrayBuffer(), { contentType: file.type });
+    if (uploadError) return { ok: false, message: uploadError.message };
+    const publicUrl = client.storage.from("product-media").getPublicUrl(uploadedPath).data.publicUrl;
+    const { error: updateError } = await client.from("products").update({
+      hover_image_storage_path: uploadedPath,
+      hover_image_public_url: publicUrl,
+      updated_at: new Date().toISOString(),
+    }).eq("id", productId);
+    if (updateError) {
+      await client.storage.from("product-media").remove([uploadedPath]);
+      return { ok: false, message: updateError.message };
+    }
+    if (existing.hover_image_storage_path && existing.hover_image_storage_path !== uploadedPath)
+      await client.storage.from("product-media").remove([existing.hover_image_storage_path]);
+    await client.from("audit_log").insert({
+      actor_id: admin.id,
+      action: "product.hover_image_updated",
+      entity_type: "product",
+      entity_id: productId,
+      before_data: existing,
+      after_data: { storagePath: uploadedPath, publicUrl },
+    });
+    return { ok: true, message: "Image de survol enregistrée." };
+  }
+  if (intent === "delete_hover_image") {
+    const productId = String(form.get("productId"));
+    if (!z.string().uuid().safeParse(productId).success)
+      return { ok: false, message: "Produit invalide." };
+    const { data: existing, error: readError } = await client
+      .from("products")
+      .select("hover_image_storage_path,hover_image_public_url")
+      .eq("id", productId)
+      .maybeSingle();
+    if (readError) return { ok: false, message: readError.message };
+    if (!existing) return { ok: false, message: "Produit introuvable." };
+    const { error: updateError } = await client.from("products").update({
+      hover_image_storage_path: null,
+      hover_image_public_url: null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", productId);
+    if (updateError) return { ok: false, message: updateError.message };
+    if (existing.hover_image_storage_path)
+      await client.storage.from("product-media").remove([existing.hover_image_storage_path]);
+    await client.from("audit_log").insert({
+      actor_id: admin.id,
+      action: "product.hover_image_deleted",
+      entity_type: "product",
+      entity_id: productId,
+      before_data: existing,
+    });
+    return { ok: true, message: "Image de survol supprimée." };
   }
   if (intent === "upload_media") {
     const productId = String(form.get("productId"));
@@ -1030,6 +1102,8 @@ export function adminProductProgressMessage(intent: string) {
     delete_variant: "Suppression de la variante…",
     upload_media: "Import de l’image…",
     upload_thumbnail_label: "Création de la miniature…",
+    upload_hover_image: "Import de l’image de survol…",
+    delete_hover_image: "Suppression de l’image de survol…",
   };
   return messages[intent] ?? "Modification en cours…";
 }
@@ -1316,6 +1390,49 @@ export default function AdminProduct() {
             currentBackgroundColor={product.thumbnailBackgroundColor}
             demo={demo}
           />
+          <section className="ui-card admin-editor admin-thumbnail-editor">
+            <div className="admin-thumbnail-editor__heading">
+              <div>
+                <p className="eyebrow">Carte produit</p>
+                <h2>Image de survol</h2>
+              </div>
+              <p>Cette image remplace la miniature principale lorsque le visiteur survole la carte ou y accède au clavier.</p>
+            </div>
+            <div className="admin-thumbnail-editor__layout">
+              <div className={`admin-hover-image-preview${product.hoverImageUrl ? "" : " is-empty"}`}>
+                {product.hoverImageUrl ? (
+                  <img src={product.hoverImageUrl} alt="Aperçu de l’image de survol" />
+                ) : (
+                  <p>Aucune image de survol</p>
+                )}
+              </div>
+              <div className="admin-hover-image-actions">
+                <Form method="post" encType="multipart/form-data" className="admin-thumbnail-form">
+                  <input type="hidden" name="intent" value="upload_hover_image" />
+                  <input type="hidden" name="productId" value={product.id} />
+                  <div className="field">
+                    <label>
+                      Fichier de l’image de survol
+                      <input name="file" type="file" accept="image/jpeg,image/png,image/webp" required />
+                    </label>
+                    <small>JPEG, PNG ou WebP, 8 Mo maximum. Privilégiez une image carrée pour conserver le cadrage des cartes.</small>
+                  </div>
+                  <button className="ui-button ui-button--outline" type="submit" disabled={demo}>
+                    <Upload aria-hidden="true" /> {product.hoverImageUrl ? "Remplacer l’image de survol" : "Ajouter l’image de survol"}
+                  </button>
+                </Form>
+                {product.hoverImageUrl ? (
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="delete_hover_image" />
+                    <input type="hidden" name="productId" value={product.id} />
+                    <button className="ui-button ui-button--danger" type="submit" disabled={demo}>
+                      <Trash2 aria-hidden="true" /> Supprimer l’image de survol
+                    </button>
+                  </Form>
+                ) : null}
+              </div>
+            </div>
+          </section>
           <section className="ui-card admin-editor">
             <h2>Galerie</h2>
             <div className="admin-media-grid">

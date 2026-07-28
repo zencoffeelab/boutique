@@ -58,6 +58,21 @@ function renderArchivedCard() {
   );
 }
 
+function renderHoverCard() {
+  return renderToStaticMarkup(
+    <MemoryRouter>
+      <CartProvider>
+        <QuoteCartProvider>
+          <ProductCard
+            product={{ ...demoProducts[0], hoverImageUrl: "https://cdn.example.com/hover.webp" }}
+            locale="fr-FR"
+          />
+        </QuoteCartProvider>
+      </CartProvider>
+    </MemoryRouter>,
+  );
+}
+
 describe("product card", () => {
   it("keeps the extended link and explicit product actions", () => {
     const html = renderCard();
@@ -85,6 +100,14 @@ describe("product card", () => {
     expect(html).toContain("https://cdn.example.com/label.png");
     expect(html).toContain("product-thumbnail-label");
     expect(html).toContain("product-thumbnail-label__image");
+  });
+
+  it("renders the optional hover image as a decorative lazy image", () => {
+    const html = renderHoverCard();
+    expect(html).toContain('class="product-card__hover-image"');
+    expect(html).toContain('src="https://cdn.example.com/hover.webp"');
+    expect(html).toContain('alt=""');
+    expect(html).toContain('loading="lazy"');
   });
 
   it("places the archived badge inside the product image and hides the price", () => {

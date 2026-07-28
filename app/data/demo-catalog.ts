@@ -189,6 +189,7 @@ export const demoProducts: Product[] = inputs.map((input) => {
     professionalStockReservedKg: 0,
     thumbnailLabelUrl: null,
     thumbnailBackgroundColor: "#d9ddd3",
+    hoverImageUrl: null,
     translations: {
       "fr-FR": {
         locale: "fr-FR",

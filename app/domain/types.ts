@@ -99,6 +99,7 @@ export type Product = Readonly<{
   professionalStockReservedKg: number;
   thumbnailLabelUrl: string | null;
   thumbnailBackgroundColor: string;
+  hoverImageUrl: string | null;
   translations: Record<Locale, ProductTranslation>;
   media: readonly ProductMedia[];
   editorialBlocks: readonly ProductEditorialBlock[];

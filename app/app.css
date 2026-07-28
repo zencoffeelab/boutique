@@ -1059,6 +1059,25 @@ button:disabled {
 .product-card:focus-within .product-card__original-image {
   transform: scale(1.035);
 }
+.product-card__hover-image {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.015);
+  transition:
+    opacity 0.45s ease,
+    transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.product-card:hover .product-card__hover-image,
+.product-card:focus-within .product-card__hover-image {
+  opacity: 1;
+  transform: scale(1.035);
+}
 .product-card__image--composed {
   background: color-mix(in srgb, var(--product-thumbnail-color, var(--green-pastel)) 28%, white 72%);
   isolation: isolate;
@@ -3693,6 +3712,34 @@ button:disabled {
 .admin-thumbnail-form {
   display: grid;
   gap: 1.25rem;
+}
+.admin-hover-image-preview {
+  display: grid;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid #cfd4ca;
+  border-radius: 0.35rem;
+  background: var(--cream-dark);
+  place-items: center;
+}
+.admin-hover-image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.admin-hover-image-preview.is-empty {
+  border-style: dashed;
+}
+.admin-hover-image-preview p {
+  margin: 0;
+  padding: 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+.admin-hover-image-actions {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
 }
 .admin-thumbnail-form small {
   display: block;
