@@ -10,7 +10,7 @@ vi.mock("~/lib/content.server", () => ({ getContentPage: vi.fn() }));
 import { getViewer } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
 import { getContentPage } from "~/lib/content.server";
-import { loader, ProfessionalApplicationSuccess } from "~/routes/professional";
+import { loader, ProfessionalApplicationSuccess, ProfessionalCatalogHeading, ProfessionalLoginLink } from "~/routes/professional";
 
 describe("professional page modes", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -45,7 +45,26 @@ describe("professional page modes", () => {
     vi.mocked(getViewer).mockResolvedValue({ user: { id: "retail-user", email: "client@example.com" }, profile: { professional_status: null }, responseHeaders: new Headers() } as never);
     vi.mocked(getContentPage).mockResolvedValue({ title: "Professionnels", blocks: [] } as never);
     const result = await loader({ request: new Request("https://example.test/professionnel"), params: {}, context: {} } as never);
-    expect(result).toMatchObject({ approved: false, signedIn: true, accountEmail: "client@example.com" });
+    expect(result).toMatchObject({ approved: false, signedIn: true, accountEmail: "client@example.com", content: null });
+    expect(getContentPage).not.toHaveBeenCalled();
+  });
+
+  it("hides the login action from a signed-in retail customer", () => {
+    const signedInHtml = renderToStaticMarkup(
+      createElement(MemoryRouter, null, createElement(ProfessionalLoginLink, { signedIn: true, english: false, loginPath: "/mon-compte?next=%2Fprofessionnel" })),
+    );
+    const visitorHtml = renderToStaticMarkup(
+      createElement(MemoryRouter, null, createElement(ProfessionalLoginLink, { signedIn: false, english: false, loginPath: "/mon-compte?next=%2Fprofessionnel" })),
+    );
+    expect(signedInHtml).toBe("");
+    expect(visitorHtml).toContain("Connexion");
+  });
+
+  it("shows the professional shop heading to approved members", () => {
+    const html = renderToStaticMarkup(createElement(ProfessionalCatalogHeading, { english: false }));
+    expect(html).toContain("Zen Coffee Lab");
+    expect(html).toContain("La boutique des professionnels");
+    expect(html).toContain("Des cafés lumineux et traçables, torréfiés à la demande.");
   });
 
   it("shows a dedicated acknowledgement after a successful application", () => {

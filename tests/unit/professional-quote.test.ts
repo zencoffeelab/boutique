@@ -1,12 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { demoProducts } from "~/data/demo-catalog";
 import {
+  buildVariantOffers,
   discountedProfessionalPrice,
   getProfessionalQuoteVariant,
   professionalDiscountPercent,
 } from "~/domain/professional-quote";
 
 describe("professional quote pricing", () => {
+  it("automatically adds a professional offer when the product is enabled", () => {
+    expect(buildVariantOffers({
+      variantId: "variant-1",
+      retailPriceCents: 6750,
+      productProfessionalEnabled: true,
+    })).toEqual([
+      { variant_id: "variant-1", audience: "retail", price_cents: 6750, minimum_quantity: 1, active: true },
+      { variant_id: "variant-1", audience: "professional", price_cents: 6750, minimum_quantity: 1, active: true },
+    ]);
+  });
+
   it.each([
     [1, 0],
     [9, 0],

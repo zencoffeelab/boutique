@@ -1,5 +1,5 @@
-import { FileText, LogIn, Menu, ShoppingBag, UserRoundCheck, X } from "lucide-react";
-import { useState } from "react";
+import { Check, ChevronDown, FileText, Menu, ShoppingBag, X } from "lucide-react";
+import { useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { CartDrawer } from "~/components/cart/cart-drawer";
 import { useCart } from "~/components/cart/cart-provider";
@@ -7,8 +7,80 @@ import { QuoteCartDrawer } from "~/components/professional-quote/quote-cart-draw
 import { useQuoteCart } from "~/components/professional-quote/quote-cart-provider";
 import { Logo } from "~/components/logo";
 import { alternatePath, dictionary } from "~/lib/i18n";
+import type { Locale } from "~/domain/types";
 
-export function SiteHeader({ signedIn, professional }: { signedIn: boolean; professional: boolean }) {
+const languageOptions = [
+  { locale: "fr-FR", code: "FR", label: "Français", flag: "🇫🇷" },
+  { locale: "en-GB", code: "EN", label: "English", flag: "🇬🇧" },
+] as const;
+
+function AccountLinkContent({ signedIn, label, initials }: { signedIn: boolean; label: string; initials: string | null }) {
+  return <><span className="account-button__label">{label}</span>{signedIn ? <span className="account-avatar" aria-hidden="true">{initials || "Z"}</span> : null}</>;
+}
+
+function LanguageSelector({ locale, frenchPath, englishPath }: { locale: Locale; frenchPath: string; englishPath: string }) {
+  const menuId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const firstOptionRef = useRef<HTMLAnchorElement>(null);
+  const [open, setOpen] = useState(false);
+  const activeLanguage = languageOptions.find((option) => option.locale === locale)!;
+  const toggle = () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setOpen(true);
+    window.requestAnimationFrame(() => firstOptionRef.current?.focus());
+  };
+  return <div
+    className="language-selector"
+    onBlur={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+    }}
+    onKeyDown={(event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+    }}
+  >
+    <button
+      ref={triggerRef}
+      className="language-selector__trigger"
+      type="button"
+      aria-label={locale === "fr-FR" ? "Langue active : Français" : "Active language: English"}
+      aria-haspopup="menu"
+      aria-expanded={open}
+      aria-controls={menuId}
+      onClick={toggle}
+    >
+      <span className="language-selector__flag" aria-hidden="true">{activeLanguage.flag}</span>
+      <span>{activeLanguage.code}</span>
+      <ChevronDown className={`language-selector__chevron${open ? " is-open" : ""}`} aria-hidden="true" />
+    </button>
+    {open ? <div id={menuId} className="language-selector__menu" role="menu" aria-label={locale === "fr-FR" ? "Choisir la langue" : "Choose language"}>
+      {languageOptions.map((option, index) => {
+        const active = option.locale === locale;
+        return <Link
+          ref={index === 0 ? firstOptionRef : undefined}
+          className={active ? "is-active" : undefined}
+          to={option.locale === "fr-FR" ? frenchPath : englishPath}
+          role="menuitem"
+          aria-label={`${option.label} (${option.code})`}
+          aria-current={active ? "true" : undefined}
+          onClick={() => setOpen(false)}
+          key={option.locale}
+        >
+          <span className="language-selector__option-flag" aria-hidden="true">{option.flag}</span>
+          <span className="language-selector__option-copy"><strong>{option.code}</strong><small>{option.label}</small></span>
+          {active ? <Check aria-hidden="true" /> : null}
+        </Link>;
+      })}
+    </div> : null}
+  </div>;
+}
+
+export function SiteHeader({ signedIn, professional, accountInitials }: { signedIn: boolean; professional: boolean; accountInitials: string | null }) {
   const location = useLocation();
   const locale = location.pathname === "/en" || location.pathname.startsWith("/en/") ? "en-GB" : "fr-FR";
   const t = dictionary[locale];
@@ -20,9 +92,12 @@ export function SiteHeader({ signedIn, professional }: { signedIn: boolean; prof
     : { home: "/en", shop: "/en/shop", professional: "/en/professional", advice: "/en/tips", about: "/en/about-us", cart: "/en/cart", account: "/en/my-account" };
   const closeMenu = () => setMenuOpen(false);
   const accountLabel = signedIn
-    ? (locale === "fr-FR" ? "Mon compte — connecté" : "My account — signed in")
-    : (locale === "fr-FR" ? "Se connecter" : "Sign in");
-  const AccountIcon = signedIn ? UserRoundCheck : LogIn;
+    ? (locale === "fr-FR" ? "Mon compte" : "My account")
+    : (locale === "fr-FR" ? "Connexion" : "Sign in");
+  const currentLanguagePath = `${location.pathname}${location.search}`;
+  const alternateLanguagePath = `${alternatePath(location.pathname)}${location.search}`;
+  const frenchPath = locale === "fr-FR" ? currentLanguagePath : alternateLanguagePath;
+  const englishPath = locale === "en-GB" ? currentLanguagePath : alternateLanguagePath;
   return (
     <>
       <a className="skip-link" href="#main-content">{locale === "fr-FR" ? "Aller au contenu" : "Skip to content"}</a>
@@ -37,16 +112,16 @@ export function SiteHeader({ signedIn, professional }: { signedIn: boolean; prof
           <Link onClick={closeMenu} to={paths.professional}>{t.professional}</Link>
           <Link onClick={closeMenu} to={paths.advice}>{t.advice}</Link>
           <Link onClick={closeMenu} to={paths.about}>{t.about}</Link>
-          <Link className={`mobile-account-link${signedIn ? " is-signed-in" : ""}`} onClick={closeMenu} to={paths.account}><AccountIcon aria-hidden="true" />{accountLabel}</Link>
+          <Link className={`mobile-account-link${signedIn ? " is-signed-in" : ""}`} onClick={closeMenu} to={paths.account}><AccountLinkContent signedIn={signedIn} label={accountLabel} initials={accountInitials} /></Link>
         </nav>
         <Logo home={paths.home} />
         <div className="header-actions">
-          <Link className="language-link" to={alternatePath(location.pathname)}>{locale === "fr-FR" ? "EN" : "FR"}</Link>
-          <Link className={`icon-button account-button${signedIn ? " is-signed-in" : ""}`} to={paths.account} aria-label={accountLabel} title={accountLabel}><AccountIcon aria-hidden="true" /></Link>
+          <LanguageSelector locale={locale} frenchPath={frenchPath} englishPath={englishPath} />
           {professional ? <button className="icon-button quote-cart-button" type="button" onClick={() => { closeMenu(); quoteCart.openDrawer(); }} aria-label={`${locale === "fr-FR" ? "Panier de devis" : "Quote basket"} (${quoteCart.totalKilograms} kg)`} aria-expanded={quoteCart.drawerOpen} aria-controls="quote-cart-drawer"><FileText aria-hidden="true" /><span>{quoteCart.totalKilograms}</span></button> : null}
           <button className="icon-button cart-button" type="button" onClick={() => { closeMenu(); openDrawer(); }} aria-label={`${t.cart} (${itemCount})`} aria-expanded={drawerOpen} aria-controls="cart-drawer">
             <ShoppingBag aria-hidden="true" /><span>{itemCount}</span>
           </button>
+          <Link className={`account-button${signedIn ? " is-signed-in" : ""}`} to={paths.account} aria-label={accountLabel}><AccountLinkContent signedIn={signedIn} label={accountLabel} initials={accountInitials} /></Link>
         </div>
       </header>
       <CartDrawer open={drawerOpen} locale={locale} onClose={closeDrawer} />

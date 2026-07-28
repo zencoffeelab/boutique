@@ -2,15 +2,24 @@ import { redirect } from "react-router";
 import { env } from "./env.server";
 import { createRequestSupabase } from "./supabase.server";
 
+export function accountInitials(firstName?: string | null, lastName?: string | null, email?: string | null) {
+  const initials = [firstName, lastName]
+    .map((value) => value?.trim().charAt(0) ?? "")
+    .filter(Boolean)
+    .join("")
+    .slice(0, 2);
+  return (initials || email?.trim().slice(0, 2) || "Z").toLocaleUpperCase("fr-FR");
+}
+
 export async function getSessionStatus(request: Request) {
   const supabase = createRequestSupabase(request);
-  if (!supabase) return { signedIn: false, professional: false, professionalUserId: null, admin: false, passwordSetupRequired: false, responseHeaders: new Headers() };
+  if (!supabase) return { signedIn: false, professional: false, professionalUserId: null, accountInitials: null, admin: false, passwordSetupRequired: false, responseHeaders: new Headers() };
   const { data, error } = await supabase.client.auth.getUser();
-  let profile: { role?: string | null; professional_status?: string | null; password_setup_required?: boolean } | null = null;
+  let profile: { role?: string | null; professional_status?: string | null; password_setup_required?: boolean; first_name?: string | null; last_name?: string | null } | null = null;
   if (!error && data.user) {
-    const result = await supabase.client.from("profiles").select("role,professional_status,password_setup_required").eq("id", data.user.id).maybeSingle();
+    const result = await supabase.client.from("profiles").select("role,professional_status,password_setup_required,first_name,last_name").eq("id", data.user.id).maybeSingle();
     if (result.error?.code === "42703") {
-      const legacy = await supabase.client.from("profiles").select("role,professional_status").eq("id", data.user.id).maybeSingle();
+      const legacy = await supabase.client.from("profiles").select("role,professional_status,first_name,last_name").eq("id", data.user.id).maybeSingle();
       if (legacy.error) throw new Response("Unable to verify account activation status.", { status: 503 });
       profile = legacy.data;
     } else if (result.error) {
@@ -26,6 +35,7 @@ export async function getSessionStatus(request: Request) {
     signedIn: !error && Boolean(data.user),
     professional: profile?.professional_status === "approved",
     professionalUserId: profile?.professional_status === "approved" ? data.user?.id ?? null : null,
+    accountInitials: !error && data.user ? accountInitials(profile?.first_name, profile?.last_name, data.user.email) : null,
     admin: profile?.role === "admin" && adminAssurance?.data?.currentLevel === "aal2",
     passwordSetupRequired: profile?.password_setup_required === true,
     responseHeaders: supabase.responseHeaders,

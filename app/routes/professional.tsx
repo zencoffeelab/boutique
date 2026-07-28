@@ -16,7 +16,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const approved = professionalStatus === "approved";
   const [products, content] = await Promise.all([
     approved ? getProducts({ status: "published", audience: "professional" }) : Promise.resolve([]),
-    approved ? Promise.resolve(null) : getContentPage("professionnel", locale),
+    viewer ? Promise.resolve(null) : getContentPage("professionnel", locale),
   ]);
   return { locale, approved, signedIn: Boolean(viewer), accountEmail: viewer?.user.email ?? null, professionalStatus, products: products.filter((product) => product.professionalEnabled && product.professionalStockKg - product.professionalStockReservedKg >= 1 && product.variants.length > 0), content };
 }
@@ -34,6 +34,19 @@ export function ProfessionalApplicationSuccess({ english, signedIn, accountPath 
   </section>;
 }
 
+export function ProfessionalLoginLink({ signedIn, english, loginPath }: { signedIn: boolean; english: boolean; loginPath: string }) {
+  if (signedIn) return null;
+  return <Link className="button button--dark professional-login-link" to={loginPath}><LogIn aria-hidden="true" />{english ? "Sign in" : "Connexion"}</Link>;
+}
+
+export function ProfessionalCatalogHeading({ english }: { english: boolean }) {
+  return <header className="page-hero page-hero--listing">
+    <p className="eyebrow">Zen Coffee Lab</p>
+    <h1>{english ? "The professional shop" : "La boutique des professionnels"}</h1>
+    <p className="lede">{english ? "Bright, traceable coffees, roasted to order." : "Des cafés lumineux et traçables, torréfiés à la demande."}</p>
+  </header>;
+}
+
 export default function Professional() {
   const { locale, approved, signedIn, accountEmail, products, content } = useLoaderData<typeof loader>();
   const english = locale === "en-GB";
@@ -41,15 +54,17 @@ export default function Professional() {
   const professionalPath = english ? "/en/professional" : "/professionnel";
   const accountPath = english ? "/en/my-account" : "/mon-compte";
   const loginPath = `${accountPath}?next=${encodeURIComponent(professionalPath)}`;
-  if (approved) return <section className="section page-shell professional-catalog" aria-label={english ? "Professional coffee catalogue" : "Catalogue de cafés professionnels"}>
-    <h1 className="sr-only">{english ? "Professional coffees" : "Cafés professionnels"}</h1>
-    {products.length > 0
-      ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} audience="professional" quoteAdd />)}</div>
-      : <div className="empty-state"><h2>{english ? "No professional coffee is currently available." : "Aucun café professionnel n’est disponible actuellement."}</h2></div>}
-  </section>;
+  if (approved) return <>
+    <ProfessionalCatalogHeading english={english} />
+    <section className="section page-shell professional-catalog" aria-label={english ? "Professional coffee catalogue" : "Catalogue de cafés professionnels"}>
+      {products.length > 0
+        ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} locale={locale} audience="professional" quoteAdd />)}</div>
+        : <div className="empty-state"><h2>{english ? "No professional coffee is currently available." : "Aucun café professionnel n’est disponible actuellement."}</h2></div>}
+    </section>
+  </>;
   return <>
-    <header className="page-hero professional-hero"><p className="eyebrow">B2B · Zen Coffee Lab</p><h1>{content?.title ?? (english ? "Coffee made for your business" : "Du café pensé pour votre établissement")}</h1><p className="lede">{english ? "Traceable coffees, consistent profiles and direct support from the roaster." : "Des cafés traçables, des profils constants et un accompagnement direct par le torréfacteur."}</p><Link className="button button--dark professional-login-link" to={signedIn ? accountPath : loginPath}><LogIn aria-hidden="true" />{english ? "Sign in" : "Connexion"}</Link></header>
-    <ContentBlocks blocks={content?.blocks} />
+    <header className="page-hero professional-hero"><p className="eyebrow">B2B · Zen Coffee Lab</p><h1>{content?.title ?? (english ? "Coffee made for your business" : "Du café pensé pour votre établissement")}</h1><p className="lede">{english ? "Traceable coffees, consistent profiles and direct support from the roaster." : "Des cafés traçables, des profils constants et un accompagnement direct par le torréfacteur."}</p><ProfessionalLoginLink signedIn={signedIn} english={english} loginPath={loginPath} /></header>
+    {signedIn ? null : <ContentBlocks blocks={content?.blocks} />}
     <div className="professional-application-layout page-shell">
       <section className="steps professional-application-steps" aria-label={english ? "Professional account steps" : "Étapes du compte professionnel"}><article><span>01</span><h3>{english ? "Tell us about your business" : "Présentez votre activité"}</h3><p>{english ? "Complete the form in a few minutes." : "Complétez le formulaire en quelques minutes."}</p></article><article><span>02</span><h3>{english ? "Manual review" : "Validation manuelle"}</h3><p>{english ? "We review every request and get back to you." : "Nous étudions chaque demande et revenons vers vous."}</p></article><article><span>03</span><h3>{english ? "Secure access" : "Accès sécurisé"}</h3><p>{english ? "Set your password and access professional terms." : "Définissez votre mot de passe et accédez aux conditions pro."}</p></article></section>
       {fetcher.data?.ok ? <ProfessionalApplicationSuccess english={english} signedIn={signedIn} accountPath={accountPath} /> : <fetcher.Form className="form-card professional-application-form" method="post" action="/api/pro-applications">

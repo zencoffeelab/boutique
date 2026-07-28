@@ -1,5 +1,5 @@
-import { ArrowUpRight, ShoppingBag } from "lucide-react";
-import { useState } from "react";
+import { ArrowUpRight, ChevronDown, ShoppingBag } from "lucide-react";
+import { useId, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
 import { ProfessionalQuoteAdd } from "~/components/professional-quote/professional-quote-add";
@@ -9,31 +9,69 @@ import { formatMoney } from "~/domain/money";
 import { dictionary } from "~/lib/i18n";
 
 function ProductCardQuickAdd({ product, locale, audience }: { product: Product; locale: Locale; audience: Audience }) {
+  const menuId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const firstOptionRef = useRef<HTMLButtonElement>(null);
   const purchasableVariants = product.variants.filter((variant) => {
     const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active);
     return offer ? variant.stockOnHand - variant.stockReserved >= offer.minimumQuantity : false;
   });
-  const [variantId, setVariantId] = useState(purchasableVariants[0]?.id ?? "");
+  const [menuOpen, setMenuOpen] = useState(false);
   const { addItem, hydrated, openDrawer } = useCart();
-  const selectedVariant = purchasableVariants.find((variant) => variant.id === variantId);
-  const selectedOffer = selectedVariant?.offers.find((offer) => offer.audience === audience && offer.active);
-  const add = () => {
-    if (!selectedVariant || !selectedOffer) return;
-    addItem(buildProductCartLine({ product, variant: selectedVariant, offer: selectedOffer, audience, quantity: selectedOffer.minimumQuantity }));
+  const add = (variant: Product["variants"][number]) => {
+    const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active);
+    if (!offer) return;
+    addItem(buildProductCartLine({ product, variant, offer, audience, quantity: offer.minimumQuantity }));
+    setMenuOpen(false);
     openDrawer();
   };
-  return <div className="product-card__quick-add">
-    <label><span>{dictionary[locale].weight}</span><select value={variantId} onChange={(event) => setVariantId(event.target.value)} disabled={purchasableVariants.length === 0}>
-      {purchasableVariants.map((variant) => {
+  const toggleMenu = () => {
+    if (menuOpen) {
+      setMenuOpen(false);
+      return;
+    }
+    setMenuOpen(true);
+    window.requestAnimationFrame(() => firstOptionRef.current?.focus());
+  };
+  return <div
+    className="product-card__quick-add"
+    onBlur={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setMenuOpen(false);
+    }}
+    onKeyDown={(event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setMenuOpen(false);
+      triggerRef.current?.focus();
+    }}
+  >
+    <button
+      ref={triggerRef}
+      className="button button--ghost product-card__quick-add-trigger"
+      type="button"
+      aria-haspopup="menu"
+      aria-expanded={menuOpen}
+      aria-controls={menuId}
+      onClick={toggleMenu}
+      disabled={!hydrated || purchasableVariants.length === 0}
+    >
+      <ShoppingBag aria-hidden="true" />
+      {purchasableVariants.length === 0 ? dictionary[locale].soldOut : dictionary[locale].addToCart}
+      {purchasableVariants.length > 0 ? <ChevronDown className={menuOpen ? "is-open" : ""} aria-hidden="true" /> : null}
+    </button>
+    {menuOpen ? <div id={menuId} className="product-card__variant-menu" role="menu" aria-label={dictionary[locale].weight}>
+      {purchasableVariants.map((variant, index) => {
         const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active)!;
-        return <option value={variant.id} key={variant.id}>{variant.label} — {formatMoney(offer.price.amount, locale)}</option>;
+        return <button ref={index === 0 ? firstOptionRef : undefined} type="button" role="menuitem" onClick={() => add(variant)} key={variant.id}>
+          <span>{variant.label}</span><strong>{formatMoney(offer.price.amount, locale)}</strong>
+        </button>;
       })}
-    </select></label>
-    <button className="button button--dark" type="button" onClick={add} disabled={!hydrated || !selectedVariant || !selectedOffer}><ShoppingBag aria-hidden="true" />{purchasableVariants.length === 0 ? dictionary[locale].soldOut : dictionary[locale].addToCart}</button>
+    </div> : null}
   </div>;
 }
 
 export function ProductCard({ product, locale, audience, quickAdd = false, quoteAdd = false }: { product: Product; locale: Locale; audience?: Audience; quickAdd?: boolean; quoteAdd?: boolean }) {
+  const titleId = useId();
   const translation = product.translations[locale];
   const resolvedAudience = audience ?? product.variants.flatMap((variant) => variant.offers)[0]?.audience ?? "retail";
   const baseHref = locale === "fr-FR" ? `/boutique/${product.slug}` : `/en/shop/${product.slug}`;
@@ -42,19 +80,20 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
   const fromPrice = prices.length > 0 ? Math.min(...prices) : 0;
   return (
     <article className="product-card">
-      <Link to={href} className="product-card__image" aria-label={translation.name}>
+      <div className="product-card__image">
         <img src={product.media[0]?.url} alt={product.media[0]?.alt[locale] ?? translation.name} width={640} height={640} loading="lazy" />
-        <span>{dictionary[locale].discover}<ArrowUpRight aria-hidden="true" /></span>
-      </Link>
+        <span>{dictionary[locale].learnMoreCoffee}<ArrowUpRight aria-hidden="true" /></span>
+      </div>
       <div className="product-card__body">
-        <div><p className="eyebrow">{translation.region}</p><h3><Link to={href}>{translation.name}</Link></h3></div>
-        <p>{dictionary[locale].from} {formatMoney(fromPrice, locale)}</p>
+        <div><p className="eyebrow">{translation.region}</p><h3 id={titleId}>{translation.name}</h3></div>
+        {quoteAdd ? null : <p>{dictionary[locale].from} {formatMoney(fromPrice, locale)}</p>}
       </div>
       <ul className="taste-list" aria-label={dictionary[locale].tasting}>
         {translation.tastingNotes.map((note) => <li key={note}>{note}</li>)}
       </ul>
       {quickAdd ? <ProductCardQuickAdd product={product} locale={locale} audience={resolvedAudience} /> : null}
       {quoteAdd ? <ProfessionalQuoteAdd product={product} locale={locale} /> : null}
+      <Link to={href} className="product-card__link" aria-labelledby={titleId} />
     </article>
   );
 }

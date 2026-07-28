@@ -1,4 +1,4 @@
-import { Trash2, X } from "lucide-react";
+import { CheckCircle2, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
@@ -30,7 +30,7 @@ const lineKey = (line: Pick<PreviewLine, "variantId" | "audience">) => `${line.v
 
 export function CartDrawer({ open, locale, onClose }: { open: boolean; locale: Locale; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const { lines, hydrated, removeItem } = useCart();
+  const { lines, hydrated, removeItem, addedNotification } = useCart();
   const [preview, setPreview] = useState<PreviewResponse>({ ok: true, lines: [], unavailableKeys: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -114,9 +114,12 @@ export function CartDrawer({ open, locale, onClose }: { open: boolean; locale: L
           <button className="icon-button" type="button" onClick={onClose} aria-label={english ? "Close cart" : "Fermer le panier"} autoFocus><X aria-hidden="true" /></button>
         </header>
 
-        {lines.length > 0 ? <p className="cart-drawer__shipping-message">{remainingCents === 0
-          ? (english ? "Congratulations! You qualify for free delivery in France." : "Félicitations ! La livraison en France vous est offerte.")
-          : (english ? `${formatMoney(remainingCents, locale)} left for free delivery in France.` : `Plus que ${formatMoney(remainingCents, locale)} pour la livraison offerte en France.`)}</p> : null}
+        {addedNotification || lines.length > 0 ? <div className="cart-drawer__messages">
+          {addedNotification ? <div className="cart-drawer__added-message" role="status" aria-live="polite" aria-atomic="true"><CheckCircle2 aria-hidden="true" /><span><strong>{english ? "Added to cart" : "Ajouté au panier"}</strong><small>{addedNotification.productName}{addedNotification.variantLabel ? ` · ${addedNotification.variantLabel}` : ""}</small></span></div> : null}
+          {lines.length > 0 ? <p className="cart-drawer__shipping-message">{remainingCents === 0
+            ? (english ? "Congratulations! You qualify for free delivery in France." : "Félicitations ! La livraison en France vous est offerte.")
+            : (english ? `${formatMoney(remainingCents, locale)} left for free delivery in France.` : `Plus que ${formatMoney(remainingCents, locale)} pour la livraison offerte en France.`)}</p> : null}
+        </div> : null}
 
         <div className="cart-drawer__content">
           {loading && !displayedLines.length ? <p className="cart-drawer__status">{english ? "Loading your cart…" : "Chargement du panier…"}</p> : null}

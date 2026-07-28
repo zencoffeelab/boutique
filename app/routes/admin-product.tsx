@@ -11,10 +11,12 @@ import {
   redirect,
   useActionData,
   useLoaderData,
+  useNavigation,
 } from "react-router";
 import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { AdminShell } from "~/components/admin-shell";
 import { formatMoney } from "~/domain/money";
+import { buildVariantOffers } from "~/domain/professional-quote";
 import type { ProductEditorialBlock, ProductVariant } from "~/domain/types";
 import { requireAdmin } from "~/lib/auth.server";
 import { getAdminProducts } from "~/lib/catalog.server";
@@ -305,6 +307,16 @@ export async function action({ request }: ActionFunctionArgs) {
         message: "Données de variante invalides.",
         errors: parsed.error.flatten().fieldErrors,
       };
+    const { data: parentProduct, error: parentProductError } = await client
+      .from("products")
+      .select("professional_enabled")
+      .eq("id", parsed.data.productId)
+      .single();
+    if (parentProductError || !parentProduct)
+      return {
+        ok: false,
+        message: parentProductError?.message ?? "Produit introuvable.",
+      };
     const { data: variant, error } = await client
       .from("product_variants")
       .insert({
@@ -322,23 +334,14 @@ export async function action({ request }: ActionFunctionArgs) {
       .single();
     if (error || !variant)
       return { ok: false, message: error?.message ?? "Variante non créée." };
-    const offers = [
-      {
-        variant_id: variant.id,
-        audience: "retail",
-        price_cents: parsed.data.retailPriceCents,
-        minimum_quantity: 1,
-        active: true,
-      },
-    ];
-    if (parsed.data.professional)
-      offers.push({
-        variant_id: variant.id,
-        audience: "professional",
-        price_cents: parsed.data.proPriceCents ?? 0,
-        minimum_quantity: parsed.data.proMinimumQuantity ?? 1,
-        active: true,
-      });
+    const offers = buildVariantOffers({
+      variantId: variant.id,
+      retailPriceCents: parsed.data.retailPriceCents,
+      productProfessionalEnabled: parentProduct.professional_enabled,
+      professionalRequested: parsed.data.professional,
+      professionalPriceCents: parsed.data.proPriceCents,
+      professionalMinimumQuantity: parsed.data.proMinimumQuantity,
+    });
     const { error: offerError } = await client
       .from("variant_offers")
       .insert(offers);
@@ -359,7 +362,7 @@ export async function action({ request }: ActionFunctionArgs) {
       entity_id: variant.id,
       after_data: parsed.data,
     });
-    return redirect(`/admin/produits/${parsed.data.productId}`);
+    return { ok: true, message: "Variante ajoutée." };
   }
   if (intent === "delete_variant") {
     const parsed = deleteVariantSchema.safeParse(Object.fromEntries(form));
@@ -403,7 +406,7 @@ export async function action({ request }: ActionFunctionArgs) {
       before_data: { variant, offers },
       after_data: { active: false },
     });
-    return redirect(`/admin/produits/${parsed.data.productId}`);
+    return { ok: true, message: "Variante supprimée." };
   }
   const parsed = productSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success)
@@ -497,7 +500,9 @@ export async function action({ request }: ActionFunctionArgs) {
     before_data: before.data,
     after_data: parsed.data,
   });
-  return redirect(`/admin/produits/${savedProductId}`);
+  if (creating)
+    return redirect(`/admin/produits/${savedProductId}?confirmation=product-created`);
+  return { ok: true, message: "Produit enregistré." };
 }
 
 export const meta: MetaFunction = () => [
@@ -959,11 +964,39 @@ function VariantList({
   );
 }
 
+export function adminProductProgressMessage(intent: string) {
+  const messages: Readonly<Record<string, string>> = {
+    save_product: "Enregistrement du produit…",
+    save_editorial_block: "Enregistrement du bloc éditorial…",
+    create_variant: "Ajout de la variante…",
+    delete_variant: "Suppression de la variante…",
+    upload_media: "Import de l’image…",
+  };
+  return messages[intent] ?? "Modification en cours…";
+}
+
+function AdminProductProgress({ message }: { message: string }) {
+  return <div className="admin-product-progress" role="status" aria-live="polite">
+    <span>{message}</span>
+    <div
+      className="admin-product-progress__track"
+      role="progressbar"
+      aria-label={message}
+      aria-valuetext="En cours"
+    ><span /></div>
+  </div>;
+}
+
 export default function AdminProduct() {
   const { demo, isNew, product } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const pendingIntent = String(navigation.formData?.get("intent") ?? "");
+  const modifying = navigation.state !== "idle" && Boolean(navigation.formData);
+  const savingProduct = modifying && pendingIntent === "save_product";
   return (
     <AdminShell active="products">
+      {modifying ? <AdminProductProgress message={adminProductProgressMessage(pendingIntent)} /> : null}
       <header className="admin-heading">
         <div>
           <p className="eyebrow">Catalogue</p>
@@ -979,12 +1012,13 @@ export default function AdminProduct() {
             </Link>
           ) : null}
           <button
-            className="ui-button ui-button--default"
+            className="ui-button ui-button--default admin-product-save-fab"
             type="submit"
             form="product-editor-form"
-            disabled={demo}
+            disabled={demo || modifying}
+            aria-busy={savingProduct}
           >
-            <Save aria-hidden="true" /> Enregistrer
+            <Save aria-hidden="true" /> {savingProduct ? "Enregistrement…" : "Enregistrer"}
           </button>
         </div>
       </header>
@@ -1076,13 +1110,6 @@ export default function AdminProduct() {
           french={<TranslationFields language="Français" translation={product.translations["fr-FR"]} />}
           english={<TranslationFields language="English" translation={product.translations["en-GB"]} />}
         />
-        <button
-          className="ui-button ui-button--default"
-          type="submit"
-          disabled={demo}
-        >
-          Enregistrer le produit
-        </button>
       </Form>
       {!isNew ? (
         <>

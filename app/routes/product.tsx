@@ -49,6 +49,17 @@ export const meta: MetaFunction<typeof loader> = ({ data }) =>
       )
     : [{ title: "Café introuvable | Zen Coffee Lab" }];
 
+export function productReturnLink(locale: Locale, audience: Audience) {
+  if (audience === "professional") {
+    return locale === "en-GB"
+      ? { href: "/en/professional", label: "Professional coffees" }
+      : { href: "/professionnel", label: "Cafés professionnels" };
+  }
+  return locale === "en-GB"
+    ? { href: "/en/shop", label: "All coffees" }
+    : { href: "/boutique", label: "Tous les cafés" };
+}
+
 function EditorialBlock({
   block,
   locale,
@@ -104,6 +115,7 @@ export default function ProductDetail() {
     useLoaderData<typeof loader>();
   const t = product.translations[locale];
   const english = locale === "en-GB";
+  const returnLink = productReturnLink(locale, audience);
   return (
     <>
       <JsonLd value={productStructuredData(product, locale)} />
@@ -112,8 +124,8 @@ export default function ProductDetail() {
         aria-label="Breadcrumb"
         style={{ paddingBlock: "1rem" }}
       >
-        <Link className="text-link" to={english ? "/en/shop" : "/boutique"}>
-          ← {english ? "All coffees" : "Tous les cafés"}
+        <Link className="text-link" to={returnLink.href}>
+          ← {returnLink.label}
         </Link>
       </nav>
       <article className="product-detail">

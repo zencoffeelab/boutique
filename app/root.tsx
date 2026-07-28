@@ -73,13 +73,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
     signedIn: session.signedIn,
     professional: session.professional,
     professionalUserId: session.professionalUserId,
+    accountInitials: session.accountInitials,
     admin: session.admin,
     footerProducts,
   }, { headers: session.responseHeaders });
 }
 
 export default function App() {
-  const { locale, gaMeasurementId, signedIn, professional, professionalUserId, admin, footerProducts } = useLoaderData<typeof loader>();
+  const { locale, gaMeasurementId, signedIn, professional, professionalUserId, accountInitials, admin, footerProducts } = useLoaderData<typeof loader>();
   const location = useLocation();
   const isAdmin = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
   const isPasswordSetup = location.pathname === "/activation/mot-de-passe" || location.pathname === "/en/activate/password";
@@ -93,9 +94,9 @@ export default function App() {
         <Links />
       </head>
       <body className={isAdmin ? "admin-body" : isPasswordSetup ? "password-setup-body" : undefined}>
-        <CartProvider>
+        <CartProvider locale={locale}>
           <QuoteCartProvider key={professionalUserId ?? "guest"} storageNamespace={professionalUserId ?? "guest"}>
-            {shellHidden ? null : <SiteHeader signedIn={signedIn} professional={professional} />}
+            {shellHidden ? null : <SiteHeader signedIn={signedIn} professional={professional} accountInitials={accountInitials} />}
             <main id="main-content" tabIndex={-1}>
               <Outlet />
             </main>

@@ -58,6 +58,7 @@ export default [
   route("en/quotes/:id/payment", "routes/professional-quote-payment.tsx", { id: "professional-quote-payment-en" }),
   route("api/pro-applications", "routes/api.pro-applications.ts"),
   route("api/professional-quotes", "routes/api.professional-quotes.ts"),
+  route("api/professional-quotes/:id/preview", "routes/api.professional-quote-preview.ts"),
   route("api/professional-quotes/:id/pdf", "routes/api.professional-quote-pdf.ts"),
   route("api/cart/preview", "routes/api.cart-preview.ts"),
   route("api/shipping/pickup-points", "routes/api.pickup-points.ts"),
