@@ -2,6 +2,37 @@ import { useId } from "react";
 
 export const PRODUCT_THUMBNAIL_BAG_URL = "/media/product-cards/zen-coffee-bag-resealable.png";
 
+export function ProductPackArtwork({
+  labelUrl,
+  alt,
+  packClassName,
+  labelClassName,
+  loading,
+}: {
+  labelUrl: string;
+  alt: string;
+  packClassName: string;
+  labelClassName: string;
+  loading?: "eager" | "lazy";
+}) {
+  return <>
+    <img
+      className={packClassName}
+      src={PRODUCT_THUMBNAIL_BAG_URL}
+      alt={alt}
+      width={900}
+      height={900}
+      loading={loading}
+    />
+    <ProductThumbnailLabel
+      className={labelClassName}
+      src={labelUrl}
+      alt=""
+      loading={loading}
+    />
+  </>;
+}
+
 export function ProductThumbnailLabel({ src, alt, className, loading }: { src: string; alt: string; className: string; loading?: "eager" | "lazy" }) {
   const wrinkleFilterId = `product-label-wrinkle-${useId().replaceAll(":", "")}`;
 

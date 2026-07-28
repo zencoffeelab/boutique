@@ -1,8 +1,10 @@
 import { ArrowRight } from "lucide-react";
+import type { CSSProperties } from "react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Link, useLoaderData } from "react-router";
 import { ProductCard } from "~/components/product-card";
 import { ProductPurchase } from "~/components/product-purchase";
+import { ProductPackArtwork } from "~/components/product-thumbnail-label";
 import { ProfessionalQuoteAdd } from "~/components/professional-quote/professional-quote-add";
 import type { Audience, Locale, ProductEditorialBlock } from "~/domain/types";
 import { getAudience } from "~/lib/auth.server";
@@ -137,14 +139,30 @@ export default function ProductDetail() {
       <article className="product-detail">
         <div className="product-gallery">
           {product.media.map((media, index) => (
-            <img
-              key={media.id}
-              src={media.url}
-              alt={media.alt[locale]}
-              width={media.width}
-              height={media.height}
-              loading={index === 0 ? "eager" : "lazy"}
-            />
+            index === 0 && product.thumbnailLabelUrl ? (
+              <div
+                key={media.id}
+                className="product-gallery__composed"
+                style={{ "--product-thumbnail-color": product.thumbnailBackgroundColor } as CSSProperties}
+              >
+                <ProductPackArtwork
+                  packClassName="product-gallery__pack"
+                  labelClassName="product-gallery__label"
+                  labelUrl={product.thumbnailLabelUrl}
+                  alt={media.alt[locale] || t.name}
+                  loading="eager"
+                />
+              </div>
+            ) : (
+              <img
+                key={media.id}
+                src={media.url}
+                alt={media.alt[locale]}
+                width={media.width}
+                height={media.height}
+                loading={index === 0 ? "eager" : "lazy"}
+              />
+            )
           ))}
         </div>
         <div className="product-info">

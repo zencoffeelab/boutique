@@ -3,7 +3,7 @@ import { useId, useRef, useState, type CSSProperties } from "react";
 import { Link } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
 import { ProfessionalQuoteAdd } from "~/components/professional-quote/professional-quote-add";
-import { PRODUCT_THUMBNAIL_BAG_URL, ProductThumbnailLabel } from "~/components/product-thumbnail-label";
+import { ProductPackArtwork } from "~/components/product-thumbnail-label";
 import { buildProductCartLine } from "~/domain/cart";
 import type { Audience, Locale, Product } from "~/domain/types";
 import { formatMoney } from "~/domain/money";
@@ -86,22 +86,13 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
         className={`product-card__image${composedThumbnail ? " product-card__image--composed" : ""}`}
         style={composedThumbnail ? { "--product-thumbnail-color": product.thumbnailBackgroundColor } as CSSProperties : undefined}
       >
-        {composedThumbnail ? <>
-          <img
-            className="product-card__pack"
-            src={PRODUCT_THUMBNAIL_BAG_URL}
-            alt={product.media[0]?.alt[locale] ?? translation.name}
-            width={900}
-            height={900}
-            loading="lazy"
-          />
-          <ProductThumbnailLabel
-            className="product-card__label"
-            src={product.thumbnailLabelUrl!}
-            alt=""
-            loading="lazy"
-          />
-        </> : <img
+        {composedThumbnail ? <ProductPackArtwork
+          packClassName="product-card__pack"
+          labelClassName="product-card__label"
+          labelUrl={product.thumbnailLabelUrl!}
+          alt={product.media[0]?.alt[locale] ?? translation.name}
+          loading="lazy"
+        /> : <img
           className="product-card__original-image"
           src={product.media[0]?.url}
           alt={product.media[0]?.alt[locale] ?? translation.name}
