@@ -66,7 +66,15 @@ export default function Home() {
       <section className="statement">
         <p>{english ? <>Every coffee carries a place, a person and an <em>intention.</em></> : <>Chaque café raconte un lieu, une personne et une <em>intention.</em></>}</p>
       </section>
-      <ContentBlocks blocks={content?.blocks} />
+      <ContentBlocks
+        blocks={content?.blocks}
+        footer={
+          <Link className="button button--dark" to={english ? "/en/about-us" : "/a-propos"}>
+            {english ? "Learn more" : "En savoir plus"}
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        }
+      />
 
       <section className="value-grid" aria-label={english ? "Our commitments" : "Nos engagements"}>
         <article className="value-card"><b>01</b><h3>{english ? "Sourced with care" : "Sourcé avec soin"}</h3><p>{english ? "Traceable lots chosen for their singularity and the quality of the work at origin." : "Des lots traçables choisis pour leur singularité et la qualité du travail à l’origine."}</p></article>

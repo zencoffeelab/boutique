@@ -1654,6 +1654,10 @@ button:disabled {
 .article-body p + p {
   margin-top: 1.5rem;
 }
+.cms-content__footer {
+  display: flex;
+  margin-top: 2rem;
+}
 .advice-detail__body {
   padding-bottom: clamp(3rem, 6vw, 5rem);
 }
