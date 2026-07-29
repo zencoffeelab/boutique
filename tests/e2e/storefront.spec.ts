@@ -15,16 +15,19 @@ test("public header identifies a signed-out visitor", async ({ page }) => {
   if ((page.viewportSize()?.width ?? 0) <= 700) {
     await page.getByRole("button", { name: "Menu" }).click();
     await expect(page.locator(".mobile-account-link")).toHaveAccessibleName(
-      "Se connecter",
+      "Connexion",
     );
     await expect(
-      page.locator(".mobile-account-link .lucide-log-in"),
-    ).toBeVisible();
+      page.locator(".mobile-account-link"),
+    ).toHaveAttribute("href", "/mon-compte");
   } else {
     await expect(page.locator(".account-button")).toHaveAccessibleName(
-      "Se connecter",
+      "Connexion",
     );
-    await expect(page.locator(".account-button .lucide-log-in")).toBeVisible();
+    await expect(page.locator(".account-button")).toHaveAttribute(
+      "href",
+      "/mon-compte",
+    );
   }
 });
 
@@ -33,10 +36,12 @@ test("a coffee can be added to the cart directly from the shop", async ({
 }) => {
   await page.goto("/boutique");
   const firstProduct = page.locator(".product-card").first();
-  await expect(
-    firstProduct.getByRole("combobox", { name: "Poids" }),
-  ).toBeVisible();
-  await firstProduct.getByRole("button", { name: "Ajouter au panier" }).click();
+  await firstProduct
+    .getByRole("button", { name: "Ajouter au panier", exact: true })
+    .click();
+  const firstFormat = firstProduct.getByRole("menuitem").first();
+  await expect(firstFormat).toBeVisible();
+  await firstFormat.click();
   const drawer = page.getByRole("dialog", { name: "Votre panier" });
   await expect(drawer).toBeVisible();
   await expect(drawer.locator(".cart-drawer-line")).toHaveCount(1);
@@ -88,7 +93,7 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "La boutique café" }),
   ).toBeVisible();
-  await page.locator(".product-card h3 a").first().click();
+  await page.locator(".product-card__link").first().click();
   await expect(page).toHaveURL(/\/boutique\/[^/]+$/);
   await page
     .locator(".purchase-panel")
@@ -99,6 +104,7 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   await expect(drawer).toBeVisible();
   await expect(drawer.getByRole("button", { name: /Supprimer/ })).toBeVisible();
   await drawer.getByRole("link", { name: "Passer la commande" }).click();
+  await expect(drawer).toBeHidden();
   await expect(
     page.getByRole("heading", { name: "Livraison & paiement" }),
   ).toBeVisible();
@@ -139,7 +145,7 @@ test("cart drawer removes an item without leaving the current page", async ({
   page,
 }) => {
   await page.goto("/boutique");
-  await page.locator(".product-card h3 a").first().click();
+  await page.locator(".product-card__link").first().click();
   await expect(page).toHaveURL(/\/boutique\/[^/]+$/);
   await page
     .locator(".purchase-panel")
@@ -197,7 +203,10 @@ test("English URLs, language switch and professional form are accessible", async
     ),
   ).toBeVisible();
   await expect(page.getByLabel("Company name")).toBeVisible();
-  await page.getByRole("link", { name: "FR" }).click();
+  await page
+    .getByRole("button", { name: "Active language: English" })
+    .click();
+  await page.getByRole("menuitem", { name: "Français (FR)" }).click();
   await expect(page).toHaveURL(/\/professionnel$/);
   expect(consoleErrors).toEqual([]);
 });
@@ -206,17 +215,16 @@ test("Zone 2 checkout offers Mondial Relay only after pickup-point selection", a
   page,
 }) => {
   await page.goto("/boutique");
-  await page.locator(".product-card h3 a").first().click();
+  await page.locator(".product-card__link").first().click();
   await expect(page).toHaveURL(/\/boutique\/[^/]+$/);
   await page
     .locator(".purchase-panel")
     .getByRole("button", { name: /Ajouter au panier/ })
     .click();
   await page.getByRole("button", { name: /Panier \(1\)/ }).click();
-  await page
-    .getByRole("dialog", { name: "Votre panier" })
-    .getByRole("link", { name: "Passer la commande" })
-    .click();
+  const drawer = page.getByRole("dialog", { name: "Votre panier" });
+  await drawer.getByRole("link", { name: "Passer la commande" }).click();
+  await expect(drawer).toBeHidden();
   await page.getByLabel("Prénom").fill("Ada");
   await page.getByLabel("Nom", { exact: true }).fill("Lovelace");
   await page.getByLabel("Email").fill("ada@example.com");
