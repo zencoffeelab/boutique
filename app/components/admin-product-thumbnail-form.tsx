@@ -1,6 +1,7 @@
 import { Upload } from "lucide-react";
-import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Form } from "react-router";
+import { AdminImageEditorInput, type AdminProcessedImage } from "~/components/admin-image-editor-input";
 import { PRODUCT_THUMBNAIL_BAG_URL, ProductThumbnailLabel } from "~/components/product-thumbnail-label";
 import { dominantLabelColor } from "~/lib/image-color";
 
@@ -50,15 +51,13 @@ export function AdminProductThumbnailForm({
     if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current);
   }, []);
 
-  const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
+  const handleFile = async ({ file }: AdminProcessedImage) => {
     detectionSequence.current += 1;
     const sequence = detectionSequence.current;
     if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current);
-    previewObjectUrl.current = file ? URL.createObjectURL(file) : null;
+    previewObjectUrl.current = URL.createObjectURL(file);
     setLabelPreview(previewObjectUrl.current ?? currentLabelUrl);
     setDetectionMessage(null);
-    if (!file) return;
     setDetecting(true);
     try {
       const detectedColor = await detectFileColor(file);
@@ -94,19 +93,15 @@ export function AdminProductThumbnailForm({
       <Form method="post" encType="multipart/form-data" className="admin-thumbnail-form">
         <input type="hidden" name="intent" value="upload_thumbnail_label" />
         <input type="hidden" name="productId" value={productId} />
-        <div className="field">
-          <label>
-            Fichier de l’étiquette
-            <input
-              name="file"
-              type="file"
-              accept="image/png,image/webp,image/jpeg"
-              required={!currentLabelUrl}
-              onChange={handleFile}
-            />
-          </label>
-          <small>L’étiquette sera centrée et intégrée sur la face avant du paquet, avec un léger effet de matière.</small>
-        </div>
+        <AdminImageEditorInput
+          label="Fichier de l’étiquette"
+          help="PNG, WebP ou JPEG. L’étiquette sera centrée et intégrée sur la face avant du paquet."
+          required={!currentLabelUrl}
+          currentPreviewUrl={currentLabelUrl}
+          defaultAspect="original"
+          defaultOutputWidth={1600}
+          onProcessed={handleFile}
+        />
         <div className="field admin-thumbnail-color-field">
           <label>
             Couleur de fond

@@ -89,8 +89,8 @@ function EditorialBlock({
         <img
           src={block.imageUrl}
           alt={block.imageAlt[locale]}
-          width="1600"
-          height="1200"
+          width="750"
+          height="830"
           loading="lazy"
         />
       </figure>

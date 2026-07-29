@@ -60,6 +60,27 @@ test("product page shows the two alternating editorial blocks below origin detai
     /product-story-block--image-first/,
   );
   await expect(story.getByRole("heading")).toHaveCount(2);
+  const firstBlock = story.locator(".product-story-block").first();
+  const firstCopy = firstBlock.locator(".product-story-block__copy");
+  const firstMedia = firstBlock.locator(".product-story-block__media");
+  const firstImage = firstMedia.locator("img");
+  await expect(firstCopy).toHaveCSS("overflow-y", "visible");
+  await expect(firstImage).toHaveAttribute("width", "750");
+  await expect(firstImage).toHaveAttribute("height", "830");
+  expect(await firstMedia.evaluate((media) => {
+    const image = media.querySelector("img");
+    if (!image) return false;
+    const style = getComputedStyle(media);
+    const expectedWidth = media.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const expectedHeight = media.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    const imageBox = image.getBoundingClientRect();
+    return Math.abs(imageBox.width - expectedWidth) < 1 && Math.abs(imageBox.height - expectedHeight) < 1;
+  })).toBe(true);
+  if ((page.viewportSize()?.width ?? 0) > 980) {
+    const copyHeight = (await firstCopy.boundingBox())?.height ?? 0;
+    const mediaHeight = (await firstMedia.boundingBox())?.height ?? 0;
+    expect(Math.abs(copyHeight - mediaHeight)).toBeLessThan(1);
+  }
   expect((await origin.boundingBox())!.y).toBeLessThan(
     (await story.boundingBox())!.y,
   );

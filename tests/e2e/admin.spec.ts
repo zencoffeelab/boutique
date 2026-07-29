@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { resolve } from "node:path";
 
 test("dashboard and product management use distinct pages", async ({
   page,
@@ -71,7 +72,7 @@ test("product editor provides a save action at the top", async ({ page }) => {
 test("product editor provides two editable editorial blocks", async ({
   page,
 }) => {
-  await page.goto("/admin/produits/ethiopia-aricha");
+  await page.goto("/admin/produits/ethiopia-aricha", { waitUntil: "networkidle" });
   const contentForm = page.locator("form#product-editor-form");
   await expect(contentForm.getByRole("heading", { name: "Contenu", exact: true })).toBeVisible();
   const contentTabs = contentForm.getByRole("tablist", { name: "Langue du contenu produit" });
@@ -99,6 +100,37 @@ test("product editor provides two editable editorial blocks", async ({
   ).toBeVisible();
   await expect(page.getByText("Texte à gauche · image à droite")).toBeVisible();
   await expect(page.getByText("Image à gauche · texte à droite")).toBeVisible();
+});
+
+test("every product image upload opens the crop and resize editor", async ({
+  page,
+}) => {
+  await page.goto("/admin/produits/ethiopia-aricha");
+  await expect(page.locator(".admin-image-input")).toHaveCount(5);
+
+  const firstEditorialBlock = page.locator("form.admin-editorial-block").first();
+  await expect(firstEditorialBlock.locator(".admin-image-input")).toHaveAttribute("data-ready", "true");
+  const fileInput = firstEditorialBlock.locator('input[type="file"]');
+  await fileInput.setInputFiles(resolve("public/media/product-cards/zen-coffee-bag-resealable.png"));
+
+  const editor = page.getByRole("dialog", { name: "Recadrer et redimensionner" });
+  await expect(editor).toBeVisible();
+  await expect(editor.getByLabel("Format de recadrage")).toHaveValue("75:83");
+  await expect(editor.getByLabel("Format de recadrage")).toBeDisabled();
+  await editor.getByLabel("Largeur finale (px)").fill("750");
+  await editor.getByRole("button", { name: "Valider le recadrage" }).click();
+  await expect(editor).toBeHidden();
+
+  await expect(
+    firstEditorialBlock.locator(".admin-image-input__summary small").filter({ hasText: "750 × 830 px" }),
+  ).toBeVisible();
+  expect(await fileInput.evaluate((input: HTMLInputElement) => ({
+    name: input.files?.[0]?.name,
+    type: input.files?.[0]?.type,
+  }))).toEqual({
+    name: "zen-coffee-bag-resealable-recadree.png",
+    type: "image/png",
+  });
 });
 
 test("FAQ and advice management use separate pages", async ({ page }) => {

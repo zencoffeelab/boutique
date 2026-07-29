@@ -15,6 +15,7 @@ import {
 } from "react-router";
 import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { AdminShell } from "~/components/admin-shell";
+import { AdminImageEditorInput } from "~/components/admin-image-editor-input";
 import { AdminProductThumbnailForm } from "~/components/admin-product-thumbnail-form";
 import { formatMoney } from "~/domain/money";
 import { buildVariantOffers } from "~/domain/professional-quote";
@@ -292,6 +293,8 @@ export async function action({ request }: ActionFunctionArgs) {
     const file = form.get("file");
     const altFr = String(form.get("altFr") ?? "").trim();
     const altEn = String(form.get("altEn") ?? "").trim();
+    const imageWidth = z.coerce.number().int().min(1).max(3200).safeParse(form.get("imageWidth"));
+    const imageHeight = z.coerce.number().int().min(1).max(3200).safeParse(form.get("imageHeight"));
     if (
       !(file instanceof File) ||
       file.size === 0 ||
@@ -305,7 +308,7 @@ export async function action({ request }: ActionFunctionArgs) {
         message:
           "Image JPEG/PNG/WebP (8 Mo maximum) et textes alternatifs requis.",
       };
-    const extension = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+    const extension = productImageExtensions[file.type];
     const path = `${productId}/${crypto.randomUUID()}.${extension}`;
     const { error } = await client.storage
       .from("product-media")
@@ -323,8 +326,8 @@ export async function action({ request }: ActionFunctionArgs) {
       public_url: url,
       alt_fr: altFr,
       alt_en: altEn,
-      width: 1600,
-      height: 1600,
+      width: imageWidth.success ? imageWidth.data : 1600,
+      height: imageHeight.success ? imageHeight.data : 1600,
       position: count ?? 0,
     });
     await client.from("audit_log").insert({
@@ -856,18 +859,15 @@ function EditorialBlockForm({
               Aucune image
             </div>
           )}
-          <div className="field">
-            <label>
-              {block ? "Remplacer l’image" : "Image"}
-              <input
-                name="file"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                required={!block}
-              />
-            </label>
-            <small>JPEG, PNG ou WebP · 8 Mo maximum</small>
-          </div>
+          <AdminImageEditorInput
+            label={block ? "Remplacer l’image" : "Image"}
+            help="JPEG, PNG ou WebP · recadrage imposé au ratio 75:83"
+            required={!block}
+            currentPreviewUrl={block?.imageUrl}
+            defaultAspect="75:83"
+            lockAspect
+            defaultOutputWidth={1500}
+          />
         </div>
         <div className="admin-editorial-block__content">
           <LanguageTabs
@@ -1410,13 +1410,14 @@ export default function AdminProduct() {
                 <Form method="post" encType="multipart/form-data" className="admin-thumbnail-form">
                   <input type="hidden" name="intent" value="upload_hover_image" />
                   <input type="hidden" name="productId" value={product.id} />
-                  <div className="field">
-                    <label>
-                      Fichier de l’image de survol
-                      <input name="file" type="file" accept="image/jpeg,image/png,image/webp" required />
-                    </label>
-                    <small>JPEG, PNG ou WebP, 8 Mo maximum. Privilégiez une image carrée pour conserver le cadrage des cartes.</small>
-                  </div>
+                  <AdminImageEditorInput
+                    label="Fichier de l’image de survol"
+                    help="JPEG, PNG ou WebP · format carré recommandé pour les cartes"
+                    required
+                    currentPreviewUrl={product.hoverImageUrl}
+                    defaultAspect="1:1"
+                    defaultOutputWidth={1200}
+                  />
                   <button className="ui-button ui-button--outline" type="submit" disabled={demo}>
                     <Upload aria-hidden="true" /> {product.hoverImageUrl ? "Remplacer l’image de survol" : "Ajouter l’image de survol"}
                   </button>
@@ -1448,15 +1449,14 @@ export default function AdminProduct() {
               <input type="hidden" name="intent" value="upload_media" />
               <input type="hidden" name="productId" value={product.id} />
               <div className="field field--wide">
-                <label>
-                  Fichier
-                  <input
-                    name="file"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    required
-                  />
-                </label>
+                <AdminImageEditorInput
+                  label="Fichier"
+                  help="JPEG, PNG ou WebP · recadrez puis choisissez la définition finale"
+                  required
+                  defaultAspect="1:1"
+                  defaultOutputWidth={1600}
+                  dimensionFieldNames={{ width: "imageWidth", height: "imageHeight" }}
+                />
               </div>
               <div className="field">
                 <label>
