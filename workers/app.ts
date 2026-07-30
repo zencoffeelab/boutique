@@ -37,8 +37,9 @@ export default {
     const url = new URL(request.url);
     const legacyRedirect = legacyRedirects.get(url.pathname);
 
-    if (url.hostname === "zencoffeelab.com") {
-      url.hostname = "www.zencoffeelab.com";
+    if (url.protocol !== "https:" || url.hostname === "zencoffeelab.com") {
+      url.protocol = "https:";
+      if (url.hostname === "zencoffeelab.com") url.hostname = "www.zencoffeelab.com";
       return Response.redirect(url, 301);
     }
 
