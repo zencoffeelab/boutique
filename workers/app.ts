@@ -37,6 +37,11 @@ export default {
     const url = new URL(request.url);
     const legacyRedirect = legacyRedirects.get(url.pathname);
 
+    if (url.hostname === "zencoffeelab.com") {
+      url.hostname = "www.zencoffeelab.com";
+      return Response.redirect(url, 301);
+    }
+
     if ((request.method === "GET" || request.method === "HEAD") && legacyRedirect) {
       return Response.redirect(new URL(legacyRedirect.destination, url), legacyRedirect.status);
     }

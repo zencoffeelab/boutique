@@ -4579,14 +4579,17 @@ button:disabled {
 }
 .admin-content-tabs {
   display: inline-flex;
+  max-width: 100%;
   gap: 0.35rem;
   margin-bottom: 1.5rem;
   padding: 0.35rem;
   border: 1px solid #d9ddd4;
   border-radius: 0.4rem;
   background: #e9ece6;
+  overflow-x: auto;
 }
 .admin-content-tabs a {
+  flex: none;
   min-width: 8rem;
   padding: 0.7rem 1rem;
   border-radius: 0.25rem;
@@ -4603,6 +4606,167 @@ button:disabled {
 .admin-content-tabs a.is-active {
   background: var(--green-deep);
   color: white;
+}
+.admin-coming-soon-editor {
+  display: grid;
+  gap: 1.25rem;
+}
+.admin-coming-soon-editor__settings,
+.admin-coming-soon-preview {
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+.admin-coming-soon-editor__heading,
+.admin-coming-soon-preview__toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+}
+.admin-coming-soon-editor__heading h2,
+.admin-coming-soon-preview__toolbar h2 {
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.55rem, 2.5vw, 2.15rem);
+}
+.admin-coming-soon-editor__heading > div > p:last-child {
+  max-width: 62ch;
+  margin: 0.7rem 0 0;
+  color: var(--muted);
+}
+.admin-coming-soon-switch {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 2.5rem;
+  cursor: pointer;
+}
+.admin-coming-soon-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.admin-coming-soon-switch span {
+  position: relative;
+  width: 3rem;
+  height: 1.7rem;
+  border: 1px solid #b8beb4;
+  border-radius: 999px;
+  background: #dfe3dc;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+.admin-coming-soon-switch span::after {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.18rem;
+  height: 1.18rem;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 4px #1c241b35;
+  content: "";
+  transition: transform 180ms ease;
+}
+.admin-coming-soon-switch input:checked + span {
+  border-color: var(--green-deep);
+  background: var(--green-deep);
+}
+.admin-coming-soon-switch input:checked + span::after {
+  transform: translateX(1.3rem);
+}
+.admin-coming-soon-switch input:focus-visible + span {
+  outline: 3px solid color-mix(in srgb, var(--green-deep) 35%, transparent);
+  outline-offset: 3px;
+}
+.admin-coming-soon-switch input:disabled + span {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.admin-coming-soon-editor__translations {
+  margin-top: 2rem;
+  margin-bottom: 0;
+}
+.admin-coming-soon-preview__toolbar {
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+.admin-coming-soon-preview__toolbar .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.admin-coming-soon-preview__toolbar .eyebrow svg {
+  width: 1rem;
+  height: 1rem;
+}
+.admin-coming-soon-preview__languages {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--cream-dark);
+}
+.admin-coming-soon-preview__languages button {
+  min-width: 2.6rem;
+  padding: 0.45rem 0.7rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.admin-coming-soon-preview__languages button.is-active {
+  background: var(--green-deep);
+  color: white;
+}
+.admin-coming-soon-preview__screen {
+  display: grid;
+  min-height: min(62vh, 620px);
+  place-content: center;
+  justify-items: center;
+  padding: clamp(2rem, 7vw, 5rem);
+  background:
+    radial-gradient(circle at 20% 15%, #ffffff14, transparent 35%),
+    #56634f;
+  color: white;
+  text-align: center;
+}
+.admin-coming-soon-preview__screen img {
+  width: clamp(7rem, 14vw, 10rem);
+  height: auto;
+  margin-bottom: 2rem;
+  filter: brightness(0) invert(1);
+}
+.admin-coming-soon-preview__screen .eyebrow {
+  color: inherit;
+}
+.admin-coming-soon-preview__screen h3 {
+  max-width: 12ch;
+  margin: 0.7rem 0 1.1rem;
+  color: inherit;
+  font-family: var(--display);
+  font-size: clamp(2.4rem, 6vw, 5.5rem);
+  font-weight: 400;
+  line-height: 0.95;
+}
+.admin-coming-soon-preview__screen > p:not(.eyebrow) {
+  max-width: 42rem;
+  margin: 0;
+  font-size: clamp(1rem, 1.7vw, 1.2rem);
+  line-height: 1.55;
+}
+.admin-coming-soon-preview__screen > span {
+  margin-top: 2rem;
+  border-bottom: 1px solid currentColor;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .admin-navigation-organizer {
   display: grid;
@@ -5048,6 +5212,74 @@ button:disabled {
 .error-page h1 {
   margin-bottom: 1rem;
 }
+.coming-soon-body {
+  min-height: 100dvh;
+  background: #56634f;
+}
+.coming-soon-page {
+  position: relative;
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  overflow: hidden;
+  padding: clamp(2rem, 6vw, 6rem);
+  background:
+    radial-gradient(circle at 18% 16%, #ffffff17, transparent 35%),
+    radial-gradient(circle at 82% 85%, #18201724, transparent 38%),
+    #56634f;
+  color: white;
+  text-align: center;
+}
+.coming-soon-page::before {
+  position: absolute;
+  inset: clamp(0.8rem, 2vw, 1.5rem);
+  border: 1px solid #ffffff38;
+  content: "";
+  pointer-events: none;
+}
+.coming-soon-page__content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  width: min(100%, 60rem);
+}
+.coming-soon-page__logo {
+  width: clamp(8rem, 15vw, 13rem);
+  height: auto;
+  margin-bottom: clamp(2rem, 5vh, 4rem);
+  filter: brightness(0) invert(1);
+}
+.coming-soon-page .eyebrow {
+  color: inherit;
+}
+.coming-soon-page h1 {
+  max-width: 12ch;
+  margin: 0.7rem 0 1.3rem;
+  color: inherit;
+  font-size: clamp(3rem, 8vw, 8rem);
+  line-height: 0.9;
+}
+.coming-soon-page__message {
+  max-width: 38rem;
+  margin: 0;
+  font-size: clamp(1rem, 2vw, 1.3rem);
+  line-height: 1.55;
+}
+.coming-soon-page a {
+  margin-top: clamp(2rem, 5vh, 3.5rem);
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid currentColor;
+  color: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.coming-soon-page a:hover,
+.coming-soon-page a:focus-visible {
+  border-color: transparent;
+}
 .password-setup-body {
   background: var(--green-deep);
 }
@@ -5313,6 +5545,19 @@ button:disabled {
 }
 
 @media (max-width: 700px) {
+  .admin-coming-soon-editor__heading,
+  .admin-coming-soon-preview__toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  .admin-coming-soon-preview__languages {
+    align-self: flex-start;
+  }
+  .admin-coming-soon-preview__screen {
+    min-height: 30rem;
+    padding: 2rem 1rem;
+  }
   h1 {
     font-size: clamp(2.6rem, 13vw, 4.25rem);
   }

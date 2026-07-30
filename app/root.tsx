@@ -13,6 +13,7 @@ import {
   redirect,
 } from "react-router";
 import { CartProvider } from "~/components/cart/cart-provider";
+import { ComingSoonPage } from "~/components/coming-soon-page";
 import { QuoteCartProvider } from "~/components/professional-quote/quote-cart-provider";
 import { CookieConsent } from "~/components/cookie-consent";
 import { SiteFooter } from "~/components/site-footer";
@@ -20,6 +21,8 @@ import { SiteHeader } from "~/components/site-header";
 import { getSessionStatus } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
 import { getContentPage } from "~/lib/content.server";
+import { getComingSoon } from "~/lib/coming-soon.server";
+import { comingSoonCopy, defaultComingSoonSettings, isComingSoonExemptPath } from "~/lib/coming-soon";
 import { getLocale } from "~/lib/i18n";
 import { defaultSiteNavigation } from "~/lib/site-navigation";
 import { getSiteNavigation } from "~/lib/site-navigation.server";
@@ -42,12 +45,8 @@ export const meta: MetaFunction = () => [
 export async function loader({ request }: LoaderFunctionArgs) {
   const requestUrl = new URL(request.url);
   const locale = getLocale(request);
-  const shellHidden =
-    requestUrl.pathname === "/admin" ||
-    requestUrl.pathname.startsWith("/admin/") ||
-    requestUrl.pathname === "/activation/mot-de-passe" ||
-    requestUrl.pathname === "/en/activate/password";
-  const [session, footerProducts, announcementContent, navigation] = await Promise.all([
+  const shellHidden = isComingSoonExemptPath(requestUrl.pathname);
+  const [session, footerProducts, announcementContent, navigation, comingSoon] = await Promise.all([
     getSessionStatus(request),
     shellHidden
       ? Promise.resolve([])
@@ -66,6 +65,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     ),
     shellHidden ? Promise.resolve(null) : getContentPage("bandeau", locale),
     shellHidden ? Promise.resolve(defaultSiteNavigation) : getSiteNavigation(),
+    shellHidden ? Promise.resolve(comingSoonCopy(defaultComingSoonSettings, locale)) : getComingSoon(locale),
   ]);
   const setupPath = passwordSetupPath(locale);
   if (session.passwordSetupRequired && !isAllowedDuringRequiredPasswordSetup(requestUrl.pathname)) {
@@ -83,25 +83,28 @@ export async function loader({ request }: LoaderFunctionArgs) {
     footerProducts,
     announcement: announcementContent?.title ?? null,
     navigation,
+    comingSoon,
   }, { headers: session.responseHeaders });
 }
 
 export default function App() {
-  const { locale, gaMeasurementId, signedIn, professional, professionalUserId, accountInitials, admin, footerProducts, announcement, navigation } = useLoaderData<typeof loader>();
+  const { locale, gaMeasurementId, signedIn, professional, professionalUserId, accountInitials, admin, footerProducts, announcement, navigation, comingSoon } = useLoaderData<typeof loader>();
   const location = useLocation();
   const isAdmin = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
   const isPasswordSetup = location.pathname === "/activation/mot-de-passe" || location.pathname === "/en/activate/password";
-  const shellHidden = isAdmin || isPasswordSetup;
+  const shellHidden = isComingSoonExemptPath(location.pathname);
+  const constructionMode = comingSoon.active && !shellHidden;
   return (
     <html lang={locale === "fr-FR" ? "fr" : "en"}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
+        {constructionMode ? <meta name="robots" content="noindex,nofollow" /> : null}
         <Links />
       </head>
-      <body className={isAdmin ? "admin-body" : isPasswordSetup ? "password-setup-body" : undefined}>
-        <CartProvider locale={locale}>
+      <body className={isAdmin ? "admin-body" : isPasswordSetup ? "password-setup-body" : constructionMode ? "coming-soon-body" : undefined}>
+        {constructionMode ? <ComingSoonPage title={comingSoon.title} message={comingSoon.message} /> : <CartProvider locale={locale}>
           <QuoteCartProvider key={professionalUserId ?? "guest"} storageNamespace={professionalUserId ?? "guest"}>
             {shellHidden ? null : <SiteHeader signedIn={signedIn} professional={professional} accountInitials={accountInitials} announcement={announcement ?? undefined} navigation={navigation} />}
             <main id="main-content" tabIndex={-1}>
@@ -110,7 +113,7 @@ export default function App() {
             {shellHidden ? null : <SiteFooter products={footerProducts} admin={admin} navigation={navigation} />}
             {shellHidden ? null : <CookieConsent measurementId={gaMeasurementId} />}
           </QuoteCartProvider>
-        </CartProvider>
+        </CartProvider>}
         <ScrollRestoration />
         <Scripts />
       </body>

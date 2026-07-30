@@ -1,10 +1,13 @@
 import { z } from "zod";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Form, Link, useActionData, useLoaderData, useLocation } from "react-router";
+import { AdminComingSoonEditor } from "~/components/admin-coming-soon-editor";
 import { AdminNavigationOrganizer } from "~/components/admin-navigation-organizer";
 import { AdminShell } from "~/components/admin-shell";
 import { RichTextEditor } from "~/components/rich-text-editor";
 import { requireAdmin } from "~/lib/auth.server";
+import { defaultComingSoonSettings } from "~/lib/coming-soon";
+import { getComingSoonSettings } from "~/lib/coming-soon.server";
 import {
   paragraphsToRichTextDocument,
   parseRichTextInput,
@@ -47,6 +50,14 @@ const navigationSchema = z.object({
   intent: z.literal("save_navigation"),
   configuration: z.string().min(2).max(20_000),
 });
+const comingSoonSchema = z.object({
+  intent: z.literal("save_coming_soon"),
+  active: z.enum(["true", "false"]),
+  titleFr: z.string().trim().min(2).max(140),
+  messageFr: z.string().trim().min(2).max(500),
+  titleEn: z.string().trim().min(2).max(140),
+  messageEn: z.string().trim().min(2).max(500),
+});
 
 const defaults = ["accueil", "a-propos", "professionnel", "faq", "contact", "cgv", "mentions-legales", "politique-de-confidentialite"];
 const placeholderFr = "Contenu à compléter avant publication.";
@@ -54,20 +65,22 @@ const placeholderEn = "Content to complete before publication.";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
-  if (admin.demo) return { demo: true, pages: [] as ContentPage[], navigation: await getSiteNavigation() };
+  if (admin.demo) return { demo: true, pages: [] as ContentPage[], navigation: await getSiteNavigation(), comingSoon: defaultComingSoonSettings };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
-  const [{ data, error }, navigation] = await Promise.all([
+  const [{ data, error }, navigation, comingSoon] = await Promise.all([
     client
       .from("content_pages")
       .select("*,content_page_translations(*)")
       .neq("page_key", "bandeau")
       .neq("page_key", "navigation")
+      .neq("page_key", "coming-soon")
       .order("page_key"),
     getSiteNavigation(),
+    getComingSoonSettings(),
   ]);
   if (error) throw new Response(error.message, { status: 500 });
-  return { demo: false, pages: (data ?? []) as ContentPage[], navigation };
+  return { demo: false, pages: (data ?? []) as ContentPage[], navigation, comingSoon };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -75,6 +88,42 @@ export async function action({ request }: ActionFunctionArgs) {
   if (admin.demo) return { ok: false, message: "Lecture seule en démonstration." };
   const formData = await request.formData();
   const fields = Object.fromEntries(formData);
+  if (fields.intent === "save_coming_soon") {
+    const parsedComingSoon = comingSoonSchema.safeParse(fields);
+    if (!parsedComingSoon.success) return { ok: false, message: "Les textes français et anglais sont requis." };
+    const active = parsedComingSoon.data.active === "true";
+    const client = createServiceSupabase();
+    if (!client) return { ok: false, message: "Base indisponible." };
+    const { data: page, error } = await client
+      .from("content_pages")
+      .upsert({ page_key: "coming-soon", status: active ? "published" : "draft", updated_at: new Date().toISOString() }, { onConflict: "page_key" })
+      .select("id")
+      .single();
+    if (error || !page) return { ok: false, message: error?.message ?? "Mode construction non enregistré." };
+    const translations = [
+      { locale: "fr-FR", title: parsedComingSoon.data.titleFr, message: parsedComingSoon.data.messageFr },
+      { locale: "en-GB", title: parsedComingSoon.data.titleEn, message: parsedComingSoon.data.messageEn },
+    ].map((translation) => ({
+      page_id: page.id,
+      locale: translation.locale,
+      title: translation.title,
+      seo_title: translation.title,
+      seo_description: translation.message,
+      blocks: [{ type: "comingSoon", content: { message: translation.message } }],
+    }));
+    const { error: translationError } = await client
+      .from("content_page_translations")
+      .upsert(translations, { onConflict: "page_id,locale" });
+    if (translationError) return { ok: false, message: translationError.message };
+    await client.from("audit_log").insert({
+      actor_id: admin.id,
+      action: "coming_soon.updated",
+      entity_type: "content_page",
+      entity_id: page.id,
+      after_data: { active, translations },
+    });
+    return { ok: true, message: active ? "Mode Site en construction activé." : "Mode Site en construction désactivé." };
+  }
   if (fields.intent === "save_navigation") {
     const parsedNavigation = navigationSchema.safeParse(fields);
     if (!parsedNavigation.success) return { ok: false, message: "Le rangement envoyé est invalide." };
@@ -210,10 +259,12 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
 }
 
 export default function AdminContent() {
-  const { demo, pages, navigation } = useLoaderData<typeof loader>();
+  const { demo, pages, navigation, comingSoon } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const location = useLocation();
-  const arranging = new URLSearchParams(location.search).get("tab") === "rangement";
+  const activeTab = new URLSearchParams(location.search).get("tab");
+  const arranging = activeTab === "rangement";
+  const construction = activeTab === "construction";
   const byKey = new Map(pages.map((page) => [page.page_key, page]));
   const keys = [...new Set([...defaults, ...byKey.keys()])];
 
@@ -227,10 +278,15 @@ export default function AdminContent() {
     {demo ? <p className="admin-notice">Connectez Supabase pour éditer les pages avec l’éditeur enrichi.</p> : null}
     {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"}>{result.message}</p> : null}
     <nav className="admin-content-tabs" aria-label="Gestion des pages" role="tablist">
-      <Link role="tab" aria-selected={!arranging} className={!arranging ? "is-active" : undefined} to="/admin/contenus">Contenu</Link>
+      <Link role="tab" aria-selected={!arranging && !construction} className={!arranging && !construction ? "is-active" : undefined} to="/admin/contenus">Contenu</Link>
       <Link role="tab" aria-selected={arranging} className={arranging ? "is-active" : undefined} to="/admin/contenus?tab=rangement">Rangement</Link>
+      <Link role="tab" aria-selected={construction} className={construction ? "is-active" : undefined} to="/admin/contenus?tab=construction">Site en construction</Link>
     </nav>
-    {arranging ? <AdminNavigationOrganizer initialConfiguration={navigation} demo={demo} /> : <div className="admin-content-list">
+    {arranging
+      ? <AdminNavigationOrganizer initialConfiguration={navigation} demo={demo} />
+      : construction
+        ? <AdminComingSoonEditor initialSettings={comingSoon} demo={demo} />
+        : <div className="admin-content-list">
         {keys.map((key) => {
           const page = byKey.get(key);
           return <details className="ui-card admin-content-page" key={key}>

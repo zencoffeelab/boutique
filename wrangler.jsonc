@@ -5,6 +5,16 @@
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,
   "main": "./workers/app.ts",
+  "routes": [
+    {
+      "pattern": "zencoffeelab.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.zencoffeelab.com",
+      "custom_domain": true
+    }
+  ],
   "vars": {
     "NODE_ENV": "production"
   },
