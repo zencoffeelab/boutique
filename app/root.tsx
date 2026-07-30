@@ -21,6 +21,8 @@ import { getSessionStatus } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
 import { getContentPage } from "~/lib/content.server";
 import { getLocale } from "~/lib/i18n";
+import { defaultSiteNavigation } from "~/lib/site-navigation";
+import { getSiteNavigation } from "~/lib/site-navigation.server";
 import { isAllowedDuringRequiredPasswordSetup, passwordSetupPath } from "~/lib/password-setup";
 import { safeInternalPath } from "~/lib/redirects";
 import "./app.css";
@@ -45,7 +47,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     requestUrl.pathname.startsWith("/admin/") ||
     requestUrl.pathname === "/activation/mot-de-passe" ||
     requestUrl.pathname === "/en/activate/password";
-  const [session, footerProducts, announcementContent] = await Promise.all([
+  const [session, footerProducts, announcementContent, navigation] = await Promise.all([
     getSessionStatus(request),
     shellHidden
       ? Promise.resolve([])
@@ -61,8 +63,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
                   sensitivity: "base",
                 }),
               ),
-        ),
+    ),
     shellHidden ? Promise.resolve(null) : getContentPage("bandeau", locale),
+    shellHidden ? Promise.resolve(defaultSiteNavigation) : getSiteNavigation(),
   ]);
   const setupPath = passwordSetupPath(locale);
   if (session.passwordSetupRequired && !isAllowedDuringRequiredPasswordSetup(requestUrl.pathname)) {
@@ -79,11 +82,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     admin: session.admin,
     footerProducts,
     announcement: announcementContent?.title ?? null,
+    navigation,
   }, { headers: session.responseHeaders });
 }
 
 export default function App() {
-  const { locale, gaMeasurementId, signedIn, professional, professionalUserId, accountInitials, admin, footerProducts, announcement } = useLoaderData<typeof loader>();
+  const { locale, gaMeasurementId, signedIn, professional, professionalUserId, accountInitials, admin, footerProducts, announcement, navigation } = useLoaderData<typeof loader>();
   const location = useLocation();
   const isAdmin = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
   const isPasswordSetup = location.pathname === "/activation/mot-de-passe" || location.pathname === "/en/activate/password";
@@ -99,11 +103,11 @@ export default function App() {
       <body className={isAdmin ? "admin-body" : isPasswordSetup ? "password-setup-body" : undefined}>
         <CartProvider locale={locale}>
           <QuoteCartProvider key={professionalUserId ?? "guest"} storageNamespace={professionalUserId ?? "guest"}>
-            {shellHidden ? null : <SiteHeader signedIn={signedIn} professional={professional} accountInitials={accountInitials} announcement={announcement ?? undefined} />}
+            {shellHidden ? null : <SiteHeader signedIn={signedIn} professional={professional} accountInitials={accountInitials} announcement={announcement ?? undefined} navigation={navigation} />}
             <main id="main-content" tabIndex={-1}>
               <Outlet />
             </main>
-            {shellHidden ? null : <SiteFooter products={footerProducts} admin={admin} />}
+            {shellHidden ? null : <SiteFooter products={footerProducts} admin={admin} navigation={navigation} />}
             {shellHidden ? null : <CookieConsent measurementId={gaMeasurementId} />}
           </QuoteCartProvider>
         </CartProvider>

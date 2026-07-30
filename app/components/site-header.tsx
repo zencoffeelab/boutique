@@ -9,6 +9,7 @@ import { useQuoteCart } from "~/components/professional-quote/quote-cart-provide
 import { Logo } from "~/components/logo";
 import { alternatePath, dictionary } from "~/lib/i18n";
 import type { Locale } from "~/domain/types";
+import { defaultSiteNavigation, getSiteNavigationItem, siteNavigationLabel, type SiteNavigationConfiguration } from "~/lib/site-navigation";
 
 const languageOptions = [
   { locale: "fr-FR", code: "FR", label: "Français" },
@@ -99,7 +100,7 @@ function LanguageSelector({ locale, frenchPath, englishPath }: { locale: Locale;
   </div>;
 }
 
-export function SiteHeader({ signedIn, professional, accountInitials, announcement }: { signedIn: boolean; professional: boolean; accountInitials: string | null; announcement?: string }) {
+export function SiteHeader({ signedIn, professional, accountInitials, announcement, navigation = defaultSiteNavigation }: { signedIn: boolean; professional: boolean; accountInitials: string | null; announcement?: string; navigation?: SiteNavigationConfiguration }) {
   const location = useLocation();
   const locale = location.pathname === "/en" || location.pathname.startsWith("/en/") ? "en-GB" : "fr-FR";
   const t = dictionary[locale];
@@ -135,10 +136,10 @@ export function SiteHeader({ signedIn, professional, accountInitials, announceme
           <span className="sr-only">Menu</span>
         </button>
         <nav id="primary-navigation" className={menuOpen ? "site-nav is-open" : "site-nav"} aria-label={locale === "fr-FR" ? "Navigation principale" : "Primary navigation"}>
-          <Link onClick={closeMenu} to={paths.shop}>{t.shop}</Link>
-          <Link onClick={closeMenu} to={paths.professional}>{t.professional}</Link>
-          <Link onClick={closeMenu} to={paths.advice}>{t.advice}</Link>
-          <Link onClick={closeMenu} to={paths.about}>{t.about}</Link>
+          {navigation.menu.map((key) => {
+            const item = getSiteNavigationItem(key);
+            return item.paths ? <Link onClick={closeMenu} to={item.paths[locale]} key={key}>{siteNavigationLabel(key, locale, "menu")}</Link> : null;
+          })}
           {signedIn ? <button className="mobile-account-link is-signed-in" type="button" onClick={openAccountDrawer} aria-expanded={accountDrawerOpen} aria-controls="account-drawer"><AccountLinkContent signedIn label={accountLabel} initials={accountInitials} /></button> : <Link className="mobile-account-link" onClick={closeMenu} to={paths.account}><AccountLinkContent signedIn={false} label={accountLabel} initials={null} /></Link>}
         </nav>
         <Logo home={paths.home} />

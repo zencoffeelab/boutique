@@ -18,7 +18,7 @@ test("global brand surfaces and language flags use the updated artwork", async (
   await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", "/favicon.svg?v=3");
 });
 
-test("home hero is vertical, centered and uses a full-width 70vh image without a media title", async ({
+test("home hero overlays its centered white content on a full-width 70vh image", async ({
   page,
 }) => {
   await page.goto("/");
@@ -29,15 +29,24 @@ test("home hero is vertical, centered and uses a full-width 70vh image without a
 
   await expect(copy).toHaveCSS("text-align", "center");
   await expect(copy).toHaveCSS("align-items", "center");
+  await expect(copy).toHaveCSS("position", "absolute");
+  await expect(copy).toHaveCSS("color", "rgb(255, 255, 255)");
+  await expect(copy.getByRole("link", { name: /Découvrir les cafés/ })).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(copy.getByRole("link", { name: "Notre approche" })).toHaveCSS("color", "rgb(255, 255, 255)");
   await expect(copy.getByText(/Des cafés traçables/)).toHaveCount(0);
   await expect(hero.locator(".hero__media-title")).toHaveCount(0);
   await expect(media.locator("img")).toHaveAttribute("src", "/media/home-hero-coffee-cherries.jpg");
   await expect(hero.locator(".hero__stamp")).toHaveCount(0);
 
   const mediaBox = await media.boundingBox();
+  const copyBox = await copy.boundingBox();
   expect(mediaBox).not.toBeNull();
+  expect(copyBox).not.toBeNull();
   expect(mediaBox!.width).toBeCloseTo(viewport!.width, 0);
   expect(mediaBox!.height).toBeCloseTo(viewport!.height * 0.7, 0);
+  expect(copyBox!.x).toBeCloseTo(mediaBox!.x, 0);
+  expect(copyBox!.y).toBeCloseTo(mediaBox!.y, 0);
+  expect(copyBox!.height).toBeCloseTo(mediaBox!.height, 0);
 });
 
 test("public header identifies a signed-out visitor", async ({ page }) => {
@@ -108,7 +117,7 @@ test("shop cards reveal quick add over the image and place prices below plain ta
 
   await expect(notes.locator("li").first()).toHaveCSS("border-top-width", "0px");
   if (await notes.locator("li").count() > 1) {
-    expect(await notes.locator("li").nth(1).evaluate((note) => getComputedStyle(note, "::before").content)).toBe('"—"');
+    expect(await notes.locator("li").nth(1).evaluate((note) => getComputedStyle(note, "::before").content)).toBe('","');
   }
   expect((await price.boundingBox())!.y).toBeGreaterThan((await notes.boundingBox())!.y);
 });

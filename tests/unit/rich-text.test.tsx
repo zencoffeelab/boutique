@@ -60,4 +60,14 @@ describe("rich advice content", () => {
     expect(html).toContain("<h2>Le terroir</h2>");
     expect(html).toContain("<em>Une identité préservée.</em>");
   });
+
+  it("renders an editorial footer in its dedicated centering container", () => {
+    const html = renderToStaticMarkup(<ContentBlocks
+      blocks={[{ type: "paragraph", content: "Une identité préservée." }]}
+      footer={<a href="/a-propos">En savoir plus</a>}
+    />);
+
+    expect(html).toContain('class="cms-content__footer"');
+    expect(html).toContain('href="/a-propos">En savoir plus</a>');
+  });
 });

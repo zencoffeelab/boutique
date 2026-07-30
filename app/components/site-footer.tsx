@@ -1,14 +1,16 @@
 import { Link, useLocation } from "react-router";
 import { Logo } from "./logo";
+import { defaultSiteNavigation, getSiteNavigationItem, siteNavigationLabel, type SiteNavigationConfiguration } from "~/lib/site-navigation";
 
 type FooterProductLink = Readonly<{
   slug: string;
   name: string;
 }>;
 
-export function SiteFooter({ products = [], admin = false }: { products?: readonly FooterProductLink[]; admin?: boolean }) {
+export function SiteFooter({ products = [], admin = false, navigation = defaultSiteNavigation }: { products?: readonly FooterProductLink[]; admin?: boolean; navigation?: SiteNavigationConfiguration }) {
   const location = useLocation();
   const english = location.pathname === "/en" || location.pathname.startsWith("/en/");
+  const locale = english ? "en-GB" : "fr-FR";
   return (
     <footer className="site-footer">
       <div className="footer-intro">
@@ -19,29 +21,16 @@ export function SiteFooter({ products = [], admin = false }: { products?: readon
             : "Nous sommes le fruit de tout le travail accompli en amont et choisissons nos cafés avec soin, tant dans le projet d'établir des liens directs avec les producteurs, que dans le but d'offrir une torréfaction légère qui représentera le mieux possible le terroir, la variété et la vision originelle du producteur."}
         </p>
       </div>
-      <div>
-        <h2>{english ? "Explore" : "Explorer"}</h2>
-        <Link to={english ? "/en/shop" : "/boutique"}>{english ? "Shop" : "Boutique"}</Link>
-        <Link to={english ? "/en/professional" : "/professionnel"}>{english ? "Professionals" : "Professionnels"}</Link>
-        <Link to={english ? "/en/archives" : "/archives"}>Archives</Link>
-      </div>
-      <div>
-        <h2>{english ? "Help" : "Aide"}</h2>
-        <Link to={english ? "/en/faq" : "/faq"}>FAQ</Link>
-        <Link to={english ? "/en/contact" : "/contact"}>Contact</Link>
-        <Link to={english ? "/en/general-terms-and-conditions-of-sale" : "/cgv"}>{english ? "Terms" : "CGV"}</Link>
-        <Link to={english ? "/en/legal-notice" : "/mentions-legales"}>{english ? "Legal notice" : "Mentions légales"}</Link>
-        <Link to={english ? "/en/privacy-policy" : "/politique-de-confidentialite"}>{english ? "Privacy policy" : "Politique de confidentialité"}</Link>
-      </div>
-      <div>
-        <h2>{english ? "Shop" : "Boutique"}</h2>
-        <Link to={english ? "/en/shop" : "/boutique"}>{english ? "All coffees" : "Tous les cafés"}</Link>
-        {products.map((product) => (
-          <Link key={product.slug} to={english ? `/en/shop/${product.slug}` : `/boutique/${product.slug}`}>
-            {product.name}
-          </Link>
-        ))}
-      </div>
+      {navigation.footerColumns.map((column) => <div className="site-footer__navigation-column" key={column.id}>
+        <h2>{column.titles[locale]}</h2>
+        {column.items.map((key) => {
+          if (key === "available-products") return products.map((product) => (
+            <Link key={`${column.id}-${product.slug}`} to={english ? `/en/shop/${product.slug}` : `/boutique/${product.slug}`}>{product.name}</Link>
+          ));
+          const item = getSiteNavigationItem(key);
+          return item.paths ? <Link key={key} to={item.paths[locale]}>{siteNavigationLabel(key, locale, "footer")}</Link> : null;
+        })}
+      </div>)}
       <div className="footer-bottom">
         <div className="footer-bottom__meta">
           <p>© {new Date().getFullYear()} Zen Coffee Lab</p>

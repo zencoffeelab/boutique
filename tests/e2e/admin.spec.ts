@@ -55,6 +55,23 @@ test("site changes have a dedicated back-office history", async ({ page }) => {
   ).toHaveAttribute("aria-current", "page");
 });
 
+test("pages separate content editing from menu and footer arrangement", async ({ page }) => {
+  await page.goto("/admin/contenus?tab=rangement");
+  await expect(page.getByRole("heading", { name: "Pages", exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Rangement" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "Menu principal" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Pages du menu principal" }).getByRole("listitem")).toHaveCount(4);
+  await expect(page.getByRole("heading", { name: "Footer · 3 colonnes" })).toBeVisible();
+  await expect(page.locator(".admin-footer-column")).toHaveCount(3);
+  await expect(page.getByLabel("Nom français")).toHaveCount(3);
+  await expect(page.getByText("Cafés en stock (automatique)").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Enregistrer le rangement" })).toBeDisabled();
+
+  await page.getByRole("tab", { name: "Contenu" }).click();
+  await expect(page).toHaveURL(/\/admin\/contenus$/);
+  await expect(page.locator(".admin-content-page")).toHaveCount(8);
+});
+
 test("product editor provides a save action at the top", async ({ page }) => {
   await page.goto("/admin/produits/nouveau");
   await expect(

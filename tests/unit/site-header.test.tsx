@@ -4,11 +4,12 @@ import { describe, expect, it } from "vitest";
 import { CartProvider } from "~/components/cart/cart-provider";
 import { QuoteCartProvider } from "~/components/professional-quote/quote-cart-provider";
 import { SiteHeader } from "~/components/site-header";
+import type { SiteNavigationConfiguration } from "~/lib/site-navigation";
 
-function renderHeader(signedIn: boolean, professional = false, accountInitials: string | null = null, initialPath = "/") {
+function renderHeader(signedIn: boolean, professional = false, accountInitials: string | null = null, initialPath = "/", navigation?: SiteNavigationConfiguration) {
   const router = createMemoryRouter([{
     path: "*",
-    element: <CartProvider><QuoteCartProvider><SiteHeader signedIn={signedIn} professional={professional} accountInitials={accountInitials} /></QuoteCartProvider></CartProvider>,
+    element: <CartProvider><QuoteCartProvider><SiteHeader signedIn={signedIn} professional={professional} accountInitials={accountInitials} navigation={navigation} /></QuoteCartProvider></CartProvider>,
   }], { initialEntries: [initialPath] });
   return renderToStaticMarkup(<RouterProvider router={router} />);
 }
@@ -52,5 +53,17 @@ describe("public account navigation", () => {
     expect(englishHtml).not.toContain("🇬🇧");
     expect(englishHtml).toContain(">EN<");
     expect(englishHtml).toContain("language-selector__chevron");
+  });
+
+  it("uses the configured menu order and only its selected pages", () => {
+    const navigation: SiteNavigationConfiguration = {
+      menu: ["contact", "shop"],
+      footerColumns: [],
+    };
+    const html = renderHeader(false, false, null, "/", navigation);
+
+    expect(html.indexOf('href="/contact"')).toBeLessThan(html.indexOf('href="/boutique"'));
+    expect(html).not.toContain('href="/professionnel"');
+    expect(html).not.toContain('href="/conseils"');
   });
 });

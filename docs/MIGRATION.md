@@ -16,4 +16,4 @@ npm run import:wordpress -- --source=https://www.zencoffeelab.com --commit --rep
 
 Les produits courants sont importés en `draft` et les produits classés dans une catégorie Archive en `archived`. Les Conseils restent en brouillon et les FAQ importées restent masquées. La publication n’est possible qu’après contrôle manuel des deux traductions, des images, poids, stocks, coûts, prix public/pro, minimums, producteurs, régions, variétés, traitements, altitudes et données douanières. Les contenus Elementor sont nettoyés en blocs de paragraphes ; toute structure perdue est signalée dans le rapport.
 
-Les comptes et commandes historiques ne sont pas importés. La sauvegarde WordPress reste disponible en lecture seule. Compléter `vercel.json` avec les redirections issues de l’inventaire final et vérifier chaque URL avec un crawler avant DNS.
+Les comptes et commandes historiques ne sont pas importés. La sauvegarde WordPress reste disponible en lecture seule. Compléter la table `legacyRedirects` de `workers/app.ts` avec les redirections issues de l’inventaire final et vérifier chaque URL avec un crawler avant DNS.

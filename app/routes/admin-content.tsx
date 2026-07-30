@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
-import { Form, useActionData, useLoaderData } from "react-router";
+import { Form, Link, useActionData, useLoaderData, useLocation } from "react-router";
+import { AdminNavigationOrganizer } from "~/components/admin-navigation-organizer";
 import { AdminShell } from "~/components/admin-shell";
 import { RichTextEditor } from "~/components/rich-text-editor";
 import { requireAdmin } from "~/lib/auth.server";
@@ -11,6 +12,8 @@ import {
   storedBlocksToRichTextDocument,
 } from "~/lib/rich-text";
 import { createServiceSupabase } from "~/lib/supabase.server";
+import { parseSiteNavigationConfiguration } from "~/lib/site-navigation";
+import { getSiteNavigation } from "~/lib/site-navigation.server";
 
 type ContentTranslation = {
   locale: "fr-FR" | "en-GB";
@@ -40,6 +43,10 @@ const pageSchema = z.object({
   contentFr: z.string().trim().min(10),
   contentEn: z.string().trim().min(10),
 });
+const navigationSchema = z.object({
+  intent: z.literal("save_navigation"),
+  configuration: z.string().min(2).max(20_000),
+});
 
 const defaults = ["accueil", "a-propos", "professionnel", "faq", "contact", "cgv", "mentions-legales", "politique-de-confidentialite"];
 const placeholderFr = "Contenu à compléter avant publication.";
@@ -47,22 +54,62 @@ const placeholderEn = "Content to complete before publication.";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
-  if (admin.demo) return { demo: true, pages: [] as ContentPage[] };
+  if (admin.demo) return { demo: true, pages: [] as ContentPage[], navigation: await getSiteNavigation() };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
-  const { data, error } = await client
-    .from("content_pages")
-    .select("*,content_page_translations(*)")
-    .neq("page_key", "bandeau")
-    .order("page_key");
+  const [{ data, error }, navigation] = await Promise.all([
+    client
+      .from("content_pages")
+      .select("*,content_page_translations(*)")
+      .neq("page_key", "bandeau")
+      .neq("page_key", "navigation")
+      .order("page_key"),
+    getSiteNavigation(),
+  ]);
   if (error) throw new Response(error.message, { status: 500 });
-  return { demo: false, pages: (data ?? []) as ContentPage[] };
+  return { demo: false, pages: (data ?? []) as ContentPage[], navigation };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
   const admin = await requireAdmin(request);
   if (admin.demo) return { ok: false, message: "Lecture seule en démonstration." };
-  const parsed = pageSchema.safeParse(Object.fromEntries(await request.formData()));
+  const formData = await request.formData();
+  const fields = Object.fromEntries(formData);
+  if (fields.intent === "save_navigation") {
+    const parsedNavigation = navigationSchema.safeParse(fields);
+    if (!parsedNavigation.success) return { ok: false, message: "Le rangement envoyé est invalide." };
+    let rawConfiguration: unknown;
+    try {
+      rawConfiguration = JSON.parse(parsedNavigation.data.configuration);
+    } catch {
+      return { ok: false, message: "Le rangement envoyé est illisible." };
+    }
+    const configuration = parseSiteNavigationConfiguration(rawConfiguration);
+    const client = createServiceSupabase();
+    if (!client) return { ok: false, message: "Base indisponible." };
+    const { data: page, error } = await client
+      .from("content_pages")
+      .upsert({ page_key: "navigation", status: "published", updated_at: new Date().toISOString() }, { onConflict: "page_key" })
+      .select("id")
+      .single();
+    if (error || !page) return { ok: false, message: error?.message ?? "Rangement non enregistré." };
+    const blocks = [{ type: "siteNavigation", content: configuration }];
+    const { error: translationError } = await client.from("content_page_translations").upsert([
+      { page_id: page.id, locale: "fr-FR", title: "Navigation du site", seo_title: "Navigation du site", seo_description: "Organisation du menu et du pied de page Zen Coffee Lab.", blocks },
+      { page_id: page.id, locale: "en-GB", title: "Site navigation", seo_title: "Site navigation", seo_description: "Zen Coffee Lab header and footer organisation.", blocks },
+    ], { onConflict: "page_id,locale" });
+    if (translationError) return { ok: false, message: translationError.message };
+    await client.from("audit_log").insert({
+      actor_id: admin.id,
+      action: "site_navigation.updated",
+      entity_type: "content_page",
+      entity_id: page.id,
+      after_data: configuration,
+    });
+    return { ok: true, message: "Rangement du menu et du footer enregistré." };
+  }
+
+  const parsed = pageSchema.safeParse(fields);
   if (!parsed.success) return { ok: false, message: "Les contenus français et anglais sont requis." };
 
   const contentFr = parseRichTextInput(parsed.data.contentFr, 10);
@@ -163,8 +210,10 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
 }
 
 export default function AdminContent() {
-  const { demo, pages } = useLoaderData<typeof loader>();
+  const { demo, pages, navigation } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
+  const location = useLocation();
+  const arranging = new URLSearchParams(location.search).get("tab") === "rangement";
   const byKey = new Map(pages.map((page) => [page.page_key, page]));
   const keys = [...new Set([...defaults, ...byKey.keys()])];
 
@@ -172,19 +221,23 @@ export default function AdminContent() {
     <header className="admin-heading">
       <div>
         <p className="eyebrow">Mini-CMS</p>
-        <h1>Contenus</h1>
+        <h1>Pages</h1>
       </div>
     </header>
     {demo ? <p className="admin-notice">Connectez Supabase pour éditer les pages avec l’éditeur enrichi.</p> : null}
     {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"}>{result.message}</p> : null}
-    <div className="admin-content-list">
-      {keys.map((key) => {
-        const page = byKey.get(key);
-        return <details className="ui-card admin-content-page" key={key}>
-          <summary><strong>{key}</strong><span className="ui-badge">{page?.status ?? "draft"}</span></summary>
-          <ContentPageForm pageKey={key} page={page} demo={demo} />
-        </details>;
-      })}
-    </div>
+    <nav className="admin-content-tabs" aria-label="Gestion des pages" role="tablist">
+      <Link role="tab" aria-selected={!arranging} className={!arranging ? "is-active" : undefined} to="/admin/contenus">Contenu</Link>
+      <Link role="tab" aria-selected={arranging} className={arranging ? "is-active" : undefined} to="/admin/contenus?tab=rangement">Rangement</Link>
+    </nav>
+    {arranging ? <AdminNavigationOrganizer initialConfiguration={navigation} demo={demo} /> : <div className="admin-content-list">
+        {keys.map((key) => {
+          const page = byKey.get(key);
+          return <details className="ui-card admin-content-page" key={key}>
+            <summary><strong>{key}</strong><span className="ui-badge">{page?.status ?? "draft"}</span></summary>
+            <ContentPageForm pageKey={key} page={page} demo={demo} />
+          </details>;
+        })}
+      </div>}
   </AdminShell>;
 }

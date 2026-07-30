@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { SiteFooter } from "~/components/site-footer";
+import type { SiteNavigationConfiguration } from "~/lib/site-navigation";
 
 describe("site footer shop navigation", () => {
   it("links the shop and every available coffee in French", () => {
@@ -41,5 +42,27 @@ describe("site footer shop navigation", () => {
     );
 
     expect(html).toMatch(/href="\/admin"[^>]*>Back-office<\/a>/);
+  });
+
+  it("uses renamed columns and expands the available-coffees block where it is placed", () => {
+    const navigation: SiteNavigationConfiguration = {
+      menu: [],
+      footerColumns: [
+        { id: "discover", titles: { "fr-FR": "Découvrir", "en-GB": "Discover" }, items: ["about", "shop"] },
+        { id: "support", titles: { "fr-FR": "Nous joindre", "en-GB": "Get in touch" }, items: ["contact"] },
+        { id: "coffee", titles: { "fr-FR": "Nos cafés", "en-GB": "Our coffees" }, items: ["shop", "available-products"] },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={["/"]}>
+        <SiteFooter navigation={navigation} products={[{ slug: "cafe-test", name: "Café test" }]} />
+      </MemoryRouter>,
+    );
+
+    expect(html).toContain(">Découvrir</h2>");
+    expect(html).toContain(">Nous joindre</h2>");
+    expect(html).toContain(">Nos cafés</h2>");
+    expect(html).toMatch(/<h2>Nos cafés<\/h2>.*href="\/boutique\/cafe-test"[^>]*>Café test<\/a>/);
+    expect(html.match(/href="\/boutique"/g)).toHaveLength(2);
   });
 });

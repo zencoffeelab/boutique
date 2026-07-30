@@ -38,16 +38,16 @@ export default function Home() {
         sameAs: ["https://www.instagram.com/zencoffeeclub/"],
       }} />
       <section className="hero">
-        <div className="hero__copy">
-          <p className="eyebrow">Micro-roastery · Tours</p>
-          <h1>{english ? <>Coffee with <em>clarity.</em></> : <>Le café en toute <em>clarté.</em></>}</h1>
-          <div className="hero__actions">
-            <Link className="button button--dark" to={english ? "/en/shop" : "/boutique"}>{english ? "Shop our coffees" : "Découvrir les cafés"}<ArrowRight aria-hidden="true" /></Link>
-            <Link className="button button--ghost" to={english ? "/en/about-us" : "/a-propos"}>{english ? "Our approach" : "Notre approche"}</Link>
-          </div>
-        </div>
         <div className="hero__media">
           <img src="/media/home-hero-coffee-cherries.jpg" alt={english ? "Coffee cherries ripening on a coffee plant" : "Cerises de café mûrissant sur un caféier"} width="1674" height="941" fetchPriority="high" />
+          <div className="hero__copy">
+            <p className="eyebrow">Micro-roastery · Tours</p>
+            <h1>{english ? <>Coffee with <em>clarity.</em></> : <>Le café en toute <em>clarté.</em></>}</h1>
+            <div className="hero__actions">
+              <Link className="button hero__button hero__button--primary" to={english ? "/en/shop" : "/boutique"}>{english ? "Shop our coffees" : "Découvrir les cafés"}<ArrowRight aria-hidden="true" /></Link>
+              <Link className="button hero__button hero__button--secondary" to={english ? "/en/about-us" : "/a-propos"}>{english ? "Our approach" : "Notre approche"}</Link>
+            </div>
+          </div>
         </div>
       </section>
 
