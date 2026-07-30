@@ -39,7 +39,7 @@ export function ProductThumbnailLabel({ src, alt, className, loading }: { src: s
   return <span className={`product-thumbnail-label ${className}`}>
     <svg className="product-thumbnail-label__filter" width="0" height="0" aria-hidden="true" focusable="false">
       <defs>
-        <filter id={wrinkleFilterId} x="-4%" y="-8%" width="108%" height="116%" colorInterpolationFilters="sRGB">
+        <filter id={wrinkleFilterId} x="-8%" y="-12%" width="116%" height="124%" colorInterpolationFilters="sRGB">
           <feTurbulence type="fractalNoise" baseFrequency="0.012 0.045" numOctaves={2} seed={11} result="wrinkles" />
           <feGaussianBlur in="wrinkles" stdDeviation="0.35" result="softWrinkles" />
           <feDisplacementMap in="SourceGraphic" in2="softWrinkles" scale={2.2} xChannelSelector="R" yChannelSelector="G" />

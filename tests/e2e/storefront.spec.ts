@@ -10,6 +10,36 @@ test("public header stays visible while scrolling", async ({ page }) => {
     .toBe(0);
 });
 
+test("global brand surfaces and language flags use the updated artwork", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".announcement")).toHaveCSS("background-color", "rgb(86, 99, 79)");
+  await expect(page.locator('.language-selector__trigger [data-language-flag="fr-FR"] svg')).toBeVisible();
+  await expect(page.locator(".site-footer")).toHaveCSS("background-color", "rgb(86, 99, 79)");
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", "/favicon.svg?v=3");
+});
+
+test("home hero is vertical, centered and uses a full-width 70vh image without a media title", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const hero = page.locator(".hero");
+  const copy = hero.locator(".hero__copy");
+  const media = hero.locator(".hero__media");
+  const viewport = page.viewportSize();
+
+  await expect(copy).toHaveCSS("text-align", "center");
+  await expect(copy).toHaveCSS("align-items", "center");
+  await expect(copy.getByText(/Des cafés traçables/)).toHaveCount(0);
+  await expect(hero.locator(".hero__media-title")).toHaveCount(0);
+  await expect(media.locator("img")).toHaveAttribute("src", "/media/home-hero-coffee-cherries.jpg");
+  await expect(hero.locator(".hero__stamp")).toHaveCount(0);
+
+  const mediaBox = await media.boundingBox();
+  expect(mediaBox).not.toBeNull();
+  expect(mediaBox!.width).toBeCloseTo(viewport!.width, 0);
+  expect(mediaBox!.height).toBeCloseTo(viewport!.height * 0.7, 0);
+});
+
 test("public header identifies a signed-out visitor", async ({ page }) => {
   await page.goto("/");
   if ((page.viewportSize()?.width ?? 0) <= 700) {
@@ -49,12 +79,60 @@ test("a coffee can be added to the cart directly from the shop", async ({
   await expect(page.getByRole("button", { name: "Panier (1)" })).toBeVisible();
 });
 
-test("product page shows the two alternating editorial blocks below origin details", async ({
+test("shop cards reveal quick add over the image and place prices below plain tasting notes", async ({
+  page,
+}) => {
+  await page.goto("/boutique");
+  const card = page.locator(".product-card").first();
+  const image = card.locator(".product-card__image");
+  const imageActions = card.locator(".product-card__image-actions");
+  const notes = card.locator(".taste-list");
+  const price = card.locator(".product-card__price");
+
+  await expect(card.getByRole("link", { name: "Voir plus" })).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Ajouter au panier", exact: true })).toBeAttached();
+  const imageBox = await image.boundingBox();
+  const actionBox = await imageActions.boundingBox();
+  expect(imageBox).not.toBeNull();
+  expect(actionBox).not.toBeNull();
+  expect(actionBox!.y).toBeGreaterThan(imageBox!.y);
+  expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(imageBox!.y + imageBox!.height);
+
+  if ((page.viewportSize()?.width ?? 0) > 700) {
+    await expect(imageActions).toHaveCSS("opacity", "0");
+    await card.hover();
+    await expect(imageActions).toHaveCSS("opacity", "1");
+  } else {
+    await expect(imageActions).toHaveCSS("opacity", "1");
+  }
+
+  await expect(notes.locator("li").first()).toHaveCSS("border-top-width", "0px");
+  if (await notes.locator("li").count() > 1) {
+    expect(await notes.locator("li").nth(1).evaluate((note) => getComputedStyle(note, "::before").content)).toBe('"—"');
+  }
+  expect((await price.boundingBox())!.y).toBeGreaterThan((await notes.boundingBox())!.y);
+});
+
+test("product page shows compact origins, prominent notes and alternating editorial blocks", async ({
   page,
 }) => {
   await page.goto("/boutique/kenya-kaiguri-ab");
+  const detail = page.locator(".product-detail");
+  await expect(detail.locator(".product-info__description")).toHaveCSS("font-size", "16.8px");
   const origin = page.locator(".origin-grid");
+  const tastingNotes = page.locator(".product-tasting-notes");
   const story = page.locator(".product-story");
+  await expect(detail.locator(".stock-note")).toHaveCount(0);
+  await expect(detail.getByText(/unités disponibles/)).toHaveCount(0);
+  await expect(detail.locator(".product-info").locator(".origin-grid")).toHaveCount(1);
+  await expect(origin.locator("div")).toHaveCount(5);
+  await expect(tastingNotes.getByRole("heading", { name: "Notes de dégustation" })).toBeVisible();
+  expect(await tastingNotes.locator("li").count()).toBeGreaterThan(0);
+  await expect(page.getByText("De la graine à la tasse")).toHaveCount(0);
+  if ((page.viewportSize()?.width ?? 0) > 980) {
+    const viewportWidth = page.viewportSize()?.width ?? 0;
+    expect((await detail.boundingBox())!.width).toBeCloseTo(Math.min(viewportWidth - 32, 1320), 0);
+  }
   await expect(story.locator(".product-story-block")).toHaveCount(2);
   await expect(story.locator(".product-story-block").nth(1)).toHaveClass(
     /product-story-block--image-first/,
@@ -82,6 +160,9 @@ test("product page shows the two alternating editorial blocks below origin detai
     expect(Math.abs(copyHeight - mediaHeight)).toBeLessThan(1);
   }
   expect((await origin.boundingBox())!.y).toBeLessThan(
+    (await tastingNotes.boundingBox())!.y,
+  );
+  expect((await tastingNotes.boundingBox())!.y).toBeLessThan(
     (await story.boundingBox())!.y,
   );
 });

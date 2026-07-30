@@ -53,6 +53,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { data, error } = await client
     .from("content_pages")
     .select("*,content_page_translations(*)")
+    .neq("page_key", "bandeau")
     .order("page_key");
   if (error) throw new Response(error.message, { status: 500 });
   return { demo: false, pages: (data ?? []) as ContentPage[] };

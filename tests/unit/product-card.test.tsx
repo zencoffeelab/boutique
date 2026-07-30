@@ -74,14 +74,17 @@ function renderHoverCard() {
 }
 
 describe("product card", () => {
-  it("keeps the extended link and explicit product actions", () => {
+  it("keeps the extended link and moves the quick add action over the image", () => {
     const html = renderCard();
     expect(html).toContain('class="product-card__link"');
     expect(html).not.toContain("En savoir plus sur le café");
-    expect(html.match(/href="\/boutique\//g)).toHaveLength(2);
+    expect(html.match(/href="\/boutique\//g)).toHaveLength(1);
     expect(html).toContain("Ajouter au panier");
-    expect(html).toContain("Voir plus");
-    expect(html).toContain("product-card__more-link");
+    expect(html).toContain('class="product-card__media"');
+    expect(html).toContain("product-card__image-actions");
+    expect(html).not.toContain("Voir plus");
+    expect(html.indexOf("product-card__image-actions")).toBeLessThan(html.indexOf("product-card__body"));
+    expect(html.indexOf("taste-list")).toBeLessThan(html.indexOf("product-card__price"));
   });
 
   it("keeps the professional audience in the card destination", () => {

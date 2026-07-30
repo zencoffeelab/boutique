@@ -1,4 +1,4 @@
-import { ArrowUpRight, ChevronDown, ShoppingBag } from "lucide-react";
+import { ChevronDown, ShoppingBag } from "lucide-react";
 import { useId, useRef, useState, type CSSProperties } from "react";
 import { Link } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
@@ -82,48 +82,47 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
   const composedThumbnail = Boolean(product.thumbnailLabelUrl);
   return (
     <article className="product-card">
-      <div
-        className={`product-card__image${composedThumbnail ? " product-card__image--composed" : ""}`}
-        style={composedThumbnail ? { "--product-thumbnail-color": product.thumbnailBackgroundColor } as CSSProperties : undefined}
-      >
-        {composedThumbnail ? <ProductPackArtwork
-          packClassName="product-card__pack"
-          labelClassName="product-card__label"
-          labelUrl={product.thumbnailLabelUrl!}
-          alt={product.media[0]?.alt[locale] ?? translation.name}
-          loading="lazy"
-        /> : <img
-          className="product-card__original-image"
-          src={product.media[0]?.url}
-          alt={product.media[0]?.alt[locale] ?? translation.name}
-          width={640}
-          height={640}
-          loading="lazy"
-        />}
-        {product.hoverImageUrl ? <img
-          className="product-card__hover-image"
-          src={product.hoverImageUrl}
-          alt=""
-          width={900}
-          height={900}
-          loading="lazy"
-          decoding="async"
-        /> : null}
-        {product.status === "archived" ? <p className="product-card__archive-label">{locale === "fr-FR" ? "Archivé" : "Archived"}</p> : null}
+      <div className="product-card__media">
+        <div
+          className={`product-card__image${composedThumbnail ? " product-card__image--composed" : ""}`}
+          style={composedThumbnail ? { "--product-thumbnail-color": product.thumbnailBackgroundColor } as CSSProperties : undefined}
+        >
+          {composedThumbnail ? <ProductPackArtwork
+            packClassName="product-card__pack"
+            labelClassName="product-card__label"
+            labelUrl={product.thumbnailLabelUrl!}
+            alt={product.media[0]?.alt[locale] ?? translation.name}
+            loading="lazy"
+          /> : <img
+            className="product-card__original-image"
+            src={product.media[0]?.url}
+            alt={product.media[0]?.alt[locale] ?? translation.name}
+            width={640}
+            height={640}
+            loading="lazy"
+          />}
+          {product.hoverImageUrl ? <img
+            className="product-card__hover-image"
+            src={product.hoverImageUrl}
+            alt=""
+            width={900}
+            height={900}
+            loading="lazy"
+            decoding="async"
+          /> : null}
+          {product.status === "archived" ? <p className="product-card__archive-label">{locale === "fr-FR" ? "Archivé" : "Archived"}</p> : null}
+        </div>
+        {quickAdd ? <div className="product-card__image-actions">
+          <ProductCardQuickAdd product={product} locale={locale} audience={resolvedAudience} />
+        </div> : null}
       </div>
       <div className="product-card__body">
-        <div><p className="eyebrow">{translation.region}</p><h3 id={titleId}>{translation.name}</h3></div>
-        {quoteAdd || product.status === "archived" ? null : <p>{dictionary[locale].from} {formatMoney(fromPrice, locale)}</p>}
+        <p className="eyebrow">{translation.region}</p><h3 id={titleId}>{translation.name}</h3>
       </div>
       <ul className="taste-list" aria-label={dictionary[locale].tasting}>
         {translation.tastingNotes.map((note) => <li key={note}>{note}</li>)}
       </ul>
-      {quickAdd ? <div className="product-card__actions">
-        <ProductCardQuickAdd product={product} locale={locale} audience={resolvedAudience} />
-        <Link className="button button--ghost product-card__more-link" to={href}>
-          {locale === "fr-FR" ? "Voir plus" : "View more"}<ArrowUpRight aria-hidden="true" />
-        </Link>
-      </div> : null}
+      {quoteAdd || product.status === "archived" ? null : <p className="product-card__price">{dictionary[locale].from} {formatMoney(fromPrice, locale)}</p>}
       {quoteAdd ? <ProfessionalQuoteAdd product={product} locale={locale} /> : null}
       <Link to={href} className="product-card__link" aria-labelledby={titleId} />
     </article>

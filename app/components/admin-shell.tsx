@@ -1,9 +1,9 @@
-import { BookOpen, Boxes, Check, CircleHelp, FileText, History, LayoutDashboard, LogOut, Package, ShoppingCart, UserRound, Users, X } from "lucide-react";
+import { BookOpen, Boxes, Check, CircleHelp, FileText, History, LayoutDashboard, LogOut, Megaphone, Package, ShoppingCart, UserRound, Users, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useActionData, useFetchers, useLocation, useNavigate } from "react-router";
 import { Logo } from "~/components/logo";
 
-export type AdminSection = "dashboard" | "orders" | "products" | "shipping" | "customers" | "professionals" | "content" | "faq" | "advice" | "changelog";
+export type AdminSection = "dashboard" | "orders" | "products" | "shipping" | "customers" | "professionals" | "content" | "announcement" | "faq" | "advice" | "changelog";
 
 const navigation = [
   { section: "dashboard", label: "Tableau de bord", href: "/admin", icon: LayoutDashboard },
@@ -13,6 +13,7 @@ const navigation = [
   { section: "customers", label: "Clients", href: "/admin/clients", icon: UserRound },
   { section: "professionals", label: "Professionnels", href: "/admin/professionnels", icon: Users },
   { section: "content", label: "Pages", href: "/admin/contenus", icon: FileText },
+  { section: "announcement", label: "Bandeau", href: "/admin/bandeau", icon: Megaphone },
   { section: "faq", label: "FAQ", href: "/admin/faq", icon: CircleHelp },
   { section: "advice", label: "Conseils", href: "/admin/conseils", icon: BookOpen },
   { section: "changelog", label: "Modifications", href: "/admin/modifications", icon: History },

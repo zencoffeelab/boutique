@@ -32,6 +32,7 @@ export default [
   route("admin/clients", "routes/admin-customers.tsx"),
   route("admin/professionnels", "routes/admin-professionals.tsx"),
   route("admin/contenus", "routes/admin-content.tsx"),
+  route("admin/bandeau", "routes/admin-announcement.tsx"),
   route("admin/editorial", "routes/admin-editorial.tsx"),
   route("admin/faq", "routes/admin-faq.tsx"),
   route("admin/conseils", "routes/admin-advice.tsx"),

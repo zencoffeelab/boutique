@@ -11,9 +11,27 @@ import { alternatePath, dictionary } from "~/lib/i18n";
 import type { Locale } from "~/domain/types";
 
 const languageOptions = [
-  { locale: "fr-FR", code: "FR", label: "Français", flag: "🇫🇷" },
-  { locale: "en-GB", code: "EN", label: "English", flag: "🇬🇧" },
+  { locale: "fr-FR", code: "FR", label: "Français" },
+  { locale: "en-GB", code: "EN", label: "English" },
 ] as const;
+
+function LanguageFlag({ locale, className }: { locale: Locale; className: string }) {
+  return <span className={className} data-language-flag={locale} aria-hidden="true">
+    <svg viewBox="0 0 30 20" focusable="false" shapeRendering="geometricPrecision">
+      {locale === "fr-FR" ? <>
+        <rect width="10" height="20" fill="#002395" />
+        <rect x="10" width="10" height="20" fill="#fff" />
+        <rect x="20" width="10" height="20" fill="#ed2939" />
+      </> : <>
+        <rect width="30" height="20" fill="#012169" />
+        <path d="M0 0 30 20M30 0 0 20" stroke="#fff" strokeWidth="5" />
+        <path d="M0 0 30 20M30 0 0 20" stroke="#c8102e" strokeWidth="2" />
+        <path d="M15 0v20M0 10h30" stroke="#fff" strokeWidth="7" />
+        <path d="M15 0v20M0 10h30" stroke="#c8102e" strokeWidth="4" />
+      </>}
+    </svg>
+  </span>;
+}
 
 function AccountLinkContent({ signedIn, label, initials }: { signedIn: boolean; label: string; initials: string | null }) {
   return <><span className="account-button__label">{label}</span>{signedIn ? <span className="account-avatar" aria-hidden="true">{initials || "Z"}</span> : null}</>;
@@ -55,7 +73,7 @@ function LanguageSelector({ locale, frenchPath, englishPath }: { locale: Locale;
       aria-controls={menuId}
       onClick={toggle}
     >
-      <span className="language-selector__flag" aria-hidden="true">{activeLanguage.flag}</span>
+      <LanguageFlag locale={activeLanguage.locale} className="language-selector__flag" />
       <span>{activeLanguage.code}</span>
       <ChevronDown className={`language-selector__chevron${open ? " is-open" : ""}`} aria-hidden="true" />
     </button>
@@ -72,7 +90,7 @@ function LanguageSelector({ locale, frenchPath, englishPath }: { locale: Locale;
           onClick={() => setOpen(false)}
           key={option.locale}
         >
-          <span className="language-selector__option-flag" aria-hidden="true">{option.flag}</span>
+          <LanguageFlag locale={option.locale} className="language-selector__option-flag" />
           <span className="language-selector__option-copy"><strong>{option.code}</strong><small>{option.label}</small></span>
           {active ? <Check aria-hidden="true" /> : null}
         </Link>;
@@ -81,7 +99,7 @@ function LanguageSelector({ locale, frenchPath, englishPath }: { locale: Locale;
   </div>;
 }
 
-export function SiteHeader({ signedIn, professional, accountInitials }: { signedIn: boolean; professional: boolean; accountInitials: string | null }) {
+export function SiteHeader({ signedIn, professional, accountInitials, announcement }: { signedIn: boolean; professional: boolean; accountInitials: string | null; announcement?: string }) {
   const location = useLocation();
   const locale = location.pathname === "/en" || location.pathname.startsWith("/en/") ? "en-GB" : "fr-FR";
   const t = dictionary[locale];
@@ -110,7 +128,7 @@ export function SiteHeader({ signedIn, professional, accountInitials }: { signed
   return (
     <>
       <a className="skip-link" href="#main-content">{locale === "fr-FR" ? "Aller au contenu" : "Skip to content"}</a>
-      <div className="announcement">{t.freeShipping}</div>
+      <div className="announcement">{announcement || t.freeShipping}</div>
       <header className="site-header">
         <button className="icon-button mobile-menu-button" type="button" onClick={() => setMenuOpen((value) => !value)} aria-expanded={menuOpen} aria-controls="primary-navigation">
           {menuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}

@@ -41,15 +41,13 @@ export default function Home() {
         <div className="hero__copy">
           <p className="eyebrow">Micro-roastery · Tours</p>
           <h1>{english ? <>Coffee with <em>clarity.</em></> : <>Le café en toute <em>clarté.</em></>}</h1>
-          <p>{english ? "Traceable coffees, lightly roasted in small batches to let every origin speak." : "Des cafés traçables, torréfiés avec légèreté en petits lots pour laisser chaque origine s’exprimer."}</p>
           <div className="hero__actions">
             <Link className="button button--dark" to={english ? "/en/shop" : "/boutique"}>{english ? "Shop our coffees" : "Découvrir les cafés"}<ArrowRight aria-hidden="true" /></Link>
             <Link className="button button--ghost" to={english ? "/en/about-us" : "/a-propos"}>{english ? "Our approach" : "Notre approche"}</Link>
           </div>
         </div>
         <div className="hero__media">
-          {products[0]?.media[0] ? <img src={products[0].media[0].url} alt={english ? "Zen Coffee Lab specialty coffee" : "Café de spécialité Zen Coffee Lab"} width="960" height="1100" fetchPriority="high" /> : null}
-          <span className="hero__stamp">{english ? "Roasted fresh in Tours" : "Torréfié frais à Tours"}</span>
+          <img src="/media/home-hero-coffee-cherries.jpg" alt={english ? "Coffee cherries ripening on a coffee plant" : "Cerises de café mûrissant sur un caféier"} width="1674" height="941" fetchPriority="high" />
         </div>
       </section>
 

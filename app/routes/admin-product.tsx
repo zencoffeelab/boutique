@@ -1,4 +1,4 @@
-import { Plus, Save, Trash2, Upload } from "lucide-react";
+import { Pencil, Plus, Save, Trash2, Upload, X } from "lucide-react";
 import { z } from "zod";
 import type {
   ActionFunctionArgs,
@@ -13,7 +13,7 @@ import {
   useLoaderData,
   useNavigation,
 } from "react-router";
-import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { AdminShell } from "~/components/admin-shell";
 import { AdminImageEditorInput } from "~/components/admin-image-editor-input";
 import { AdminProductThumbnailForm } from "~/components/admin-product-thumbnail-form";
@@ -40,8 +40,6 @@ const productSchema = z.object({
   nameEn: z.string().trim().min(2),
   shortFr: z.string().trim().min(10),
   shortEn: z.string().trim().min(10),
-  bodyFr: z.string().trim().min(10),
-  bodyEn: z.string().trim().min(10),
   producerFr: z.string().trim().min(1),
   producerEn: z.string().trim().min(1),
   regionFr: z.string().trim().min(1),
@@ -57,9 +55,7 @@ const productSchema = z.object({
   seoDescriptionFr: z.string().trim().min(10),
   seoDescriptionEn: z.string().trim().min(10),
 });
-const variantSchema = z.object({
-  intent: z.literal("create_variant"),
-  productId: z.uuid(),
+const variantFieldsSchema = {
   sku: z.string().trim().min(2).max(80),
   label: z.string().trim().min(1).max(80),
   weightGrams: z.coerce.number().int().min(1).max(100_000),
@@ -79,22 +75,40 @@ const variantSchema = z.object({
   professional: z.string().optional().transform(Boolean),
   proPriceCents: z.coerce.number().int().min(0).optional(),
   proMinimumQuantity: z.coerce.number().int().min(1).optional(),
+};
+const variantSchema = z.object({
+  intent: z.literal("create_variant"),
+  productId: z.uuid(),
+  ...variantFieldsSchema,
+});
+const updateVariantSchema = z.object({
+  intent: z.literal("update_variant"),
+  productId: z.uuid(),
+  variantId: z.uuid(),
+  ...variantFieldsSchema,
 });
 const deleteVariantSchema = z.object({
   intent: z.literal("delete_variant"),
   productId: z.uuid(),
   variantId: z.uuid(),
 });
-const editorialBlockSchema = z.object({
-  intent: z.literal("save_editorial_block"),
+const deleteMediaSchema = z.object({
+  intent: z.literal("delete_media"),
   productId: z.uuid(),
-  position: z.coerce.number().int().min(1).max(2),
+  mediaId: z.uuid(),
+});
+const editorialBlockFieldsSchema = z.object({
   titleFr: z.string().trim().min(2).max(180),
   titleEn: z.string().trim().min(2).max(180),
   bodyFr: z.string().trim().min(10).max(8_000),
   bodyEn: z.string().trim().min(10).max(8_000),
   altFr: z.string().trim().min(2).max(240),
   altEn: z.string().trim().min(2).max(240),
+});
+const editorialBlockSchema = editorialBlockFieldsSchema.extend({
+  intent: z.literal("save_editorial_block"),
+  productId: z.uuid(),
+  position: z.coerce.number().int().min(1).max(2),
 });
 
 const productImageExtensions: Record<string, string> = {
@@ -116,6 +130,102 @@ const emptyTranslation = (locale: "fr-FR" | "en-GB") => ({
   seoTitle: "",
   seoDescription: "",
 });
+
+type EditorialBlockFields = z.infer<typeof editorialBlockFieldsSchema>;
+type ServiceSupabase = NonNullable<ReturnType<typeof createServiceSupabase>>;
+
+async function saveEditorialBlock({
+  client,
+  adminId,
+  productId,
+  position,
+  fields,
+  file,
+}: {
+  client: ServiceSupabase;
+  adminId: string;
+  productId: string;
+  position: 1 | 2;
+  fields: EditorialBlockFields;
+  file: FormDataEntryValue | null;
+}) {
+  const { data: existing, error: readError } = await client
+    .from("product_editorial_blocks")
+    .select("*")
+    .eq("product_id", productId)
+    .eq("position", position)
+    .maybeSingle();
+  if (readError) return { ok: false as const, message: readError.message };
+
+  const hasNewImage = file instanceof File && file.size > 0;
+  if (!hasNewImage && !existing)
+    return {
+      ok: false as const,
+      message: `Ajoutez une image pour publier le bloc éditorial ${position}.`,
+    };
+  if (
+    hasNewImage &&
+    (file.size > 8_000_000 || !productImageExtensions[file.type])
+  )
+    return {
+      ok: false as const,
+      message: `L’image du bloc ${position} doit être au format JPEG, PNG ou WebP et peser au maximum 8 Mo.`,
+    };
+
+  let storagePath = existing?.storage_path as string | undefined;
+  let publicUrl = existing?.public_url as string | undefined;
+  let uploadedPath: string | null = null;
+  if (hasNewImage) {
+    uploadedPath = `editorial/${productId}/${position}-${crypto.randomUUID()}.${productImageExtensions[file.type]}`;
+    const { error: uploadError } = await client.storage
+      .from("product-media")
+      .upload(uploadedPath, await file.arrayBuffer(), {
+        contentType: file.type,
+      });
+    if (uploadError) return { ok: false as const, message: uploadError.message };
+    storagePath = uploadedPath;
+    publicUrl = client.storage
+      .from("product-media")
+      .getPublicUrl(uploadedPath).data.publicUrl;
+  }
+
+  const mutation = {
+    product_id: productId,
+    position,
+    storage_path: storagePath,
+    public_url: publicUrl,
+    alt_fr: fields.altFr,
+    alt_en: fields.altEn,
+    title_fr: fields.titleFr,
+    title_en: fields.titleEn,
+    body_fr: fields.bodyFr,
+    body_en: fields.bodyEn,
+    updated_at: new Date().toISOString(),
+  };
+  const { error: saveError } = await client
+    .from("product_editorial_blocks")
+    .upsert(mutation, { onConflict: "product_id,position" });
+  if (saveError) {
+    if (uploadedPath)
+      await client.storage.from("product-media").remove([uploadedPath]);
+    return { ok: false as const, message: saveError.message };
+  }
+  if (
+    uploadedPath &&
+    existing?.storage_path &&
+    existing.storage_path !== uploadedPath
+  )
+    await client.storage.from("product-media").remove([existing.storage_path]);
+  await client.from("audit_log").insert({
+    actor_id: adminId,
+    action: "product.editorial_block_updated",
+    entity_type: "product",
+    entity_id: productId,
+    before_data: existing,
+    after_data: mutation,
+  });
+  return { ok: true as const, message: `Bloc éditorial ${position} enregistré.` };
+}
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
@@ -288,6 +398,73 @@ export async function action({ request }: ActionFunctionArgs) {
     });
     return { ok: true, message: "Image de survol supprimée." };
   }
+  if (intent === "delete_media") {
+    const parsed = deleteMediaSchema.safeParse(Object.fromEntries(form));
+    if (!parsed.success)
+      return { ok: false, message: "Image ou produit invalide." };
+    const { data: media, error: readError } = await client
+      .from("product_media")
+      .select("id,product_id,storage_path,public_url,alt_fr,alt_en,position")
+      .eq("id", parsed.data.mediaId)
+      .eq("product_id", parsed.data.productId)
+      .maybeSingle();
+    if (readError) return { ok: false, message: readError.message };
+    if (!media)
+      return { ok: false, message: "Cette image n’existe plus dans la galerie." };
+
+    const [productResult, mediaCountResult] = await Promise.all([
+      client
+        .from("products")
+        .select("status")
+        .eq("id", parsed.data.productId)
+        .maybeSingle(),
+      client
+        .from("product_media")
+        .select("id", { count: "exact", head: true })
+        .eq("product_id", parsed.data.productId),
+    ]);
+    if (productResult.error) return { ok: false, message: productResult.error.message };
+    if (!productResult.data) return { ok: false, message: "Produit introuvable." };
+    if (mediaCountResult.error) return { ok: false, message: mediaCountResult.error.message };
+    if (
+      productResult.data.status === "published" &&
+      (mediaCountResult.count ?? 0) <= 1
+    )
+      return {
+        ok: false,
+        message: "Un café publié doit conserver au moins une image. Ajoutez son remplacement avant de supprimer celle-ci.",
+      };
+
+    const { error: deleteError } = await client
+      .from("product_media")
+      .delete()
+      .eq("id", media.id)
+      .eq("product_id", parsed.data.productId);
+    if (deleteError) return { ok: false, message: deleteError.message };
+    const storageCleanup = media.storage_path
+      ? await client.storage.from("product-media").remove([media.storage_path])
+      : { error: null };
+    await client
+      .from("products")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", parsed.data.productId);
+    await client.from("audit_log").insert({
+      actor_id: admin.id,
+      action: "product.media_deleted",
+      entity_type: "product_media",
+      entity_id: media.id,
+      before_data: media,
+      after_data: storageCleanup.error
+        ? { removedFromGallery: true, storageCleanupError: storageCleanup.error.message }
+        : { removedFromGallery: true, removedFromStorage: Boolean(media.storage_path) },
+    });
+    return {
+      ok: true,
+      message: storageCleanup.error
+        ? "Image supprimée de la galerie. Le nettoyage du fichier source devra être relancé."
+        : "Image supprimée de la galerie.",
+    };
+  }
   if (intent === "upload_media") {
     const productId = String(form.get("productId"));
     const file = form.get("file");
@@ -348,89 +525,164 @@ export async function action({ request }: ActionFunctionArgs) {
           "Le titre, le texte et l’alternative de l’image sont requis dans les deux langues.",
         errors: parsed.error.flatten().fieldErrors,
       };
-
-    const { data: existing, error: readError } = await client
-      .from("product_editorial_blocks")
-      .select("*")
-      .eq("product_id", parsed.data.productId)
-      .eq("position", parsed.data.position)
-      .maybeSingle();
-    if (readError) return { ok: false, message: readError.message };
-
-    const file = form.get("file");
-    const hasNewImage = file instanceof File && file.size > 0;
-    if (!hasNewImage && !existing)
-      return { ok: false, message: "Ajoutez une image pour publier ce bloc." };
-    if (
-      hasNewImage &&
-      (file.size > 8_000_000 || !productImageExtensions[file.type])
-    ) {
+    return saveEditorialBlock({
+      client,
+      adminId: admin.id,
+      productId: parsed.data.productId,
+      position: parsed.data.position as 1 | 2,
+      fields: parsed.data,
+      file: form.get("file"),
+    });
+  }
+  if (intent === "update_variant") {
+    const parsed = updateVariantSchema.safeParse(Object.fromEntries(form));
+    if (!parsed.success)
       return {
         ok: false,
-        message:
-          "L’image doit être au format JPEG, PNG ou WebP et peser au maximum 8 Mo.",
+        message: "Données de variante invalides.",
+        errors: parsed.error.flatten().fieldErrors,
       };
-    }
 
-    let storagePath = existing?.storage_path as string | undefined;
-    let publicUrl = existing?.public_url as string | undefined;
-    let uploadedPath: string | null = null;
-    if (hasNewImage) {
-      uploadedPath = `editorial/${parsed.data.productId}/${parsed.data.position}-${crypto.randomUUID()}.${productImageExtensions[file.type]}`;
-      const { error: uploadError } = await client.storage
-        .from("product-media")
-        .upload(uploadedPath, await file.arrayBuffer(), {
-          contentType: file.type,
-        });
-      if (uploadError) return { ok: false, message: uploadError.message };
-      storagePath = uploadedPath;
-      publicUrl = client.storage
-        .from("product-media")
-        .getPublicUrl(uploadedPath).data.publicUrl;
-    }
+    const { data: existing, error: readError } = await client
+      .from("product_variants")
+      .select("*,variant_offers(*)")
+      .eq("id", parsed.data.variantId)
+      .eq("product_id", parsed.data.productId)
+      .maybeSingle();
+    if (readError) return { ok: false, message: readError.message };
+    if (!existing)
+      return { ok: false, message: "Variante introuvable pour ce produit." };
+    const { data: parentProduct, error: parentProductError } = await client
+      .from("products")
+      .select("professional_enabled")
+      .eq("id", parsed.data.productId)
+      .maybeSingle();
+    if (parentProductError) return { ok: false, message: parentProductError.message };
+    if (!parentProduct) return { ok: false, message: "Produit introuvable." };
+    if (parsed.data.stockOnHand < Number(existing.stock_reserved ?? 0))
+      return {
+        ok: false,
+        message: `Le stock total ne peut pas être inférieur aux ${existing.stock_reserved} unité(s) actuellement réservée(s).`,
+      };
 
-    const mutation = {
-      product_id: parsed.data.productId,
-      position: parsed.data.position,
-      storage_path: storagePath,
-      public_url: publicUrl,
-      alt_fr: parsed.data.altFr,
-      alt_en: parsed.data.altEn,
-      title_fr: parsed.data.titleFr,
-      title_en: parsed.data.titleEn,
-      body_fr: parsed.data.bodyFr,
-      body_en: parsed.data.bodyEn,
+    const previousOffers: Array<{
+      id: string;
+      audience: "retail" | "professional";
+      price_cents: number;
+      minimum_quantity: number;
+      active: boolean;
+    }> = Array.isArray(existing.variant_offers)
+      ? existing.variant_offers
+      : [];
+    const previousVariant = {
+      sku: existing.sku,
+      label: existing.label,
+      weight_grams: existing.weight_grams,
+      internal_cost_cents: existing.internal_cost_cents,
+      stock_on_hand: existing.stock_on_hand,
+      low_stock_threshold: existing.low_stock_threshold,
+      hs_code: existing.hs_code,
+      customs_origin_country: existing.customs_origin_country,
+    };
+    const restorePreviousState = async () => {
+      await client
+        .from("product_variants")
+        .update({ ...previousVariant, updated_at: new Date().toISOString() })
+        .eq("id", existing.id);
+      if (previousOffers.length > 0)
+        await client.from("variant_offers").upsert(
+          previousOffers.map((offer) => ({
+            id: offer.id,
+            variant_id: existing.id,
+            audience: offer.audience,
+            price_cents: offer.price_cents,
+            minimum_quantity: offer.minimum_quantity,
+            active: offer.active,
+          })),
+          { onConflict: "variant_id,audience" },
+        );
+      for (const audience of ["retail", "professional"] as const) {
+        if (!previousOffers.some((offer) => offer.audience === audience))
+          await client
+            .from("variant_offers")
+            .delete()
+            .eq("variant_id", existing.id)
+            .eq("audience", audience);
+      }
+    };
+
+    const variantMutation = {
+      sku: parsed.data.sku,
+      label: parsed.data.label,
+      weight_grams: parsed.data.weightGrams,
+      internal_cost_cents: parsed.data.internalCostCents,
+      stock_on_hand: parsed.data.stockOnHand,
+      low_stock_threshold: parsed.data.lowStockThreshold,
+      hs_code: parsed.data.hsCode,
+      customs_origin_country: parsed.data.customsOriginCountry,
       updated_at: new Date().toISOString(),
     };
-    const { error: saveError } = await client
-      .from("product_editorial_blocks")
-      .upsert(mutation, { onConflict: "product_id,position" });
-    if (saveError) {
-      if (uploadedPath)
-        await client.storage.from("product-media").remove([uploadedPath]);
-      return { ok: false, message: saveError.message };
+    const { error: variantError } = await client
+      .from("product_variants")
+      .update(variantMutation)
+      .eq("id", existing.id);
+    if (variantError) return { ok: false, message: variantError.message };
+
+    const professionalRequested = Boolean(
+      parentProduct.professional_enabled || parsed.data.professional,
+    );
+    const desiredOffers = buildVariantOffers({
+      variantId: existing.id,
+      retailPriceCents: parsed.data.retailPriceCents,
+      productProfessionalEnabled: false,
+      professionalRequested,
+      professionalPriceCents: parsed.data.proPriceCents,
+      professionalMinimumQuantity: parsed.data.proMinimumQuantity,
+    });
+    const { error: offerError } = await client
+      .from("variant_offers")
+      .upsert(desiredOffers, { onConflict: "variant_id,audience" });
+    if (offerError) {
+      await restorePreviousState();
+      return { ok: false, message: offerError.message };
     }
-    if (
-      uploadedPath &&
-      existing?.storage_path &&
-      existing.storage_path !== uploadedPath
-    ) {
-      await client.storage
-        .from("product-media")
-        .remove([existing.storage_path]);
+    if (!professionalRequested) {
+      const { error: professionalOfferError } = await client
+        .from("variant_offers")
+        .update({ active: false })
+        .eq("variant_id", existing.id)
+        .eq("audience", "professional");
+      if (professionalOfferError) {
+        await restorePreviousState();
+        return { ok: false, message: professionalOfferError.message };
+      }
     }
+
+    const stockDelta = parsed.data.stockOnHand - Number(existing.stock_on_hand);
+    if (stockDelta !== 0) {
+      const { error: movementError } = await client
+        .from("stock_movements")
+        .insert({
+          variant_id: existing.id,
+          quantity_delta: stockDelta,
+          reason: "Ajustement manuel depuis la fiche produit",
+          actor_id: admin.id,
+        });
+      if (movementError) {
+        await restorePreviousState();
+        return { ok: false, message: movementError.message };
+      }
+    }
+
     await client.from("audit_log").insert({
       actor_id: admin.id,
-      action: "product.editorial_block_updated",
-      entity_type: "product",
-      entity_id: parsed.data.productId,
-      before_data: existing,
-      after_data: mutation,
+      action: "variant.updated",
+      entity_type: "product_variant",
+      entity_id: existing.id,
+      before_data: { variant: previousVariant, offers: previousOffers },
+      after_data: { variant: variantMutation, offers: desiredOffers },
     });
-    return {
-      ok: true,
-      message: `Bloc éditorial ${parsed.data.position} enregistré.`,
-    };
+    return { ok: true, message: `Variante « ${parsed.data.label} » enregistrée.` };
   }
   if (intent === "create_variant") {
     const parsed = variantSchema.safeParse(Object.fromEntries(form));
@@ -553,9 +805,52 @@ export async function action({ request }: ActionFunctionArgs) {
     ? { data: null }
     : await client
         .from("products")
-        .select("*,product_translations(*)")
+        .select("*,product_translations(*),product_editorial_blocks(*)")
         .eq("id", parsed.data.productId)
         .single();
+  if ("error" in before && before.error)
+    return { ok: false, message: before.error.message };
+  const editorialBlocksToSave: Array<{
+    position: 1 | 2;
+    fields: EditorialBlockFields;
+    file: FormDataEntryValue | null;
+  }> = [];
+  if (!creating) {
+    const existingEditorialBlocks = Array.isArray(before.data?.product_editorial_blocks)
+      ? before.data.product_editorial_blocks
+      : [];
+    for (const position of [1, 2] as const) {
+      const prefix = `editorial${position}`;
+      const rawFields = {
+        titleFr: String(form.get(`${prefix}TitleFr`) ?? ""),
+        titleEn: String(form.get(`${prefix}TitleEn`) ?? ""),
+        bodyFr: String(form.get(`${prefix}BodyFr`) ?? ""),
+        bodyEn: String(form.get(`${prefix}BodyEn`) ?? ""),
+        altFr: String(form.get(`${prefix}AltFr`) ?? ""),
+        altEn: String(form.get(`${prefix}AltEn`) ?? ""),
+      };
+      const file = form.get(`${prefix}File`);
+      const hasNewImage = file instanceof File && file.size > 0;
+      const hasText = Object.values(rawFields).some((value) => value.trim().length > 0);
+      const existingBlock = existingEditorialBlocks.some(
+        (block: { position?: number }) => Number(block.position) === position,
+      );
+      if (!hasText && !hasNewImage && !existingBlock) continue;
+      const blockFields = editorialBlockFieldsSchema.safeParse(rawFields);
+      if (!blockFields.success)
+        return {
+          ok: false,
+          message: `Complétez le titre, le texte et l’alternative de l’image du bloc éditorial ${position} dans les deux langues.`,
+          errors: blockFields.error.flatten().fieldErrors,
+        };
+      if (!existingBlock && !hasNewImage)
+        return {
+          ok: false,
+          message: `Ajoutez une image au bloc éditorial ${position}.`,
+        };
+      editorialBlocksToSave.push({ position, fields: blockFields.data, file });
+    }
+  }
   const productMutation = {
     slug: parsed.data.slug,
     status: creating ? "draft" : parsed.data.status,
@@ -583,12 +878,17 @@ export async function action({ request }: ActionFunctionArgs) {
       message: mutation.error?.message ?? "Produit non enregistré.",
     };
   const savedProductId = mutation.data.id;
+  const previousTranslations = Array.isArray(before.data?.product_translations)
+    ? (before.data.product_translations as Array<{ locale?: string; body?: string | null }>)
+    : [];
+  const previousBody = (locale: "fr-FR" | "en-GB") =>
+    previousTranslations.find((translation) => translation.locale === locale)?.body ?? "";
   const translations = [
     {
       locale: "fr-FR",
       name: parsed.data.nameFr,
       short_description: parsed.data.shortFr,
-      body: parsed.data.bodyFr,
+      body: previousBody("fr-FR"),
       producer: parsed.data.producerFr,
       region: parsed.data.regionFr,
       variety: parsed.data.varietyFr,
@@ -604,7 +904,7 @@ export async function action({ request }: ActionFunctionArgs) {
       locale: "en-GB",
       name: parsed.data.nameEn,
       short_description: parsed.data.shortEn,
-      body: parsed.data.bodyEn,
+      body: previousBody("en-GB"),
       producer: parsed.data.producerEn,
       region: parsed.data.regionEn,
       variety: parsed.data.varietyEn,
@@ -633,9 +933,29 @@ export async function action({ request }: ActionFunctionArgs) {
     before_data: before.data,
     after_data: parsed.data,
   });
+  for (const block of editorialBlocksToSave) {
+    const blockResult = await saveEditorialBlock({
+      client,
+      adminId: admin.id,
+      productId: savedProductId,
+      position: block.position,
+      fields: block.fields,
+      file: block.file,
+    });
+    if (!blockResult.ok)
+      return {
+        ok: false,
+        message: `Le produit a été enregistré, mais ${blockResult.message.toLocaleLowerCase("fr-FR")}`,
+      };
+  }
   if (creating)
     return redirect(`/admin/produits/${savedProductId}?confirmation=product-created`);
-  return { ok: true, message: "Produit enregistré." };
+  return {
+    ok: true,
+    message: editorialBlocksToSave.length > 0
+      ? "Produit et blocs éditoriaux enregistrés."
+      : "Produit enregistré.",
+  };
 }
 
 export const meta: MetaFunction = () => [
@@ -728,16 +1048,6 @@ function TranslationFields({
             />
           </label>
         </div>
-        <div className="field field--wide">
-          <label>
-            Contenu produit
-            <textarea
-              name={`body${suffix}`}
-              defaultValue={translation.body}
-              required
-            />
-          </label>
-        </div>
         <div className="field">
           <label>
             Producteur
@@ -812,27 +1122,17 @@ function TranslationFields({
   );
 }
 
-function EditorialBlockForm({
-  productId,
+function EditorialBlockFields({
   position,
   block,
-  demo,
 }: {
-  productId: string;
   position: 1 | 2;
   block?: ProductEditorialBlock;
-  demo: boolean;
 }) {
   const imageFirst = position === 2;
+  const prefix = `editorial${position}`;
   return (
-    <Form
-      method="post"
-      encType="multipart/form-data"
-      className="admin-editorial-block"
-    >
-      <input type="hidden" name="intent" value="save_editorial_block" />
-      <input type="hidden" name="productId" value={productId} />
-      <input type="hidden" name="position" value={position} />
+    <div className="admin-editorial-block">
       <header className="admin-editorial-block__heading">
         <div>
           <p className="eyebrow">Bloc {position}</p>
@@ -860,9 +1160,9 @@ function EditorialBlockForm({
             </div>
           )}
           <AdminImageEditorInput
+            name={`${prefix}File`}
             label={block ? "Remplacer l’image" : "Image"}
             help="JPEG, PNG ou WebP · recadrage imposé au ratio 75:83"
-            required={!block}
             currentPreviewUrl={block?.imageUrl}
             defaultAspect="75:83"
             lockAspect
@@ -878,10 +1178,10 @@ function EditorialBlockForm({
               <label>
                 Titre
                 <input
-                  name="titleFr"
+                  name={`${prefix}TitleFr`}
                   defaultValue={block?.title["fr-FR"] ?? ""}
                   maxLength={180}
-                  required
+                  required={Boolean(block)}
                 />
               </label>
             </div>
@@ -889,10 +1189,10 @@ function EditorialBlockForm({
               <label>
                 Texte
                 <textarea
-                  name="bodyFr"
+                  name={`${prefix}BodyFr`}
                   defaultValue={block?.body["fr-FR"] ?? ""}
                   maxLength={8_000}
-                  required
+                  required={Boolean(block)}
                 />
               </label>
             </div>
@@ -900,10 +1200,10 @@ function EditorialBlockForm({
               <label>
                 Texte alternatif de l’image
                 <input
-                  name="altFr"
+                  name={`${prefix}AltFr`}
                   defaultValue={block?.imageAlt["fr-FR"] ?? ""}
                   maxLength={240}
-                  required
+                  required={Boolean(block)}
                 />
               </label>
             </div>
@@ -914,10 +1214,10 @@ function EditorialBlockForm({
               <label>
                 Title
                 <input
-                  name="titleEn"
+                  name={`${prefix}TitleEn`}
                   defaultValue={block?.title["en-GB"] ?? ""}
                   maxLength={180}
-                  required
+                  required={Boolean(block)}
                 />
               </label>
             </div>
@@ -925,10 +1225,10 @@ function EditorialBlockForm({
               <label>
                 Text
                 <textarea
-                  name="bodyEn"
+                  name={`${prefix}BodyEn`}
                   defaultValue={block?.body["en-GB"] ?? ""}
                   maxLength={8_000}
-                  required
+                  required={Boolean(block)}
                 />
               </label>
             </div>
@@ -936,10 +1236,10 @@ function EditorialBlockForm({
               <label>
                 Image alternative text
                 <input
-                  name="altEn"
+                  name={`${prefix}AltEn`}
                   defaultValue={block?.imageAlt["en-GB"] ?? ""}
                   maxLength={240}
-                  required
+                  required={Boolean(block)}
                 />
               </label>
             </div>
@@ -947,44 +1247,29 @@ function EditorialBlockForm({
           />
         </div>
       </div>
-      <button
-        className="ui-button ui-button--outline"
-        type="submit"
-        disabled={demo}
-      >
-        <Save aria-hidden="true" /> Enregistrer le bloc {position}
-      </button>
-    </Form>
+    </div>
   );
 }
 
 function EditorialBlocksSection({
-  productId,
   blocks,
-  demo,
 }: {
-  productId: string;
   blocks: readonly ProductEditorialBlock[];
-  demo: boolean;
 }) {
-  return <section className="ui-card admin-editor admin-editorial-section">
+  return <section id="product-editorial-blocks" className="ui-card admin-editor admin-editorial-section admin-product-anchor-target">
     <h2>Blocs éditoriaux</h2>
     <p>
       Ces deux encarts apparaissent sous les informations d’origine sur la fiche
       produit. Le second inverse automatiquement la position de l’image et du texte.
     </p>
     <div className="admin-editorial-blocks">
-      <EditorialBlockForm
-        productId={productId}
+      <EditorialBlockFields
         position={1}
         block={blocks.find((block) => block.position === 1)}
-        demo={demo}
       />
-      <EditorialBlockForm
-        productId={productId}
+      <EditorialBlockFields
         position={2}
         block={blocks.find((block) => block.position === 2)}
-        demo={demo}
       />
     </div>
   </section>;
@@ -993,12 +1278,15 @@ function EditorialBlocksSection({
 function VariantList({
   productId,
   variants,
+  productProfessionalEnabled,
   demo,
 }: {
   productId: string;
   variants: readonly ProductVariant[];
+  productProfessionalEnabled: boolean;
   demo: boolean;
 }) {
+  const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
   if (variants.length === 0)
     return (
       <p className="admin-notice">Aucune variante active pour ce produit.</p>
@@ -1031,61 +1319,92 @@ function VariantList({
             const professionalOffer = variant.offers.find(
               (offer) => offer.audience === "professional" && offer.active,
             );
+            const editorId = `variant-editor-${variant.id}`;
+            const editing = editingVariantId === variant.id;
             return (
-              <tr key={variant.id}>
-                <td>
-                  <strong>{variant.label}</strong>
-                </td>
-                <td>{variant.sku}</td>
-                <td>{variant.weightGrams} g</td>
-                <td>
-                  {variant.stockOnHand - variant.stockReserved} disponible
-                  {variant.stockReserved > 0
-                    ? ` · ${variant.stockReserved} réservé`
-                    : ""}
-                </td>
-                <td>
-                  {retailOffer
-                    ? formatMoney(retailOffer.price.amount, "fr-FR")
-                    : "—"}
-                </td>
-                <td>
-                  {professionalOffer
-                    ? `${formatMoney(professionalOffer.price.amount, "fr-FR")} · min. ${professionalOffer.minimumQuantity}`
-                    : "—"}
-                </td>
-                <td>{formatMoney(variant.internalCostCents, "fr-FR")}</td>
-                <td>
-                  <Form
-                    method="post"
-                    onSubmit={(event) => {
-                      if (
-                        !window.confirm(
-                          `Supprimer la variante « ${variant.label} » de la vente ? L’historique sera conservé.`,
-                        )
-                      )
-                        event.preventDefault();
-                    }}
-                  >
-                    <input type="hidden" name="intent" value="delete_variant" />
-                    <input type="hidden" name="productId" value={productId} />
-                    <input type="hidden" name="variantId" value={variant.id} />
-                    <button
-                      className="ui-button ui-button--danger ui-button--sm"
-                      type="submit"
-                      disabled={demo || variant.stockReserved > 0}
-                      aria-label={`Supprimer la variante ${variant.label}`}
-                      title={
-                        variant.stockReserved > 0
-                          ? "Suppression impossible tant que du stock est réservé"
-                          : undefined
-                      }
-                    >
-                      <Trash2 aria-hidden="true" /> Supprimer
-                    </button>
-                  </Form>
-                </td>
-              </tr>
+              <Fragment key={variant.id}>
+                <tr>
+                  <td>
+                    <strong>{variant.label}</strong>
+                  </td>
+                  <td>{variant.sku}</td>
+                  <td>{variant.weightGrams} g</td>
+                  <td>
+                    {variant.stockOnHand - variant.stockReserved} disponible
+                    {variant.stockReserved > 0
+                      ? ` · ${variant.stockReserved} réservé`
+                      : ""}
+                  </td>
+                  <td>
+                    {retailOffer
+                      ? formatMoney(retailOffer.price.amount, "fr-FR")
+                      : "—"}
+                  </td>
+                  <td>
+                    {professionalOffer
+                      ? `${formatMoney(professionalOffer.price.amount, "fr-FR")} · min. ${professionalOffer.minimumQuantity}`
+                      : "—"}
+                  </td>
+                  <td>{formatMoney(variant.internalCostCents, "fr-FR")}</td>
+                  <td>
+                    <div className="admin-variant-actions">
+                      <button
+                        className="ui-button ui-button--outline ui-button--sm"
+                        type="button"
+                        aria-expanded={editing}
+                        aria-controls={editorId}
+                        aria-label={`Modifier la variante ${variant.label}`}
+                        onClick={() => setEditingVariantId(editing ? null : variant.id)}
+                      >
+                        {editing ? <X aria-hidden="true" /> : <Pencil aria-hidden="true" />}
+                        {editing ? "Fermer" : "Modifier"}
+                      </button>
+                      <Form
+                        method="post"
+                        onSubmit={(event) => {
+                          if (
+                            !window.confirm(
+                              `Supprimer la variante « ${variant.label} » de la vente ? L’historique sera conservé.`,
+                            )
+                          )
+                            event.preventDefault();
+                        }}
+                      >
+                        <input type="hidden" name="intent" value="delete_variant" />
+                        <input type="hidden" name="productId" value={productId} />
+                        <input type="hidden" name="variantId" value={variant.id} />
+                        <button
+                          className="ui-button ui-button--danger ui-button--sm"
+                          type="submit"
+                          disabled={demo || variant.stockReserved > 0}
+                          aria-label={`Supprimer la variante ${variant.label}`}
+                          title={
+                            variant.stockReserved > 0
+                              ? "Suppression impossible tant que du stock est réservé"
+                              : undefined
+                          }
+                        >
+                          <Trash2 aria-hidden="true" /> Supprimer
+                        </button>
+                      </Form>
+                    </div>
+                  </td>
+                </tr>
+                {editing ? (
+                  <tr className="admin-variant-edit-row">
+                    <td colSpan={8}>
+                      <VariantEditForm
+                        id={editorId}
+                        productId={productId}
+                        variant={variant}
+                        professionalRequired={productProfessionalEnabled}
+                        demo={demo}
+                        onCancel={() => setEditingVariantId(null)}
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
             );
           })}
         </tbody>
@@ -1094,13 +1413,169 @@ function VariantList({
   );
 }
 
+function VariantEditForm({
+  id,
+  productId,
+  variant,
+  professionalRequired,
+  demo,
+  onCancel,
+}: {
+  id: string;
+  productId: string;
+  variant: ProductVariant;
+  professionalRequired: boolean;
+  demo: boolean;
+  onCancel: () => void;
+}) {
+  const retailOffer = variant.offers.find((offer) => offer.audience === "retail");
+  const professionalOffer = variant.offers.find((offer) => offer.audience === "professional");
+  const [professionalEnabled, setProfessionalEnabled] = useState(
+    professionalRequired || Boolean(professionalOffer?.active),
+  );
+  const effectiveProfessionalEnabled = professionalRequired || professionalEnabled;
+  const headingId = `${id}-title`;
+  return (
+    <Form
+      id={id}
+      method="post"
+      className="admin-variant-edit-form"
+      aria-labelledby={headingId}
+    >
+      <input type="hidden" name="intent" value="update_variant" />
+      <input type="hidden" name="productId" value={productId} />
+      <input type="hidden" name="variantId" value={variant.id} />
+      <div className="admin-variant-edit-form__heading">
+        <div>
+          <p className="eyebrow">Variante existante</p>
+          <h3 id={headingId}>Modifier {variant.label}</h3>
+        </div>
+        <p>Les commandes passées conservent les valeurs enregistrées lors de l’achat.</p>
+      </div>
+      <div className="form-grid admin-variant-edit-form__grid">
+        <div className="field">
+          <label>
+            SKU
+            <input name="sku" defaultValue={variant.sku} required />
+          </label>
+        </div>
+        <div className="field">
+          <label>
+            Libellé
+            <input name="label" defaultValue={variant.label} required />
+          </label>
+        </div>
+        <div className="field">
+          <label>
+            Poids (g)
+            <input name="weightGrams" type="number" min="1" defaultValue={variant.weightGrams} required />
+          </label>
+        </div>
+        <div className="field">
+          <label>
+            Stock total
+            <input
+              name="stockOnHand"
+              type="number"
+              min={variant.stockReserved}
+              defaultValue={variant.stockOnHand}
+              required
+            />
+          </label>
+          <small>{variant.stockReserved} réservé · {variant.stockOnHand - variant.stockReserved} disponible actuellement</small>
+        </div>
+        <div className="field">
+          <label>
+            Seuil bas
+            <input name="lowStockThreshold" type="number" min="0" defaultValue={variant.lowStockThreshold} required />
+          </label>
+        </div>
+        <div className="field">
+          <label>
+            Coût interne (¢)
+            <input name="internalCostCents" type="number" min="0" defaultValue={variant.internalCostCents} required />
+          </label>
+        </div>
+        <div className="field">
+          <label>
+            Prix public (¢)
+            <input name="retailPriceCents" type="number" min="0" defaultValue={retailOffer?.price.amount ?? 0} required />
+          </label>
+        </div>
+        <div className="field">
+          <label>
+            Code douanier
+            <input name="hsCode" defaultValue={variant.hsCode} pattern="[0-9]{6,10}" required />
+          </label>
+        </div>
+        <div className="field">
+          <label>
+            Origine douanière
+            <input name="customsOriginCountry" defaultValue={variant.customsOriginCountry} maxLength={2} required />
+          </label>
+        </div>
+        <label className="admin-variant-professional-toggle">
+          {professionalRequired ? <input type="hidden" name="professional" value="on" /> : null}
+          <input
+            name="professional"
+            type="checkbox"
+            checked={effectiveProfessionalEnabled}
+            disabled={professionalRequired}
+            onChange={(event) => setProfessionalEnabled(event.currentTarget.checked)}
+          />
+          <span>
+            Offre professionnelle active
+            {professionalRequired ? <small>Requise tant que le café est activé dans la boutique pro.</small> : null}
+          </span>
+        </label>
+        <div className="field">
+          <label>
+            Prix pro (¢)
+            <input
+              name="proPriceCents"
+              type="number"
+              min="0"
+              defaultValue={professionalOffer?.price.amount ?? retailOffer?.price.amount ?? 0}
+              disabled={!effectiveProfessionalEnabled}
+              required={effectiveProfessionalEnabled}
+            />
+          </label>
+        </div>
+        <div className="field">
+          <label>
+            Minimum pro
+            <input
+              name="proMinimumQuantity"
+              type="number"
+              min="1"
+              defaultValue={professionalOffer?.minimumQuantity ?? 1}
+              disabled={!effectiveProfessionalEnabled}
+              required={effectiveProfessionalEnabled}
+            />
+          </label>
+        </div>
+      </div>
+      <div className="admin-variant-edit-form__actions">
+        <button className="ui-button ui-button--default" type="submit" disabled={demo}>
+          <Save aria-hidden="true" /> Enregistrer la variante
+        </button>
+        <button className="ui-button ui-button--outline" type="button" onClick={onCancel}>
+          Annuler
+        </button>
+      </div>
+    </Form>
+  );
+}
+
 export function adminProductProgressMessage(intent: string) {
   const messages: Readonly<Record<string, string>> = {
     save_product: "Enregistrement du produit…",
     save_editorial_block: "Enregistrement du bloc éditorial…",
     create_variant: "Ajout de la variante…",
+    update_variant: "Enregistrement de la variante…",
     delete_variant: "Suppression de la variante…",
     upload_media: "Import de l’image…",
+    delete_media: "Suppression de l’image…",
     upload_thumbnail_label: "Création de la miniature…",
     upload_hover_image: "Import de l’image de survol…",
     delete_hover_image: "Suppression de l’image de survol…",
@@ -1118,6 +1593,69 @@ function AdminProductProgress({ message }: { message: string }) {
       aria-valuetext="En cours"
     ><span /></div>
   </div>;
+}
+
+const adminProductSections = [
+  { id: "product-editor-form", label: "Contenu" },
+  { id: "product-editorial-blocks", label: "Blocs éditoriaux" },
+  { id: "product-variants", label: "Variantes" },
+  { id: "product-new-variant", label: "Nouvelle variante" },
+  { id: "product-thumbnail", label: "Miniature" },
+  { id: "product-hover-image", label: "Survol" },
+  { id: "product-gallery", label: "Galerie" },
+] as const;
+
+function AdminProductAnchorNavigation({ isNew }: { isNew: boolean }) {
+  const navigationRef = useRef<HTMLElement>(null);
+  const sections = isNew ? adminProductSections.slice(0, 1) : adminProductSections;
+  const [activeSection, setActiveSection] = useState(sections[0].id);
+
+  useEffect(() => {
+    let frame = 0;
+    const updateActiveSection = () => {
+      frame = 0;
+      const firstTarget = document.getElementById(sections[0].id);
+      const targetScrollMargin = firstTarget
+        ? Number.parseFloat(window.getComputedStyle(firstTarget).scrollMarginTop) || 0
+        : 0;
+      const activationLine = Math.max(
+        (navigationRef.current?.getBoundingClientRect().bottom ?? 0) + 16,
+        targetScrollMargin + 1,
+      );
+      let nextActiveSection = sections[0].id;
+      for (const section of sections) {
+        const target = document.getElementById(section.id);
+        if (!target || target.getBoundingClientRect().top > activationLine) break;
+        nextActiveSection = section.id;
+      }
+      setActiveSection(nextActiveSection);
+    };
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(updateActiveSection);
+    };
+
+    updateActiveSection();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    document.addEventListener("scroll", scheduleUpdate, { capture: true, passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+    return () => {
+      window.removeEventListener("scroll", scheduleUpdate);
+      document.removeEventListener("scroll", scheduleUpdate, { capture: true });
+      window.removeEventListener("resize", scheduleUpdate);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [isNew]);
+
+  return <nav ref={navigationRef} className="admin-product-anchor-nav" aria-label="Sections de la fiche produit">
+    {sections.map((section) => <a
+      className={activeSection === section.id ? "is-active" : undefined}
+      href={`#${section.id}`}
+      aria-current={activeSection === section.id ? "location" : undefined}
+      onClick={() => setActiveSection(section.id)}
+      key={section.id}
+    >{section.label}</a>)}
+  </nav>;
 }
 
 export default function AdminProduct() {
@@ -1163,15 +1701,18 @@ export default function AdminProduct() {
           {result.message}
         </p>
       ) : null}
+      <AdminProductAnchorNavigation isNew={isNew} />
       <Form
         id="product-editor-form"
         method="post"
-        className="ui-card admin-editor"
+        encType="multipart/form-data"
+        className="admin-product-global-form admin-product-anchor-target"
       >
         <input type="hidden" name="intent" value="save_product" />
         <input type="hidden" name="productId" value={product.id} />
-        <h2 className="admin-editor__title">Contenu</h2>
-        <div className="form-grid">
+        <section className="ui-card admin-editor">
+          <h2 className="admin-editor__title">Contenu</h2>
+          <div className="form-grid">
           <div className="field">
             <label>
               Slug
@@ -1237,21 +1778,20 @@ export default function AdminProduct() {
               <small>{product.professionalStockReservedKg} kg supplémentaires sont actuellement réservés par des devis.</small>
             ) : null}
           </div>
-        </div>
-        <LanguageTabs
-          label="Langue du contenu produit"
-          french={<TranslationFields language="Français" translation={product.translations["fr-FR"]} />}
-          english={<TranslationFields language="English" translation={product.translations["en-GB"]} />}
-        />
+          </div>
+          <LanguageTabs
+            label="Langue du contenu produit"
+            french={<TranslationFields language="Français" translation={product.translations["fr-FR"]} />}
+            english={<TranslationFields language="English" translation={product.translations["en-GB"]} />}
+          />
+        </section>
+        {!isNew ? (
+          <EditorialBlocksSection blocks={product.editorialBlocks} />
+        ) : null}
       </Form>
       {!isNew ? (
         <>
-          <EditorialBlocksSection
-            productId={product.id}
-            blocks={product.editorialBlocks}
-            demo={demo}
-          />
-          <section className="ui-card admin-editor">
+          <section id="product-variants" className="ui-card admin-editor admin-product-anchor-target">
             <h2>Variantes existantes</h2>
             <p>
               La suppression retire la variante de la vente tout en conservant
@@ -1260,10 +1800,11 @@ export default function AdminProduct() {
             <VariantList
               productId={product.id}
               variants={product.variants}
+              productProfessionalEnabled={product.professionalEnabled}
               demo={demo}
             />
           </section>
-          <section className="ui-card admin-editor">
+          <section id="product-new-variant" className="ui-card admin-editor admin-product-anchor-target">
             <h2>Ajouter une variante</h2>
             <Form method="post" className="form-grid">
               <input type="hidden" name="intent" value="create_variant" />
@@ -1384,13 +1925,15 @@ export default function AdminProduct() {
               </button>
             </Form>
           </section>
-          <AdminProductThumbnailForm
-            productId={product.id}
-            currentLabelUrl={product.thumbnailLabelUrl}
-            currentBackgroundColor={product.thumbnailBackgroundColor}
-            demo={demo}
-          />
-          <section className="ui-card admin-editor admin-thumbnail-editor">
+          <div id="product-thumbnail" className="admin-product-anchor-target">
+            <AdminProductThumbnailForm
+              productId={product.id}
+              currentLabelUrl={product.thumbnailLabelUrl}
+              currentBackgroundColor={product.thumbnailBackgroundColor}
+              demo={demo}
+            />
+          </div>
+          <section id="product-hover-image" className="ui-card admin-editor admin-thumbnail-editor admin-product-anchor-target">
             <div className="admin-thumbnail-editor__heading">
               <div>
                 <p className="eyebrow">Carte produit</p>
@@ -1434,12 +1977,41 @@ export default function AdminProduct() {
               </div>
             </div>
           </section>
-          <section className="ui-card admin-editor">
+          <section id="product-gallery" className="ui-card admin-editor admin-product-anchor-target">
             <h2>Galerie</h2>
+            <p>Supprimez les visuels devenus inutiles. Pour un café publié, importez toujours une nouvelle image avant de retirer la dernière.</p>
             <div className="admin-media-grid">
-              {product.media.map((media) => (
-                <img key={media.id} src={media.url} alt={media.alt["fr-FR"]} />
-              ))}
+              {product.media.map((media, index) => {
+                const protectedLastImage = product.status === "published" && product.media.length === 1;
+                return (
+                  <figure className="admin-media-item" key={media.id}>
+                    <img src={media.url} alt={media.alt["fr-FR"]} />
+                    <figcaption>
+                      <span>Image {index + 1}</span>
+                      <Form
+                        method="post"
+                        onSubmit={(event) => {
+                          if (!window.confirm(`Supprimer l’image ${index + 1} de la galerie ? Cette action est définitive.`))
+                            event.preventDefault();
+                        }}
+                      >
+                        <input type="hidden" name="intent" value="delete_media" />
+                        <input type="hidden" name="productId" value={product.id} />
+                        <input type="hidden" name="mediaId" value={media.id} />
+                        <button
+                          className="ui-button ui-button--danger ui-button--sm"
+                          type="submit"
+                          disabled={demo || protectedLastImage}
+                          aria-label={`Supprimer l’image ${index + 1} de la galerie`}
+                          title={protectedLastImage ? "Ajoutez une nouvelle image avant de supprimer la dernière d’un café publié" : undefined}
+                        >
+                          <Trash2 aria-hidden="true" /> Supprimer
+                        </button>
+                      </Form>
+                    </figcaption>
+                  </figure>
+                );
+              })}
             </div>
             <Form
               method="post"

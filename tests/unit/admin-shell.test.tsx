@@ -8,7 +8,7 @@ describe("admin navigation", () => {
     const router = createMemoryRouter([{ path: "/", element: <AdminShell active="advice"><h1>Conseils</h1></AdminShell> }]);
     const html = renderToStaticMarkup(<RouterProvider router={router} />);
 
-    for (const label of ["Tableau de bord", "Commandes", "Produits", "Expédition", "Clients", "Professionnels", "Pages", "FAQ", "Conseils", "Modifications"]) {
+    for (const label of ["Tableau de bord", "Commandes", "Produits", "Expédition", "Clients", "Professionnels", "Pages", "Bandeau", "FAQ", "Conseils", "Modifications"]) {
       expect(html).toContain(label);
     }
     expect(html).not.toContain("Archives");
@@ -18,6 +18,7 @@ describe("admin navigation", () => {
     expect(html).toContain('href="/admin/clients"');
     expect(html).toContain('href="/admin/produits"');
     expect(html).toContain('href="/admin/modifications"');
+    expect(html).toContain('href="/admin/bandeau"');
     expect(html).not.toContain('href="/admin/produits#catalogue"');
     expect(html).not.toContain('href="/admin#catalogue"');
     expect(html).toContain('action="/mon-compte"');

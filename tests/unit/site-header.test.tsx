@@ -37,15 +37,19 @@ describe("public account navigation", () => {
     expect(renderHeader(true, false)).not.toContain("Panier de devis");
   });
 
-  it("shows the active language with its flag in a dropdown", () => {
+  it("shows the active language with an SVG flag in a dropdown", () => {
     const frenchHtml = renderHeader(false);
     const englishHtml = renderHeader(false, false, null, "/en/shop");
     expect(frenchHtml).toContain('aria-label="Langue active : Français"');
     expect(frenchHtml).toContain('aria-haspopup="menu"');
-    expect(frenchHtml).toContain("🇫🇷");
+    expect(frenchHtml).toContain('data-language-flag="fr-FR"');
+    expect(frenchHtml).toContain('viewBox="0 0 30 20"');
+    expect(frenchHtml).not.toContain("🇫🇷");
     expect(frenchHtml).toContain(">FR<");
     expect(englishHtml).toContain('aria-label="Active language: English"');
-    expect(englishHtml).toContain("🇬🇧");
+    expect(englishHtml).toContain('data-language-flag="en-GB"');
+    expect(englishHtml).toContain('fill="#012169"');
+    expect(englishHtml).not.toContain("🇬🇧");
     expect(englishHtml).toContain(">EN<");
     expect(englishHtml).toContain("language-selector__chevron");
   });

@@ -22,8 +22,11 @@ describe("custom language menu", () => {
     );
 
     const trigger = screen.getByRole("button", { name: "Langue active : Français" });
+    expect(trigger.querySelector('[data-language-flag="fr-FR"] svg')).toBeInTheDocument();
     await user.click(trigger);
-    expect(screen.getByRole("menu", { name: "Choisir la langue" })).toBeInTheDocument();
+    const languageMenu = screen.getByRole("menu", { name: "Choisir la langue" });
+    expect(languageMenu).toBeInTheDocument();
+    expect(languageMenu.querySelectorAll("[data-language-flag] svg")).toHaveLength(2);
     expect(screen.getByRole("menuitem", { name: "English (EN)" })).toHaveAttribute("href", "/en/shop?origine=kenya");
 
     await user.keyboard("{Escape}");

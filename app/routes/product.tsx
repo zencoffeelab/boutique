@@ -6,7 +6,7 @@ import { ProductCard } from "~/components/product-card";
 import { ProductPurchase } from "~/components/product-purchase";
 import { ProductPackArtwork } from "~/components/product-thumbnail-label";
 import { ProfessionalQuoteAdd } from "~/components/professional-quote/professional-quote-add";
-import type { Audience, Locale, ProductEditorialBlock } from "~/domain/types";
+import type { Audience, Locale, Product, ProductEditorialBlock } from "~/domain/types";
 import { getAudience } from "~/lib/auth.server";
 import { getProducts, hasPurchasableVariant } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
@@ -118,6 +118,33 @@ function ProductStory({
   );
 }
 
+export function ProductGallery({ product, locale }: { product: Product; locale: Locale }) {
+  const labelUrl = product.thumbnailLabelUrl;
+  const translation = product.translations[locale];
+  return <div className="product-gallery">
+    {labelUrl ? <div
+      className="product-gallery__composed"
+      style={{ "--product-thumbnail-color": product.thumbnailBackgroundColor } as CSSProperties}
+    >
+      <ProductPackArtwork
+        packClassName="product-gallery__pack"
+        labelClassName="product-gallery__label"
+        labelUrl={labelUrl}
+        alt={product.media[0]?.alt[locale] || translation.name}
+        loading="eager"
+      />
+    </div> : null}
+    {product.media.map((media, index) => <img
+      key={media.id}
+      src={media.url}
+      alt={media.alt[locale]}
+      width={media.width}
+      height={media.height}
+      loading={!labelUrl && index === 0 ? "eager" : "lazy"}
+    />)}
+  </div>;
+}
+
 export default function ProductDetail() {
   const { locale, product, audience, archived, relatedProducts } =
     useLoaderData<typeof loader>();
@@ -137,81 +164,49 @@ export default function ProductDetail() {
         </Link>
       </nav>
       <article className="product-detail">
-        <div className="product-gallery">
-          {product.media.map((media, index) => (
-            index === 0 && product.thumbnailLabelUrl ? (
-              <div
-                key={media.id}
-                className="product-gallery__composed"
-                style={{ "--product-thumbnail-color": product.thumbnailBackgroundColor } as CSSProperties}
-              >
-                <ProductPackArtwork
-                  packClassName="product-gallery__pack"
-                  labelClassName="product-gallery__label"
-                  labelUrl={product.thumbnailLabelUrl}
-                  alt={media.alt[locale] || t.name}
-                  loading="eager"
-                />
-              </div>
-            ) : (
-              <img
-                key={media.id}
-                src={media.url}
-                alt={media.alt[locale]}
-                width={media.width}
-                height={media.height}
-                loading={index === 0 ? "eager" : "lazy"}
-              />
-            )
-          ))}
-        </div>
+        <ProductGallery product={product} locale={locale} />
         <div className="product-info">
-          <p className="eyebrow">{t.region}</p>
           <h1>{t.name}</h1>
+          <dl className="origin-grid">
+            <div>
+              <dt>{english ? "Producer" : "Producteur"}</dt>
+              <dd>{t.producer}</dd>
+            </div>
+            <div>
+              <dt>{english ? "Region" : "Région"}</dt>
+              <dd>{t.region}</dd>
+            </div>
+            <div>
+              <dt>{english ? "Variety" : "Variété"}</dt>
+              <dd>{t.variety}</dd>
+            </div>
+            <div>
+              <dt>{english ? "Process" : "Traitement"}</dt>
+              <dd>{t.process}</dd>
+            </div>
+            <div>
+              <dt>Altitude</dt>
+              <dd>{product.altitudeMeters} m</dd>
+            </div>
+          </dl>
           <p className="product-info__description">{t.shortDescription}</p>
-          <ul
-            className="taste-notes"
-            aria-label={english ? "Tasting notes" : "Notes de dégustation"}
-          >
-            {t.tastingNotes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
           {archived ? <section className="product-archive-notice" aria-label={english ? "Archived coffee" : "Café archivé"}>
             <p className="eyebrow">{english ? "Coffee archives" : "Archives café"}</p>
             <p>{english ? "This limited lot is no longer available for purchase, but its complete story remains available to read." : "Ce lot éphémère n’est plus disponible à l’achat, mais son histoire complète reste accessible."}</p>
           </section> : audience === "professional" ? <ProfessionalQuoteAdd product={product} locale={locale} /> : <ProductPurchase product={product} locale={locale} audience={audience} />}
         </div>
       </article>
-      <dl className="origin-grid">
-        <div>
-          <dt>{english ? "Producer" : "Producteur"}</dt>
-          <dd>{t.producer}</dd>
-        </div>
-        <div>
-          <dt>{english ? "Region" : "Région"}</dt>
-          <dd>{t.region}</dd>
-        </div>
-        <div>
-          <dt>{english ? "Variety" : "Variété"}</dt>
-          <dd>{t.variety}</dd>
-        </div>
-        <div>
-          <dt>{english ? "Process" : "Traitement"}</dt>
-          <dd>{t.process}</dd>
-        </div>
-        <div>
-          <dt>Altitude</dt>
-          <dd>{product.altitudeMeters} m</dd>
-        </div>
-      </dl>
+      {t.tastingNotes.length > 0 ? (
+        <section className="product-tasting-notes" aria-labelledby="product-tasting-notes-title">
+          <h2 id="product-tasting-notes-title">
+            {english ? "Tasting notes" : "Notes de dégustation"}
+          </h2>
+          <ul>
+            {t.tastingNotes.map((note) => <li key={note}>{note}</li>)}
+          </ul>
+        </section>
+      ) : null}
       <ProductStory blocks={product.editorialBlocks} locale={locale} />
-      <section className="editorial-copy">
-        <p className="eyebrow">
-          {english ? "From seed to cup" : "De la graine à la tasse"}
-        </p>
-        <p>{t.body}</p>
-      </section>
       {relatedProducts.length > 0 ? (
         <section
           className="related-products"

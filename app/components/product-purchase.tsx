@@ -44,7 +44,6 @@ export function ProductPurchase({ product, locale, audience = "retail" }: { prod
           <ShoppingBag aria-hidden="true" />{available < minimum ? t.soldOut : added ? (locale === "fr-FR" ? "Ajouté !" : "Added!") : t.addToCart}
         </button>
       </div>
-      <p className="stock-note">{available} {locale === "fr-FR" ? "unités disponibles" : "units available"}{minimum > 1 ? ` · minimum ${minimum}` : ""}</p>
     </section>
   );
 }
