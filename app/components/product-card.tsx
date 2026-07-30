@@ -77,8 +77,8 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
   const resolvedAudience = audience ?? product.variants.flatMap((variant) => variant.offers)[0]?.audience ?? "retail";
   const baseHref = locale === "fr-FR" ? `/boutique/${product.slug}` : `/en/shop/${product.slug}`;
   const href = resolvedAudience === "professional" ? `${baseHref}?audience=professional` : baseHref;
-  const prices = product.variants.flatMap((variant) => variant.offers.filter((offer) => offer.audience === resolvedAudience && offer.active).map((offer) => offer.price.amount));
-  const fromPrice = prices.length > 0 ? Math.min(...prices) : 0;
+  const pack200 = product.variants.find((variant) => variant.weightGrams === 200);
+  const pack200Offer = pack200?.offers.find((offer) => offer.audience === resolvedAudience && offer.active);
   const composedThumbnail = Boolean(product.thumbnailLabelUrl);
   return (
     <article className="product-card">
@@ -116,14 +116,17 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
           <ProductCardQuickAdd product={product} locale={locale} audience={resolvedAudience} />
         </div> : null}
       </div>
-      <div className="product-card__body">
-        <p className="eyebrow">{translation.region}</p><h3 id={titleId}>{translation.name}</h3>
+      <div className="product-card__details">
+        <div className="product-card__body">
+          <h3 id={titleId}>{translation.name}</h3>
+        </div>
+        <ul className="taste-list" aria-label={locale === "fr-FR" ? "Variété et traitement" : "Variety and process"}>
+          <li>{translation.variety}</li><li>{translation.process}</li>
+        </ul>
+        <p className="product-card__tasting-notes" aria-label={locale === "fr-FR" ? "Notes de dégustation" : "Tasting notes"}>{translation.tastingNotes.slice(0, 3).join(" — ")}</p>
+        {quoteAdd || product.status === "archived" || !pack200Offer ? null : <p className="product-card__price">{formatMoney(pack200Offer.price.amount, locale)}</p>}
+        {quoteAdd ? <ProfessionalQuoteAdd product={product} locale={locale} /> : null}
       </div>
-      <ul className="taste-list" aria-label={dictionary[locale].tasting}>
-        {translation.tastingNotes.map((note) => <li key={note}>{note}</li>)}
-      </ul>
-      {quoteAdd || product.status === "archived" ? null : <p className="product-card__price">{dictionary[locale].from} {formatMoney(fromPrice, locale)}</p>}
-      {quoteAdd ? <ProfessionalQuoteAdd product={product} locale={locale} /> : null}
       <Link to={href} className="product-card__link" aria-labelledby={titleId} />
     </article>
   );
