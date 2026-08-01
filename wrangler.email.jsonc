@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "zen-coffee-lab-email-forwarder",
+  "main": "./workers/email-forwarder.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": false,
+  "keep_vars": true,
+  "observability": {
+    "enabled": true
+  }
+}
