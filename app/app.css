@@ -3791,6 +3791,14 @@ button:disabled {
 .admin-quick-form button {
   grid-column: 1 / -1;
 }
+.admin-coffee-tabs { display: grid; gap: 0.85rem; }
+.admin-coffee-tabs__list { display: flex; gap: 0.4rem; overflow-x: auto; padding: 0.2rem 0; }
+.admin-coffee-tabs__tab { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 0.5rem; min-height: 2.5rem; padding: 0.55rem 0.8rem; border: 1px solid #d5dbd1; border-radius: 999px; background: #fff; color: #44513f; font: 650 0.82rem/1 var(--sans); cursor: pointer; }
+.admin-coffee-tabs__tab[aria-selected="true"] { border-color: var(--green-deep); background: var(--green-deep); color: #fff; }
+.admin-coffee-tabs__tab span { display: inline-grid; place-items: center; min-width: 1.25rem; height: 1.25rem; padding: 0 0.25rem; border-radius: 999px; background: #e7ede4; color: var(--green-deep); font-size: 0.68rem; }
+.admin-coffee-tabs__tab[aria-selected="true"] span { background: rgba(255, 255, 255, 0.2); color: inherit; }
+.admin-coffee-tabs__summary { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; color: #667062; font-size: 0.8rem; }
+.admin-coffee-tabs__summary strong { color: var(--green-deep); font-size: 1rem; }
 .admin-catalogue-section {
   margin-bottom: 2rem;
   scroll-margin-top: 1.5rem;

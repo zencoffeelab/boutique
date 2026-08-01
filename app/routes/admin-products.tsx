@@ -1,4 +1,5 @@
-import { Archive, PackageOpen, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Archive, PackageOpen, Plus, Save } from "lucide-react";
 import { z } from "zod";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Form, Link, useActionData, useLoaderData } from "react-router";
@@ -13,136 +14,71 @@ import { getAdminProducts } from "~/lib/catalog.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
 const variantUpdateSchema = z.object({
-  intent: z.literal("update_variant"), variantId: z.uuid(), retailOfferId: z.uuid(),
-  stockOnHand: z.coerce.number().int().min(0), lowStockThreshold: z.coerce.number().int().min(0),
-  internalCostCents: z.coerce.number().int().min(0), retailPriceCents: z.coerce.number().int().min(0),
-  proOfferId: z.preprocess((value) => value === "" ? undefined : value, z.uuid().optional()),
-  proPriceCents: z.coerce.number().int().min(0).optional(), proMinimumQuantity: z.coerce.number().int().min(1).optional(),
+  variantId: z.uuid(), stockOnHand: z.coerce.number().int().min(0), lowStockThreshold: z.coerce.number().int().min(0), internalCostCents: z.coerce.number().int().min(0), proOfferId: z.preprocess((value) => value === "" ? undefined : value, z.uuid().optional()), proPriceCents: z.coerce.number().int().min(0),
 });
+
+async function saveVariant(client: any, actorId: string, data: z.infer<typeof variantUpdateSchema>) {
+  const before = await client.from("product_variants").select("*").eq("id", data.variantId).single();
+  if (before.error || !before.data) return { ok: false, message: before.error?.message ?? "Variante introuvable." };
+  if (data.stockOnHand < Number(before.data.stock_reserved ?? 0)) return { ok: false, message: `Le stock total ne peut pas être inférieur aux ${before.data.stock_reserved} unité(s) actuellement réservée(s).` };
+  const { error } = await client.from("product_variants").update({ stock_on_hand: data.stockOnHand, low_stock_threshold: data.lowStockThreshold, internal_cost_cents: data.internalCostCents, updated_at: new Date().toISOString() }).eq("id", data.variantId);
+  if (error) return { ok: false, message: error.message };
+  const professionalOffer = data.proOfferId
+    ? client.from("variant_offers").update({ price_cents: data.proPriceCents }).eq("id", data.proOfferId).eq("variant_id", data.variantId)
+    : client.from("variant_offers").upsert({ variant_id: data.variantId, audience: "professional", price_cents: data.proPriceCents, minimum_quantity: 1, active: false }, { onConflict: "variant_id,audience" });
+  const { error: professionalOfferError } = await professionalOffer;
+  if (professionalOfferError) return { ok: false, message: professionalOfferError.message };
+  const stockDelta = data.stockOnHand - Number(before.data.stock_on_hand);
+  if (stockDelta !== 0) {
+    const { error: movementError } = await client.from("stock_movements").insert({ variant_id: data.variantId, quantity_delta: stockDelta, reason: "Ajustement global depuis le catalogue", actor_id: actorId });
+    if (movementError) return { ok: false, message: movementError.message };
+  }
+  await client.from("audit_log").insert({ actor_id: actorId, action: "variant.updated", entity_type: "product_variant", entity_id: data.variantId, before_data: before.data, after_data: data });
+  return { ok: true };
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   const admin = await requireAdmin(request);
   if (admin.demo) return { ok: false, message: "Les mutations sont désactivées en mode démonstration." };
-  const parsed = variantUpdateSchema.safeParse(Object.fromEntries(await request.formData()));
-  if (!parsed.success) return { ok: false, message: "Valeurs invalides.", errors: parsed.error.flatten().fieldErrors };
+  const form = await request.formData();
+  if (form.get("intent") !== "update_variants") return { ok: false, message: "Action invalide." };
+  const values = (name: string) => form.getAll(name).map(String);
+  const variantIds = values("variantId");
+  const stocks = values("stockOnHand"), thresholds = values("lowStockThreshold"), costs = values("internalCostCents"), proOfferIds = values("proOfferId"), proPrices = values("proPriceCents");
+  const updates = variantIds.map((variantId, index) => variantUpdateSchema.safeParse({ variantId, stockOnHand: stocks[index], lowStockThreshold: thresholds[index], internalCostCents: costs[index], proOfferId: proOfferIds[index], proPriceCents: proPrices[index] }));
+  if (updates.length === 0 || updates.some((update) => !update.success)) return { ok: false, message: "Valeurs invalides." };
   const client = createServiceSupabase();
   if (!client) return { ok: false, message: "Base de données indisponible." };
-  const before = await client.from("product_variants").select("*").eq("id", parsed.data.variantId).single();
-  const { error } = await client.from("product_variants").update({ stock_on_hand: parsed.data.stockOnHand, low_stock_threshold: parsed.data.lowStockThreshold, internal_cost_cents: parsed.data.internalCostCents, updated_at: new Date().toISOString() }).eq("id", parsed.data.variantId);
-  if (error) return { ok: false, message: error.message };
-  const { error: offerError } = await client.from("variant_offers").update({ price_cents: parsed.data.retailPriceCents }).eq("id", parsed.data.retailOfferId);
-  if (offerError) return { ok: false, message: offerError.message };
-  if (parsed.data.proOfferId && parsed.data.proPriceCents !== undefined && parsed.data.proMinimumQuantity !== undefined) {
-    const { error: proError } = await client.from("variant_offers").update({ price_cents: parsed.data.proPriceCents, minimum_quantity: parsed.data.proMinimumQuantity }).eq("id", parsed.data.proOfferId);
-    if (proError) return { ok: false, message: proError.message };
+  for (const update of updates) {
+    if (!update.success) continue;
+    const result = await saveVariant(client, admin.id, update.data);
+    if (!result.ok) return result;
   }
-  await client.from("audit_log").insert({ actor_id: admin.id, action: "variant.updated", entity_type: "product_variant", entity_id: parsed.data.variantId, before_data: before.data, after_data: parsed.data });
-  return { ok: true, message: "Variante mise à jour." };
+  return { ok: true, message: `${updates.length} variante${updates.length > 1 ? "s" : ""} enregistrée${updates.length > 1 ? "s" : ""}.` };
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const admin = await requireAdmin(request);
-  const products = await getAdminProducts();
-  const variants = products.flatMap((product) => product.variants);
-  return {
-    demo: admin.demo,
-    products,
-    stats: {
-      products: products.length,
-      published: products.filter((product) => product.status === "published").length,
-      archived: products.filter((product) => product.status === "archived").length,
-      variants: variants.length,
-      lowStock: variants.filter((variant) => variant.stockOnHand - variant.stockReserved <= variant.lowStockThreshold).length,
-    },
-  };
+  const admin = await requireAdmin(request); const products = await getAdminProducts(); const variants = products.flatMap((product) => product.variants);
+  return { demo: admin.demo, products, stats: { products: products.length, published: products.filter((product) => product.status === "published").length, archived: products.filter((product) => product.status === "archived").length, variants: variants.length, lowStock: variants.filter((variant) => variant.stockOnHand - variant.stockReserved <= variant.lowStockThreshold).length } };
 }
+export const meta: MetaFunction = () => [{ title: "Produits | Administration Zen Coffee Lab" }, { name: "robots", content: "noindex,nofollow" }];
+const statusLabels: Record<ProductStatus, string> = { draft: "Brouillon", published: "Publié", archived: "Archivé" };
+type ProductGroup = Readonly<{ id: string; name: string; products: readonly Product[] }>;
 
-export const meta: MetaFunction = () => [
-  { title: "Produits | Administration Zen Coffee Lab" },
-  { name: "robots", content: "noindex,nofollow" },
-];
-
-const statusLabels: Record<ProductStatus, string> = {
-  draft: "Brouillon",
-  published: "Publié",
-  archived: "Archivé",
-};
-
-function ProductTable({ products, demo, emptyMessage, label }: { products: readonly Product[]; demo: boolean; emptyMessage: string; label: string }) {
-  return (
-    <CardContent style={{ padding: 0 }}>
-      <Table aria-label={label}>
-        <TableHeader><TableRow><TableHead>Café</TableHead><TableHead>Statut</TableHead><TableHead>Variante</TableHead><TableHead>Stock</TableHead><TableHead>Prix public</TableHead><TableHead>Mise à jour rapide</TableHead></TableRow></TableHeader>
-        <TableBody>
-          {products.flatMap((product) => product.variants.length === 0 ? [
-            <TableRow key={product.id}>
-              <TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>{product.translations["fr-FR"].name}</Link></TableCell>
-              <TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell>
-              <TableCell colSpan={4}><span className="admin-muted">Aucune variante — ouvrez la fiche pour en ajouter une.</span></TableCell>
-            </TableRow>,
-          ] : product.variants.map((variant) => {
-            const retailOffer = variant.offers.find((offer) => offer.audience === "retail");
-            const proOffer = variant.offers.find((offer) => offer.audience === "professional");
-            const availableStock = variant.stockOnHand - variant.stockReserved;
-            return (
-              <TableRow key={variant.id}>
-                <TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>{product.translations["fr-FR"].name}</Link><br /><small>{variant.sku}</small></TableCell>
-                <TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell>
-                <TableCell>{variant.label}</TableCell>
-                <TableCell><span className={availableStock <= variant.lowStockThreshold ? "admin-stock-warning" : undefined}>{availableStock}</span><br /><small>Seuil {variant.lowStockThreshold}</small></TableCell>
-                <TableCell>{formatMoney(retailOffer?.price.amount ?? 0, "fr-FR")}</TableCell>
-                <TableCell>
-                  <Form method="post" className="admin-quick-form">
-                    <input type="hidden" name="intent" value="update_variant" />
-                    <input type="hidden" name="variantId" value={variant.id} />
-                    <input type="hidden" name="retailOfferId" value={retailOffer?.id} />
-                    <input type="hidden" name="proOfferId" value={proOffer?.id ?? ""} />
-                    <label><span>Stock</span><input name="stockOnHand" type="number" min="0" defaultValue={variant.stockOnHand} /></label>
-                    <label><span>Seuil</span><input name="lowStockThreshold" type="number" min="0" defaultValue={variant.lowStockThreshold} /></label>
-                    <label><span>Prix ¢</span><input name="retailPriceCents" type="number" min="0" defaultValue={retailOffer?.price.amount ?? 0} /></label>
-                    <label><span>Coût ¢</span><input name="internalCostCents" type="number" min="0" defaultValue={variant.internalCostCents} /></label>
-                    {proOffer ? <><label><span>Prix pro ¢</span><input name="proPriceCents" type="number" min="0" defaultValue={proOffer.price.amount} /></label><label><span>Minimum pro</span><input name="proMinimumQuantity" type="number" min="1" defaultValue={proOffer.minimumQuantity} /></label></> : null}
-                    <button className="ui-button ui-button--outline ui-button--sm" type="submit" disabled={demo}>Enregistrer</button>
-                  </Form>
-                </TableCell>
-              </TableRow>
-            );
-          }))}
-        </TableBody>
-      </Table>
-      {products.length === 0 ? <p className="admin-empty-state">{emptyMessage}</p> : null}
-    </CardContent>
-  );
+function groupProductsByName(products: readonly Product[]): ProductGroup[] {
+  const groups = new Map<string, ProductGroup>();
+  for (const product of products) { const name = product.translations["fr-FR"].name.trim() || "Café sans nom"; const id = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr-FR"); const previous = groups.get(id); groups.set(id, previous ? { ...previous, products: [...previous.products, product] } : { id, name, products: [product] }); }
+  return [...groups.values()].sort((left, right) => left.name.localeCompare(right.name, "fr-FR"));
 }
-
+function ProductTable({ products, emptyMessage, label }: { products: readonly Product[]; emptyMessage: string; label: string }) {
+  return <CardContent style={{ padding: 0 }}><Table aria-label={label}><TableHeader><TableRow><TableHead>Fiche</TableHead><TableHead>Statut</TableHead><TableHead>Variante</TableHead><TableHead>Stock disponible</TableHead><TableHead>Coût interne</TableHead><TableHead>Mise à jour rapide</TableHead></TableRow></TableHeader><TableBody>{products.flatMap((product) => product.variants.length === 0 ? [<TableRow key={product.id}><TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>Ouvrir la fiche</Link></TableCell><TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell><TableCell colSpan={4}><span className="admin-muted">Aucune variante — ouvrez la fiche pour en ajouter une.</span></TableCell></TableRow>] : [...product.variants].sort((left, right) => left.weightGrams - right.weightGrams || left.label.localeCompare(right.label, "fr-FR")).map((variant) => { const availableStock = variant.stockOnHand - variant.stockReserved; const retailOffer = variant.offers.find((offer) => offer.audience === "retail"); const proOffer = variant.offers.find((offer) => offer.audience === "professional"); return <TableRow key={variant.id}><TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>Ouvrir la fiche</Link><br /><small>{variant.sku}</small></TableCell><TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell><TableCell>{variant.label}</TableCell><TableCell><span className={availableStock <= variant.lowStockThreshold ? "admin-stock-warning" : undefined}>{availableStock}</span><br /><small>Réservé : {variant.stockReserved} · Seuil {variant.lowStockThreshold}</small></TableCell><TableCell>{formatMoney(variant.internalCostCents, "fr-FR")}</TableCell><TableCell><div className="admin-quick-form"><input type="hidden" name="variantId" value={variant.id} /><input type="hidden" name="proOfferId" value={proOffer?.id ?? ""} /><label><span>Stock total</span><input name="stockOnHand" type="number" min="0" defaultValue={variant.stockOnHand} /></label><label><span>Seuil d’alerte</span><input name="lowStockThreshold" type="number" min="0" defaultValue={variant.lowStockThreshold} /></label><label><span>Coût en centimes</span><input name="internalCostCents" type="number" min="0" defaultValue={variant.internalCostCents} /></label><label><span>Tarif pro en centimes</span><input name="proPriceCents" type="number" min="0" defaultValue={proOffer?.price.amount ?? retailOffer?.price.amount ?? 0} /></label></div></TableCell></TableRow>; }))}</TableBody></Table>{products.length === 0 ? <p className="admin-empty-state">{emptyMessage}</p> : null}</CardContent>;
+}
+function CoffeeTabs({ products, emptyMessage, label }: { products: readonly Product[]; emptyMessage: string; label: string }) {
+  const groups = groupProductsByName(products); const [activeTab, setActiveTab] = useState(groups[0]?.id ?? ""); useEffect(() => { if (!groups.some((group) => group.id === activeTab)) setActiveTab(groups[0]?.id ?? ""); }, [activeTab, groups]);
+  if (groups.length === 0) return <Card><ProductTable products={[]} label={label} emptyMessage={emptyMessage} /></Card>;
+  return <div className="admin-coffee-tabs"><div className="admin-coffee-tabs__list" role="tablist" aria-label={label}>{groups.map((group) => <button key={group.id} id={`${label}-${group.id}-tab`} className="admin-coffee-tabs__tab" type="button" role="tab" aria-selected={group.id === activeTab} aria-controls={`${label}-${group.id}-panel`} onClick={() => setActiveTab(group.id)}>{group.name}<span>{group.products.reduce((count, product) => count + product.variants.length, 0)}</span></button>)}</div>{groups.map((group) => { const variantCount = group.products.reduce((count, product) => count + product.variants.length, 0); return <div key={group.id} id={`${label}-${group.id}-panel`} role="tabpanel" aria-labelledby={`${label}-${group.id}-tab`} hidden={group.id !== activeTab}><div className="admin-coffee-tabs__summary"><strong>{group.name}</strong><span>{variantCount} variante{variantCount > 1 ? "s" : ""}{group.products.length > 1 ? ` réunies depuis ${group.products.length} fiches` : ""}</span></div><Card><ProductTable products={group.products} label={`${label} — ${group.name}`} emptyMessage={emptyMessage} /></Card></div>; })}</div>;
+}
 export default function AdminProducts() {
-  const { demo, products, stats } = useLoaderData<typeof loader>();
-  const result = useActionData<typeof action>();
-  const currentProducts = products.filter((product) => product.status !== "archived");
-  const archivedProducts = products.filter((product) => product.status === "archived");
-  return (
-    <AdminShell active="products">
-      <header className="admin-heading">
-        <div><p className="eyebrow">Catalogue</p><h1>Produits</h1><p className="admin-heading__description">Gérez les cafés, leurs variantes, leurs prix et leurs niveaux de stock.</p></div>
-        <Link className={`ui-button ui-button--default${demo ? " is-disabled" : ""}`} to="/admin/produits/nouveau" aria-disabled={demo} onClick={demo ? (event) => event.preventDefault() : undefined}><Plus aria-hidden="true" /> Ajouter un café</Link>
-      </header>
-      {demo ? <p className="admin-notice">Mode démonstration local : le catalogue est en lecture seule.</p> : null}
-      {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
-      <section className="stats-grid" aria-label="Indicateurs du catalogue">
-        <Card><CardContent><p className="stat-label">Produits</p><p className="stat-value">{stats.products}</p></CardContent></Card>
-        <Card><CardContent><p className="stat-label">Publiés</p><p className="stat-value">{stats.published}</p></CardContent></Card>
-        <Card><CardContent><p className="stat-label">Variantes</p><p className="stat-value">{stats.variants}</p></CardContent></Card>
-        <Card><CardContent><p className="stat-label">Stocks faibles</p><p className="stat-value">{stats.lowStock}</p></CardContent></Card>
-        <Card><CardContent><p className="stat-label">Archivés</p><p className="stat-value">{stats.archived}</p></CardContent></Card>
-      </section>
-      <section id="catalogue" className="admin-catalogue-section" aria-labelledby="current-products-title">
-        <div className="admin-catalogue-section__heading"><PackageOpen aria-hidden="true" /><div><h2 id="current-products-title">Catalogue actuel</h2><p>Produits publiés et brouillons en cours de préparation.</p></div><Badge>{currentProducts.length} produit{currentProducts.length > 1 ? "s" : ""}</Badge></div>
-        <Card><ProductTable products={currentProducts} demo={demo} label="Produits publiés et brouillons" emptyMessage="Aucun produit actif ou brouillon dans le catalogue." /></Card>
-      </section>
-      <section className="admin-catalogue-section admin-catalogue-section--archived" aria-labelledby="archived-products-title">
-        <div className="admin-catalogue-section__heading"><Archive aria-hidden="true" /><div><h2 id="archived-products-title">Produits archivés</h2><p>Ces produits ne sont plus proposés à la vente, mais leur historique reste accessible.</p></div><Badge>{archivedProducts.length} produit{archivedProducts.length > 1 ? "s" : ""}</Badge></div>
-        <Card><ProductTable products={archivedProducts} demo={demo} label="Produits archivés" emptyMessage="Aucun produit archivé." /></Card>
-      </section>
-    </AdminShell>
-  );
+  const { demo, products, stats } = useLoaderData<typeof loader>(); const result = useActionData<typeof action>(); const currentProducts = products.filter((product) => product.status !== "archived"); const archivedProducts = products.filter((product) => product.status === "archived");
+  return <AdminShell active="products"><Form method="post"><input type="hidden" name="intent" value="update_variants" /><header className="admin-heading"><div><p className="eyebrow">Catalogue</p><h1>Produits</h1><p className="admin-heading__description">Gérez les cafés, leurs variantes, leurs prix et leurs niveaux de stock.</p></div><Link className={`ui-button ui-button--default${demo ? " is-disabled" : ""}`} to="/admin/produits/nouveau" aria-disabled={demo} onClick={demo ? (event) => event.preventDefault() : undefined}><Plus aria-hidden="true" /> Ajouter un café</Link></header>{demo ? <p className="admin-notice">Mode démonstration local : le catalogue est en lecture seule.</p> : null}{result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}<section className="stats-grid" aria-label="Indicateurs du catalogue"><Card><CardContent><p className="stat-label">Produits</p><p className="stat-value">{stats.products}</p></CardContent></Card><Card><CardContent><p className="stat-label">Publiés</p><p className="stat-value">{stats.published}</p></CardContent></Card><Card><CardContent><p className="stat-label">Variantes</p><p className="stat-value">{stats.variants}</p></CardContent></Card><Card><CardContent><p className="stat-label">Stocks faibles</p><p className="stat-value">{stats.lowStock}</p></CardContent></Card><Card><CardContent><p className="stat-label">Archivés</p><p className="stat-value">{stats.archived}</p></CardContent></Card></section><section id="catalogue" className="admin-catalogue-section" aria-labelledby="current-products-title"><div className="admin-catalogue-section__heading"><PackageOpen aria-hidden="true" /><div><h2 id="current-products-title">Catalogue actuel</h2><p>Produits publiés et brouillons en cours de préparation.</p></div><Badge>{currentProducts.length} produit{currentProducts.length > 1 ? "s" : ""}</Badge></div><CoffeeTabs products={currentProducts} label="Cafés publiés et brouillons" emptyMessage="Aucun produit actif ou brouillon dans le catalogue." /></section><section className="admin-catalogue-section admin-catalogue-section--archived" aria-labelledby="archived-products-title"><div className="admin-catalogue-section__heading"><Archive aria-hidden="true" /><div><h2 id="archived-products-title">Produits archivés</h2><p>Ces produits ne sont plus proposés à la vente, mais leur historique reste accessible.</p></div><Badge>{archivedProducts.length} produit{archivedProducts.length > 1 ? "s" : ""}</Badge></div><CoffeeTabs products={archivedProducts} label="Cafés archivés" emptyMessage="Aucun produit archivé." /></section><button className="ui-button ui-button--default admin-product-save-fab" type="submit" disabled={demo}><Save aria-hidden="true" /> Enregistrer</button></Form></AdminShell>;
 }
