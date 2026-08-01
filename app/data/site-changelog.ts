@@ -11,6 +11,7 @@ export type ChangelogEntry = Readonly<{
 
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
+  { id: "2026-08-01-home-hero-vertical-balance", date: "2026-08-01", kind: "Design", title: "Hero d’accueil équilibré verticalement", description: "La hauteur de l’image de fond du bloc Le café en toute clarté est ajustée pour laisser un espace visuel équivalent en haut et en bas du premier écran." },
   { id: "2026-08-01-product-purchase-weight-order", date: "2026-08-01", kind: "Design", title: "Formats de paquet triés par poids", description: "Le sélecteur d’achat affiche toujours le plus petit format à gauche, puis les formats suivants par poids croissant." },
   { id: "2026-08-01-product-story-original-width", date: "2026-08-01", kind: "Design", title: "Largeur d’origine des blocs éditoriaux restaurée", description: "Les blocs image et texte de fin de fiche café retrouvent leur largeur d’affichage initiale." },
   { id: "2026-08-01-product-tasting-notes-label", date: "2026-08-01", kind: "Design", title: "Titre des notes de dégustation harmonisé", description: "Le titre Notes de dégustation adopte désormais la même police, taille et présentation que les libellés Producteur, Région et autres informations café." },
