@@ -1,11 +1,17 @@
 import { ChevronRight, MapPin, Package, ShieldCheck, ShoppingBag, UserRound } from "lucide-react";
-import type { PropsWithChildren } from "react";
+import type { FormEventHandler, PropsWithChildren } from "react";
 import { Form, Link, useFetcher } from "react-router";
 import { ProfessionalQuotePreview } from "~/components/professional-quote/quote-preview-modal";
 import { formatMoney } from "~/domain/money";
 import type { Locale } from "~/domain/types";
 
 export type AccountSectionId = "orders" | "addresses" | "settings" | "professional-quotes";
+
+export type AccountMfaState = {
+  currentLevel: string | null;
+  nextLevel: string | null;
+  verifiedFactors: Array<{ id: string; friendlyName: string; createdAt: string }>;
+};
 
 type AccountViewer = {
   user: { id: string; email?: string | null };
@@ -60,14 +66,21 @@ export type AccountDashboardData = {
   professionalQuotes: AccountProfessionalQuote[];
   setPassword: boolean;
   next: string;
+  mfa: AccountMfaState | null;
 };
 
-export type AccountActionFeedback = { ok?: boolean; message?: string };
+export type AccountActionFeedback = {
+  ok?: boolean;
+  message?: string;
+  scope?: string;
+  mfaEnrollment?: { factorId: string; qrCode: string; secret: string };
+};
 
 type AccountMutationFormProps = PropsWithChildren<{
   action: string;
   className?: string;
   method: "post";
+  onSubmit?: FormEventHandler<HTMLFormElement>;
 }>;
 
 function AccountMutationForm({ drawer, ...props }: AccountMutationFormProps & { drawer: boolean }) {
@@ -108,8 +121,46 @@ function sectionVisibility(mode: "page" | "drawer", activeSection: AccountSectio
   return mode === "drawer" && activeSection !== section;
 }
 
+function AccountMfaPanel({ mfa, result, drawer, accountPath, english, prefix }: { mfa: AccountMfaState | null; result?: AccountActionFeedback | null; drawer: boolean; accountPath: string; english: boolean; prefix: string }) {
+  const factor = mfa?.verifiedFactors[0];
+  const enrollment = result?.mfaEnrollment;
+  const codeId = `${prefix}-mfa-setup-code`;
+
+  return <div className="mfa-panel">
+    <p className="eyebrow">{english ? "Optional protection" : "Protection facultative"}</p>
+    <h3>{english ? "Two-factor authentication" : "Double authentification"}</h3>
+    {factor ? <>
+      <span className="mfa-status mfa-status--success">{english ? "Active" : "Activée"}</span>
+      <p>{english ? "A code from your authenticator is required when a new session opens this account." : "Un code de votre authentificateur est demandé lorsqu’une nouvelle session ouvre ce compte."}</p>
+      <p><small>{factor.friendlyName} · {new Date(factor.createdAt).toLocaleDateString(english ? "en-GB" : "fr-FR")}</small></p>
+      <AccountMutationForm drawer={drawer} method="post" action={accountPath} className="mfa-disable-form" onSubmit={(event) => { if (!window.confirm(english ? "Disable two-factor authentication?" : "Désactiver la double authentification ?")) event.preventDefault(); }}>
+        <input type="hidden" name="intent" value="mfa_unenroll" />
+        <input type="hidden" name="factorId" value={factor.id} />
+        <button className="ui-button ui-button--danger" type="submit">{english ? "Disable two-factor authentication" : "Désactiver la double authentification"}</button>
+      </AccountMutationForm>
+    </> : enrollment ? <div className="mfa-enrollment">
+      <p>{english ? "Scan this QR code with 2FAS, Google Authenticator or 1Password, then enter the generated code." : "Scannez ce QR code avec 2FAS, Google Authenticator ou 1Password, puis saisissez le code généré."}</p>
+      <img className="mfa-qr" src={enrollment.qrCode} alt={english ? "QR code for Zen Coffee Lab two-factor authentication" : "QR code pour la double authentification Zen Coffee Lab"} width="240" height="240" />
+      <p>{english ? "Manual key:" : "Clé manuelle :"} <code className="mfa-secret">{enrollment.secret}</code></p>
+      <AccountMutationForm drawer={drawer} method="post" action={accountPath} className="mfa-code-form">
+        <input type="hidden" name="intent" value="mfa_verify" />
+        <input type="hidden" name="purpose" value="setup" />
+        <input type="hidden" name="factorId" value={enrollment.factorId} />
+        <div className="field"><label htmlFor={codeId}>{english ? "Six-digit code" : "Code à six chiffres"}<input id={codeId} name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" minLength={6} maxLength={6} required /></label></div>
+        <button className="button button--dark" type="submit">{english ? "Confirm activation" : "Confirmer l’activation"}</button>
+      </AccountMutationForm>
+    </div> : <>
+      <p>{english ? "Add an authenticator code after your password. This protection is optional and can be disabled here later." : "Ajoutez un code d’authentificateur après votre mot de passe. Cette protection est facultative et pourra être désactivée ici ultérieurement."}</p>
+      <AccountMutationForm drawer={drawer} method="post" action={accountPath} className="mfa-enable-form">
+        <input type="hidden" name="intent" value="mfa_enroll" />
+        <button className="ui-button ui-button--outline" type="submit"><ShieldCheck aria-hidden="true" />{english ? "Enable two-factor authentication" : "Activer la double authentification"}</button>
+      </AccountMutationForm>
+    </>}
+  </div>;
+}
+
 function AccountSections({ data, result, mode, activeSection, onNavigate }: { data: AccountDashboardData; result?: AccountActionFeedback | null; mode: "page" | "drawer"; activeSection: AccountSectionId; onNavigate?: () => void }) {
-  const { locale, viewer, orders, addresses, professionalQuotes, setPassword, next } = data;
+  const { locale, viewer, orders, addresses, professionalQuotes, setPassword, next, mfa } = data;
   const english = locale === "en-GB";
   const drawer = mode === "drawer";
   const prefix = drawer ? "account-drawer" : "account";
@@ -141,6 +192,7 @@ function AccountSections({ data, result, mode, activeSection, onNavigate }: { da
     <section className="account-section" id={`${prefix}-settings`} aria-labelledby={drawer ? "account-drawer-tab-settings" : `${prefix}-settings-title`} role={drawer ? "tabpanel" : undefined} hidden={sectionVisibility(mode, activeSection, "settings")}>
       <div className="account-section__heading"><div><p className="eyebrow">{english ? "Access" : "Accès"}</p><h2 id={`${prefix}-settings-title`}>{english ? "Settings & security" : "Paramètres & sécurité"}</h2></div></div>
       {setPassword ? <AccountMutationForm drawer={drawer} method="post" action={accountPath} className="account-panel account-form account-password-form"><input type="hidden" name="intent" value="update_password" /><input type="hidden" name="next" value={next} /><div className="account-form__heading"><div><p className="eyebrow">{english ? "Password" : "Mot de passe"}</p><h3>{english ? "Choose your password" : "Choisissez votre mot de passe"}</h3></div><ShieldCheck aria-hidden="true" /></div><div className="field"><label>{english ? "New password" : "Nouveau mot de passe"}<input name="password" type="password" minLength={10} required autoComplete="new-password" /></label></div><button className="button button--dark" type="submit">{english ? "Save password" : "Enregistrer le mot de passe"}</button></AccountMutationForm> : null}
+      <AccountMfaPanel mfa={mfa} result={result} drawer={drawer} accountPath={accountPath} english={english} prefix={prefix} />
       <div className="account-panel account-settings-card"><div className="account-settings-card__identity"><span><UserRound aria-hidden="true" /></span><div><small>{english ? "Login email" : "E-mail de connexion"}</small><strong>{viewer.user.email}</strong><small>{professional ? (english ? "Approved professional account" : "Compte professionnel validé") : (english ? "Customer account" : "Compte client")}</small></div></div><div className="account-settings-actions"><AccountMutationForm drawer={drawer} method="post" action={accountPath}><input type="hidden" name="intent" value="reset" /><input type="hidden" name="email" value={viewer.user.email ?? ""} /><input type="hidden" name="next" value="#account-settings" /><button className="ui-button ui-button--outline" type="submit">{english ? "Change password by email" : "Modifier le mot de passe par e-mail"}</button></AccountMutationForm>{drawer ? null : <AccountMutationForm drawer={false} method="post" action={accountPath}><input type="hidden" name="intent" value="logout" /><button className="ui-button ui-button--ghost" type="submit">{english ? "Sign out" : "Se déconnecter"}</button></AccountMutationForm>}</div></div>
     </section>
   </main>;

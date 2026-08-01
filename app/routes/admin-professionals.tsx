@@ -2,6 +2,7 @@ import { Clock3, ExternalLink, RefreshCw, Search, ShieldOff, ShieldCheck, Users 
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction, ShouldRevalidateFunction } from "react-router";
 import { Form, Link, useFetcher, useLoaderData } from "react-router";
 import { z } from "zod";
+import { AdminMemberRoleForm } from "~/components/admin-member-role-form";
 import { AdminShell } from "~/components/admin-shell";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
@@ -34,7 +35,7 @@ function includesSearch(values: unknown[], query: string) {
 }
 
 export function buildProfessionalMembers(
-  profiles: Array<{ id: string; professional_status: string | null; first_name: string | null; last_name: string | null; phone: string | null; created_at: string }>,
+  profiles: Array<{ id: string; role: "customer" | "admin"; professional_status: string | null; first_name: string | null; last_name: string | null; phone: string | null; created_at: string }>,
   applications: ProfessionalApplication[],
   users: Array<{ id: string; email?: string; last_sign_in_at?: string; email_confirmed_at?: string }>,
 ) {
@@ -48,6 +49,7 @@ export function buildProfessionalMembers(
     const user = usersById.get(profile.id);
     return {
       id: profile.id,
+      role: profile.role,
       firstName: profile.first_name ?? application?.first_name ?? "",
       lastName: profile.last_name ?? application?.last_name ?? "",
       company: application?.company_name ?? "",
@@ -68,13 +70,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
   const requestedStatus = url.searchParams.get("memberStatus");
   const memberStatus = requestedStatus === "approved" || requestedStatus === "suspended" ? requestedStatus : "all";
-  if (admin.demo) return { demo: true, query, memberStatus, summary: { pending: 0, members: 0, suspended: 0 }, pending: [], history: [], members: [] };
+  if (admin.demo) return { demo: true, adminId: admin.id, query, memberStatus, summary: { pending: 0, members: 0, suspended: 0 }, pending: [], history: [], members: [] };
 
   const client = createServiceSupabase();
   if (!client) throw new Response("Base de données indisponible.", { status: 503 });
   const [applicationResult, profileResult, userResult] = await Promise.all([
     client.from("professional_applications").select("id,company_name,first_name,last_name,email,phone,business_type,monthly_volume,locale,status,decision_note,decided_at,invited_user_id,created_at").order("created_at", { ascending: false }).limit(500),
-    client.from("profiles").select("id,professional_status,first_name,last_name,phone,created_at,updated_at").in("professional_status", ["approved", "suspended"]).limit(1_000),
+    client.from("profiles").select("id,role,professional_status,first_name,last_name,phone,created_at,updated_at").in("professional_status", ["approved", "suspended"]).limit(1_000),
     client.auth.admin.listUsers({ page: 1, perPage: 1_000 }),
   ]);
   if (applicationResult.error) throw new Response(applicationResult.error.message, { status: 500 });
@@ -88,6 +90,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const memberMatches = (member: (typeof allMembers)[number]) => includesSearch([member.company, member.firstName, member.lastName, member.email, member.phone], query) && (memberStatus === "all" || member.status === memberStatus);
   return {
     demo: false,
+    adminId: admin.id,
     query,
     memberStatus,
     summary: {
@@ -219,7 +222,7 @@ function MemberActions({ member }: { member: { id: string; email: string; status
 }
 
 export default function AdminProfessionals() {
-  const { demo, query, memberStatus, summary, pending, history, members } = useLoaderData<typeof loader>();
+  const { demo, adminId, query, memberStatus, summary, pending, history, members } = useLoaderData<typeof loader>();
   return <AdminShell active="professionals">
     <header className="admin-heading"><div><p className="eyebrow">Comptes & accès</p><h1>Professionnels</h1></div><Link className="ui-button ui-button--outline ui-button--sm" to="/professionnel">Voir la page pro</Link></header>
     {demo ? <p className="admin-notice">Connectez Supabase pour consulter et administrer les comptes professionnels.</p> : null}
@@ -243,8 +246,8 @@ export default function AdminProfessionals() {
       <CardHeader><p className="eyebrow">Comptes validés</p><h2>Membres professionnels</h2></CardHeader>
       <CardContent style={{ padding: 0 }}><Table><TableHeader><TableRow><TableHead>Membre</TableHead><TableHead>Statut</TableHead><TableHead>Validation</TableHead><TableHead>Dernière connexion</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader><TableBody>{members.map((member) => <TableRow key={member.id}>
         <TableCell><strong>{member.company || `${member.firstName} ${member.lastName}`}</strong><br /><small>{member.firstName} {member.lastName} · <a href={`mailto:${member.email}`}>{member.email}</a>{member.phone ? <> · {member.phone}</> : null}</small></TableCell>
-        <TableCell><Badge className={`admin-pro-status admin-pro-status--${member.status}`}>{member.status === "approved" ? "Actif" : "Suspendu"}</Badge><br /><small>{member.emailConfirmed ? "E-mail confirmé" : "Activation en attente"}</small></TableCell>
-        <TableCell>{formatDate(member.approvedAt)}</TableCell><TableCell>{formatDate(member.lastSignInAt)}</TableCell><TableCell><MemberActions member={member} /></TableCell>
+        <TableCell><Badge className={`admin-pro-status admin-pro-status--${member.status}`}>{member.status === "approved" ? "Actif" : "Suspendu"}</Badge>{member.role === "admin" ? <><br /><Badge className="admin-member-role-badge">Administrateur</Badge></> : null}<br /><small>{member.emailConfirmed ? "E-mail confirmé" : "Activation en attente"}</small></TableCell>
+        <TableCell>{formatDate(member.approvedAt)}</TableCell><TableCell>{formatDate(member.lastSignInAt)}</TableCell><TableCell><MemberActions member={member} /><AdminMemberRoleForm memberId={member.id} role={member.role} currentAdminId={adminId} memberLabel={member.company || `${member.firstName} ${member.lastName}` || member.email} /></TableCell>
       </TableRow>)}</TableBody></Table>{members.length ? null : <p className="admin-empty-state">Aucun membre ne correspond aux filtres.</p>}</CardContent>
     </Card>
 

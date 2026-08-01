@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
-import { AccountNavigation, AdminLoginGate } from "~/routes/account";
+import { AccountNavigation, MfaLoginGate } from "~/routes/account";
 
 describe("account anchor navigation", () => {
   it("links every customer section and exposes the current counts", () => {
@@ -25,13 +25,13 @@ describe("account anchor navigation", () => {
   });
 });
 
-describe("administrator login", () => {
-  it("shows the 2FA code directly below validated credentials", () => {
+describe("two-factor login", () => {
+  it("shows the optional 2FA code directly below validated credentials", () => {
     const router = createMemoryRouter([
       {
         path: "/",
         action: async () => null,
-        element: <AdminLoginGate
+        element: <MfaLoginGate
           email="admin@example.com"
           english={false}
           next="/admin"
@@ -48,6 +48,7 @@ describe("administrator login", () => {
     expect(html).toContain("Code à six chiffres");
     expect(html.indexOf("Mot de passe validé")).toBeLessThan(html.indexOf("Code à six chiffres"));
     expect(html).toContain("qu’une seule fois pour cette session");
+    expect(html).toContain("Vérifier et continuer");
     expect(html).toContain('name="next" value="/admin"');
   });
 });

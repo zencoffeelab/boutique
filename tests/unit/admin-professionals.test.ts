@@ -10,11 +10,11 @@ const recentApplication = {
 describe("professional member administration", () => {
   it("joins the professional profile with authentication and the latest application", () => {
     const members = buildProfessionalMembers(
-      [{ id: "user-pro", professional_status: "suspended", first_name: "Ada", last_name: "Lovelace", phone: null, created_at: "2026-07-20T12:00:00.000Z" }],
+      [{ id: "user-pro", role: "admin", professional_status: "suspended", first_name: "Ada", last_name: "Lovelace", phone: null, created_at: "2026-07-20T12:00:00.000Z" }],
       [recentApplication, { ...recentApplication, id: "application-old", company_name: "Ancien Café", decided_at: "2026-07-21T12:00:00.000Z" }],
       [{ id: "user-pro", email: "pro@example.com", last_sign_in_at: "2026-07-24T14:00:00.000Z", email_confirmed_at: "2026-07-24T13:00:00.000Z" }],
     );
 
-    expect(members[0]).toMatchObject({ company: "Café Nouveau", email: "pro@example.com", status: "suspended", emailConfirmed: true, lastSignInAt: "2026-07-24T14:00:00.000Z" });
+    expect(members[0]).toMatchObject({ company: "Café Nouveau", email: "pro@example.com", role: "admin", status: "suspended", emailConfirmed: true, lastSignInAt: "2026-07-24T14:00:00.000Z" });
   });
 });

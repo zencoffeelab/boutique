@@ -2,14 +2,14 @@ import { ExternalLink, LogOut, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useFetcher, useLocation } from "react-router";
 import { AccountDashboard } from "~/components/account/account-dashboard";
-import type { AccountActionFeedback, AccountDashboardData, AccountSectionId } from "~/components/account/account-dashboard";
+import type { AccountActionFeedback, AccountDashboardData, AccountMfaState, AccountSectionId } from "~/components/account/account-dashboard";
 import type { Locale } from "~/domain/types";
 
 const ACCOUNT_DRAWER_ANIMATION_MS = 280;
 
 type AccountDrawerResponse = Omit<AccountDashboardData, "viewer"> & {
   viewer: AccountDashboardData["viewer"] | null;
-  mfa?: { currentLevel: string | null } | null;
+  mfa?: AccountMfaState | null;
 };
 
 const tabs: Array<{ id: AccountSectionId; fr: string; en: string }> = [
@@ -32,6 +32,7 @@ export function AccountDrawer({ open, locale, onClose }: { open: boolean; locale
   const returnPath = `${location.pathname}${location.search}`;
   const data = accountFetcher.data;
   const professional = data?.viewer?.profile?.professional_status === "approved";
+  const mfaChallengeRequired = Boolean(data?.mfa?.verifiedFactors.length && data.mfa.currentLevel !== "aal2");
   const visibleTabs = tabs.filter((tab) => tab.id !== "professional-quotes" || professional);
 
   useEffect(() => {
@@ -88,7 +89,7 @@ export function AccountDrawer({ open, locale, onClose }: { open: boolean; locale
         <button className="icon-button" type="button" onClick={onClose} aria-label={english ? "Close my account" : "Fermer mon compte"} autoFocus><X aria-hidden="true" /></button>
       </header>
 
-      {data?.viewer && !(data.viewer.profile?.role === "admin" && data.mfa?.currentLevel !== "aal2") ? <div className="account-drawer__tabs" role="tablist" aria-label={english ? "My account sections" : "Rubriques de mon compte"}>
+      {data?.viewer && !mfaChallengeRequired ? <div className="account-drawer__tabs" role="tablist" aria-label={english ? "My account sections" : "Rubriques de mon compte"}>
         {visibleTabs.map((tab) => <button
           id={`account-drawer-tab-${tab.id}`}
           className={activeSection === tab.id ? "is-active" : undefined}
@@ -118,8 +119,8 @@ export function AccountDrawer({ open, locale, onClose }: { open: boolean; locale
       <div className="account-drawer__content">
         {accountFetcher.state === "loading" && !data ? <div className="account-drawer__loading" role="status"><span aria-hidden="true" /><p>{english ? "Loading your account…" : "Chargement de votre compte…"}</p></div> : null}
         {data && !data.viewer ? <div className="account-drawer__empty"><p>{english ? "Your session has expired. Sign in again to continue." : "Votre session a expiré. Reconnectez-vous pour continuer."}</p><Link className="button button--dark" to={accountPath} onClick={onClose}>{english ? "Sign in" : "Se connecter"}</Link></div> : null}
-        {data?.viewer?.profile?.role === "admin" && data.mfa?.currentLevel !== "aal2" ? <div className="account-drawer__empty"><p>{english ? "Complete two-factor authentication to open this administrator account." : "Terminez l’authentification à deux facteurs pour ouvrir ce compte administrateur."}</p><Link className="button button--dark" to={accountPath} onClick={onClose}>{english ? "Verify my account" : "Vérifier mon compte"}</Link></div> : null}
-        {data?.viewer && !(data.viewer.profile?.role === "admin" && data.mfa?.currentLevel !== "aal2") ? <AccountDashboard data={data as AccountDashboardData} result={actionFetcher.data} mode="drawer" activeSection={activeSection} onNavigate={onClose} /> : null}
+        {data?.viewer && mfaChallengeRequired ? <div className="account-drawer__empty"><p>{english ? "Complete two-factor authentication to open this protected account." : "Terminez la double authentification pour ouvrir ce compte protégé."}</p><Link className="button button--dark" to={accountPath} onClick={onClose}>{english ? "Verify my account" : "Vérifier mon compte"}</Link></div> : null}
+        {data?.viewer && !mfaChallengeRequired ? <AccountDashboard data={data as AccountDashboardData} result={actionFetcher.data} mode="drawer" activeSection={activeSection} onNavigate={onClose} /> : null}
       </div>
 
       <footer className="account-drawer__footer">

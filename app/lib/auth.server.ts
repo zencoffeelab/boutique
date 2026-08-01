@@ -11,6 +11,10 @@ export function accountInitials(firstName?: string | null, lastName?: string | n
   return (initials || email?.trim().slice(0, 2) || "Z").toLocaleUpperCase("fr-FR");
 }
 
+export function optionalMfaSatisfied(verifiedFactorCount: number, currentLevel?: string | null) {
+  return verifiedFactorCount === 0 || currentLevel === "aal2";
+}
+
 export async function getSessionStatus(request: Request) {
   const supabase = createRequestSupabase(request);
   if (!supabase) return { signedIn: false, professional: false, professionalUserId: null, accountInitials: null, admin: false, passwordSetupRequired: false, responseHeaders: new Headers() };
@@ -28,15 +32,19 @@ export async function getSessionStatus(request: Request) {
       profile = result.data;
     }
   }
-  const adminAssurance = profile?.role === "admin"
-    ? await supabase.client.auth.mfa.getAuthenticatorAssuranceLevel()
+  const adminMfa = profile?.role === "admin"
+    ? await Promise.all([
+        supabase.client.auth.mfa.getAuthenticatorAssuranceLevel(),
+        supabase.client.auth.mfa.listFactors(),
+      ])
     : null;
+  const adminMfaAvailable = adminMfa && !adminMfa[0].error && !adminMfa[1].error;
   return {
     signedIn: !error && Boolean(data.user),
     professional: profile?.professional_status === "approved",
     professionalUserId: profile?.professional_status === "approved" ? data.user?.id ?? null : null,
     accountInitials: !error && data.user ? accountInitials(profile?.first_name, profile?.last_name, data.user.email) : null,
-    admin: profile?.role === "admin" && adminAssurance?.data?.currentLevel === "aal2",
+    admin: profile?.role === "admin" && Boolean(adminMfaAvailable) && optionalMfaSatisfied(adminMfa?.[1].data?.totp.length ?? 0, adminMfa?.[0].data?.currentLevel),
     passwordSetupRequired: profile?.password_setup_required === true,
     responseHeaders: supabase.responseHeaders,
   };
@@ -66,8 +74,15 @@ export async function requireAdmin(request: Request) {
   if (!viewer?.profile || viewer.profile.role !== "admin") {
     throw redirect(`${accountPath}?next=${encodeURIComponent(next)}`, { headers: viewer?.responseHeaders });
   }
-  const aal = await createRequestSupabase(request)?.client.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (aal?.data?.currentLevel !== "aal2") {
+  const requestSupabase = createRequestSupabase(request);
+  if (!requestSupabase) throw new Response("Authentication unavailable.", { status: 503 });
+  const factors = await requestSupabase.client.auth.mfa.listFactors();
+  if (factors.error) throw new Response("Unable to verify two-factor settings.", { status: 503 });
+  const aal = factors.data.totp.length > 0
+    ? await requestSupabase.client.auth.mfa.getAuthenticatorAssuranceLevel()
+    : null;
+  if (aal?.error) throw new Response("Unable to verify two-factor authentication.", { status: 503 });
+  if (!optionalMfaSatisfied(factors.data.totp.length, aal?.data?.currentLevel)) {
     throw redirect(`${accountPath}?admin-login=2fa&next=${encodeURIComponent(next)}`, { headers: viewer.responseHeaders });
   }
   return { id: viewer.user.id, role: "admin" as const, demo: false };

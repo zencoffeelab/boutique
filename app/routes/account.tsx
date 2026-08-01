@@ -10,13 +10,14 @@ import { pageMeta } from "~/lib/seo";
 import { createRequestSupabase, createServiceSupabase } from "~/lib/supabase.server";
 
 const addressSchema = z.object({ label: z.string().trim().max(80).default(""), company: z.string().trim().max(120).default(""), firstName: z.string().trim().min(1).max(80), lastName: z.string().trim().min(1).max(80), line1: z.string().trim().min(3).max(160), line2: z.string().trim().max(160).default(""), postalCode: z.string().trim().min(2).max(20), city: z.string().trim().min(1).max(100), countryCode: z.string().trim().regex(/^[A-Z]{2}$/), phone: z.string().trim().max(30).default("") });
-const mfaVerificationSchema = z.object({ factorId: z.uuid(), code: z.string().trim().regex(/^\d{6}$/) });
+const mfaVerificationSchema = z.object({ factorId: z.uuid(), code: z.string().trim().regex(/^\d{6}$/), purpose: z.enum(["login", "setup"]).default("login") });
+const mfaUnenrollmentSchema = z.object({ factorId: z.uuid() });
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request); const accountPath = locale === "en-GB" ? "/en/my-account" : "/mon-compte"; const viewer = await getViewer(request); const url = new URL(request.url); const setPassword = url.searchParams.get("set-password") === "1"; const authError = url.searchParams.get("auth_error"); const next = safeInternalPath(url.searchParams.get("next"), accountPath);
   if (!viewer) return { locale, viewer: null, orders: [], addresses: [], professionalQuotes: [], setPassword, authError, next, mfa: null };
   const publicViewer = { user: { id: viewer.user.id, email: viewer.user.email }, profile: viewer.profile };
-  const requestSupabase = viewer.profile?.role === "admin" ? createRequestSupabase(request) : null;
+  const requestSupabase = createRequestSupabase(request);
   let mfa: { currentLevel: string | null; nextLevel: string | null; verifiedFactors: Array<{ id: string; friendlyName: string; createdAt: string }> } | null = null;
   if (requestSupabase) {
     const [aalResult, factorsResult] = await Promise.all([
@@ -28,7 +29,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       nextLevel: aalResult.data?.nextLevel ?? null,
       verifiedFactors: (factorsResult.data?.totp ?? []).map((factor) => ({ id: factor.id, friendlyName: factor.friendly_name ?? "Authenticator", createdAt: factor.created_at })),
     };
-    if (mfa.currentLevel !== "aal2") {
+    if (mfa.verifiedFactors.length > 0 && mfa.currentLevel !== "aal2") {
       return { locale, viewer: publicViewer, orders: [], addresses: [], professionalQuotes: [], setPassword, authError, next, mfa };
     }
   }
@@ -46,11 +47,9 @@ export async function action({ request }: ActionFunctionArgs) {
   const supabase = createRequestSupabase(request);
   if (!supabase) return { ok: false, message: locale === "en-GB" ? "Authentication is not configured in this environment." : "L’authentification n’est pas configurée dans cet environnement." };
   if (intent === "update_password") { const parsed = z.string().min(10).max(200).safeParse(form.get("password")); if (!parsed.success) return { ok: false, message: locale === "en-GB" ? "Use at least 10 characters." : "Utilisez au moins 10 caractères." }; const { error } = await supabase.client.auth.updateUser({ password: parsed.data }); if (error) return { ok: false, message: error.message }; return redirect(safeInternalPath(form.get("next"), accountPath), { headers: supabase.responseHeaders }); }
-  if (intent === "mfa_enroll" || intent === "mfa_verify") {
+  if (intent === "mfa_enroll" || intent === "mfa_verify" || intent === "mfa_unenroll") {
     const { data: { user } } = await supabase.client.auth.getUser();
     if (!user) return { ok: false, scope: "mfa" as const, message: locale === "en-GB" ? "Sign in again before configuring MFA." : "Reconnectez-vous avant de configurer la MFA." };
-    const { data: profile } = await supabase.client.from("profiles").select("role").eq("id", user.id).maybeSingle();
-    if (profile?.role !== "admin") return { ok: false, scope: "mfa" as const, message: locale === "en-GB" ? "Administrator access required." : "Accès administrateur requis." };
     if (intent === "mfa_enroll") {
       const listed = await supabase.client.auth.mfa.listFactors();
       if (listed.error) return { ok: false, scope: "mfa" as const, message: listed.error.message };
@@ -59,9 +58,18 @@ export async function action({ request }: ActionFunctionArgs) {
         const { error } = await supabase.client.auth.mfa.unenroll({ factorId: factor.id });
         if (error) return { ok: false, scope: "mfa" as const, message: error.message };
       }
-      const enrolled = await supabase.client.auth.mfa.enroll({ factorType: "totp", friendlyName: "Zen Coffee Lab Admin" });
+      const enrolled = await supabase.client.auth.mfa.enroll({ factorType: "totp", friendlyName: "Zen Coffee Lab" });
       if (enrolled.error) return { ok: false, scope: "mfa" as const, message: enrolled.error.message };
-      return { ok: true, scope: "mfa" as const, message: locale === "en-GB" ? "Scan the QR code, then enter the six-digit code." : "Scannez le QR code, puis saisissez le code à six chiffres.", mfaEnrollment: { factorId: enrolled.data.id, qrCode: enrolled.data.totp.qr_code, secret: enrolled.data.totp.secret } };
+      return Response.json({ ok: true, scope: "mfa" as const, message: locale === "en-GB" ? "Scan the QR code, then enter the six-digit code." : "Scannez le QR code, puis saisissez le code à six chiffres.", mfaEnrollment: { factorId: enrolled.data.id, qrCode: enrolled.data.totp.qr_code, secret: enrolled.data.totp.secret } }, { headers: supabase.responseHeaders });
+    }
+    if (intent === "mfa_unenroll") {
+      const parsed = mfaUnenrollmentSchema.safeParse(Object.fromEntries(form));
+      if (!parsed.success) return { ok: false, scope: "mfa" as const, message: locale === "en-GB" ? "This authentication factor is invalid." : "Ce facteur d’authentification est invalide." };
+      const listed = await supabase.client.auth.mfa.listFactors();
+      if (listed.error || !listed.data.totp.some((factor) => factor.id === parsed.data.factorId)) return { ok: false, scope: "mfa" as const, message: locale === "en-GB" ? "This authentication factor is unavailable." : "Ce facteur d’authentification est indisponible." };
+      const unenrolled = await supabase.client.auth.mfa.unenroll({ factorId: parsed.data.factorId });
+      if (unenrolled.error) return Response.json({ ok: false, scope: "mfa" as const, message: locale === "en-GB" ? "Verify your authenticator before disabling two-factor authentication." : "Vérifiez votre authentificateur avant de désactiver la double authentification." }, { status: 409, headers: supabase.responseHeaders });
+      return Response.json({ ok: true, scope: "mfa" as const, message: locale === "en-GB" ? "Two-factor authentication has been disabled." : "La double authentification a été désactivée." }, { headers: supabase.responseHeaders });
     }
     const parsed = mfaVerificationSchema.safeParse(Object.fromEntries(form));
     if (!parsed.success) return { ok: false, scope: "mfa" as const, message: locale === "en-GB" ? "Enter a valid six-digit code." : "Saisissez un code valide à six chiffres." };
@@ -69,7 +77,10 @@ export async function action({ request }: ActionFunctionArgs) {
     if (listed.error || !listed.data.all.some((factor) => factor.id === parsed.data.factorId && factor.factor_type === "totp")) return { ok: false, scope: "mfa" as const, message: locale === "en-GB" ? "This authentication factor is unavailable." : "Ce facteur d’authentification est indisponible." };
     const verified = await supabase.client.auth.mfa.challengeAndVerify({ factorId: parsed.data.factorId, code: parsed.data.code });
     if (verified.error) return { ok: false, scope: "mfa" as const, message: locale === "en-GB" ? "Invalid or expired code." : "Code invalide ou expiré." };
-    return redirect(safeInternalPath(form.get("next"), "/admin"), { headers: supabase.responseHeaders });
+    if (parsed.data.purpose === "setup") {
+      return Response.json({ ok: true, scope: "mfa" as const, message: locale === "en-GB" ? "Two-factor authentication is now active." : "La double authentification est maintenant activée." }, { headers: supabase.responseHeaders });
+    }
+    return redirect(safeInternalPath(form.get("next"), accountPath), { headers: supabase.responseHeaders });
   }
   if (intent === "save_address" || intent === "delete_address") {
     const { data: { user } } = await supabase.client.auth.getUser(); if (!user) return { ok: false, message: "Authentication required." };
@@ -86,7 +97,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const { data: profile } = result.data.user ? await supabase.client.from("profiles").select("role,professional_status").eq("id", result.data.user.id).maybeSingle() : { data: null };
   const requestedNext = safeInternalPath(form.get("next"), accountPath);
   const destination = profile?.role === "admin"
-    ? `${accountPath}?admin-login=2fa&next=${encodeURIComponent(requestedNext === accountPath ? "/admin" : requestedNext)}`
+    ? (requestedNext === accountPath ? "/admin" : requestedNext)
     : profile?.professional_status === "approved" && !requestedNext.startsWith("/admin")
       ? requestedNext
       : accountPath;
@@ -100,26 +111,27 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(data?.lo
 function MfaCodeForm({ factorId, next, english }: { factorId: string; next: string; english: boolean }) {
   return <Form method="post" className="mfa-code-form">
     <input type="hidden" name="intent" value="mfa_verify" />
+    <input type="hidden" name="purpose" value="login" />
     <input type="hidden" name="factorId" value={factorId} />
     <input type="hidden" name="next" value={next} />
     <div className="field"><label htmlFor="mfa-code">{english ? "Six-digit code" : "Code à six chiffres"}<input id="mfa-code" name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" minLength={6} maxLength={6} required /></label></div>
-    <button className="button button--dark" type="submit">{english ? "Verify and open admin" : "Vérifier et ouvrir l’administration"}</button>
+    <button className="button button--dark" type="submit">{english ? "Verify and continue" : "Vérifier et continuer"}</button>
   </Form>;
 }
 
-export function AdminLoginGate({ email, mfa, enrollment, next, english, message, messageIsError = false }: { email: string; mfa: NonNullable<Awaited<ReturnType<typeof loader>>["mfa"]>; enrollment?: { factorId: string; qrCode: string; secret: string }; next: string; english: boolean; message?: string; messageIsError?: boolean }) {
+export function MfaLoginGate({ email, mfa, next, english, message, messageIsError = false }: { email: string; mfa: NonNullable<Awaited<ReturnType<typeof loader>>["mfa"]>; next: string; english: boolean; message?: string; messageIsError?: boolean }) {
   const verifiedFactor = mfa.verifiedFactors[0];
   return <>
-    <header className="page-hero admin-login-hero"><p className="eyebrow">{english ? "Secure access" : "Accès sécurisé"}</p><h1>{english ? "Administrator sign-in" : "Connexion administrateur"}</h1><p className="lede">{english ? "Your credentials are correct. Complete the second and final step." : "Vos identifiants sont corrects. Terminez la seconde et dernière étape."}</p></header>
+    <header className="page-hero admin-login-hero"><p className="eyebrow">{english ? "Secure access" : "Accès sécurisé"}</p><h1>{english ? "Two-factor verification" : "Vérification en deux étapes"}</h1><p className="lede">{english ? "Your credentials are correct. Enter the code from your authenticator to continue." : "Vos identifiants sont corrects. Saisissez le code de votre authentificateur pour continuer."}</p></header>
     <section className="form-card admin-login-card" aria-labelledby="admin-login-title">
-      <div className="admin-login-card__heading"><ShieldCheck aria-hidden="true" /><div><p className="eyebrow">{english ? "Step 2 of 2" : "Étape 2 sur 2"}</p><h2 id="admin-login-title">{english ? "Two-factor authentication" : "Authentification à deux facteurs"}</h2></div></div>
+      <div className="admin-login-card__heading"><ShieldCheck aria-hidden="true" /><div><p className="eyebrow">{english ? "Protected account" : "Compte protégé"}</p><h2 id="admin-login-title">{english ? "Two-factor authentication" : "Double authentification"}</h2></div></div>
       <div className="form-grid admin-login-credentials" aria-label={english ? "Validated credentials" : "Identifiants validés"}>
         <div className="field field--wide"><label htmlFor="admin-email">Email</label><input id="admin-email" type="email" value={email} readOnly autoComplete="email" /></div>
         <div className="field field--wide"><label htmlFor="admin-password-confirmed">{english ? "Password verified" : "Mot de passe validé"}</label><input id="admin-password-confirmed" type="password" value="admin-password-verified" readOnly tabIndex={-1} autoComplete="off" /></div>
       </div>
       <div className="admin-login-second-factor">
         {message ? <p className={messageIsError ? "form-message form-error" : "form-message"} role="status">{message}</p> : null}
-        {enrollment ? <div className="mfa-enrollment"><p>{english ? "Scan this QR code with an authenticator app such as 2FAS, Google Authenticator or 1Password, then enter the generated code below." : "Scannez ce QR code avec une application comme 2FAS, Google Authenticator ou 1Password, puis saisissez ci-dessous le code généré."}</p><img className="mfa-qr" src={enrollment.qrCode} alt={english ? "QR code for Zen Coffee Lab administrator MFA" : "QR code pour la MFA administrateur Zen Coffee Lab"} width="240" height="240" /><p>{english ? "Manual key:" : "Clé manuelle :"} <code className="mfa-secret">{enrollment.secret}</code></p><MfaCodeForm factorId={enrollment.factorId} next={next} english={english} /></div> : verifiedFactor ? <><p>{english ? "Enter the code displayed in your authenticator app. It will only be requested once for this session." : "Saisissez le code affiché dans votre application d’authentification. Il ne sera demandé qu’une seule fois pour cette session."}</p><MfaCodeForm factorId={verifiedFactor.id} next={next} english={english} /></> : <><p>{english ? "Configure an authenticator before opening the back office." : "Configurez une application d’authentification avant d’ouvrir le back-office."}</p><Form method="post" className="admin-login-enroll-form"><input type="hidden" name="intent" value="mfa_enroll" /><input type="hidden" name="next" value={next} /><button className="button button--dark" type="submit">{english ? "Configure my authenticator" : "Configurer mon application d’authentification"}</button></Form></>}
+        {verifiedFactor ? <><p>{english ? "Enter the code displayed in your authenticator app. It will only be requested once for this session." : "Saisissez le code affiché dans votre application d’authentification. Il ne sera demandé qu’une seule fois pour cette session."}</p><MfaCodeForm factorId={verifiedFactor.id} next={next} english={english} /></> : null}
       </div>
       <Form method="post" className="admin-login-switch-account"><input type="hidden" name="intent" value="logout" /><button className="button button--ghost" type="submit">{english ? "Use another account" : "Utiliser un autre compte"}</button></Form>
     </section>
@@ -130,13 +142,12 @@ export { AccountNavigation } from "~/components/account/account-dashboard";
 
 export default function Account() {
   const { locale, viewer, orders, addresses, professionalQuotes, setPassword, authError, next, mfa } = useLoaderData<typeof loader>(); const result = useActionData<typeof action>(); const english = locale === "en-GB";
-  const enrollment = result && "mfaEnrollment" in result ? result.mfaEnrollment : undefined;
   const mfaResult = result && "scope" in result && result.scope === "mfa" ? result : null;
-  if (viewer?.profile?.role === "admin" && mfa && mfa.currentLevel !== "aal2") {
-    return <AdminLoginGate email={viewer.user.email ?? ""} mfa={mfa} enrollment={enrollment} next={next} english={english} message={mfaResult?.message} messageIsError={mfaResult?.ok === false} />;
+  if (viewer && mfa && mfa.verifiedFactors.length > 0 && mfa.currentLevel !== "aal2") {
+    return <MfaLoginGate email={viewer.user.email ?? ""} mfa={mfa} next={next} english={english} message={mfaResult?.message} messageIsError={mfaResult?.ok === false} />;
   }
   if (viewer) {
-    return <AccountDashboard data={{ locale, viewer, orders, addresses, professionalQuotes, setPassword, next }} result={result} />;
+    return <AccountDashboard data={{ locale, viewer, orders, addresses, professionalQuotes, setPassword, next, mfa }} result={result} />;
   }
   return <>
     <header className="page-hero"><p className="eyebrow">{english ? "Private space" : "Espace privé"}</p><h1>{english ? "Your account" : "Votre compte"}</h1><p className="lede">{english ? "Find your orders, invoices, addresses and tracking." : "Retrouvez vos commandes, factures, adresses et suivis."}</p></header>

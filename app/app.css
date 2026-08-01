@@ -2109,9 +2109,14 @@ button:disabled {
   border: 1px solid var(--line);
   background: var(--paper);
 }
-.mfa-panel h2 {
+.mfa-panel h2,
+.mfa-panel h3 {
   margin: 0.35rem 0 1rem;
   font-size: clamp(2rem, 5vw, 4rem);
+}
+.mfa-panel > p:not(.eyebrow) {
+  max-width: 48rem;
+  color: var(--muted);
 }
 .mfa-status {
   display: inline-flex;
@@ -2154,6 +2159,10 @@ button:disabled {
 .mfa-code-form .field input {
   letter-spacing: 0.35em;
   font-variant-numeric: tabular-nums;
+}
+.mfa-enable-form,
+.mfa-disable-form {
+  margin-top: 1.5rem;
 }
 .account-hero {
   padding-bottom: clamp(3rem, 6vw, 5rem);
@@ -4576,6 +4585,20 @@ button:disabled {
 .admin-content-list {
   display: grid;
   gap: 0.8rem;
+}
+.admin-member-role-control {
+  display: grid;
+  gap: 0.5rem;
+}
+.admin-member-role-control .form-message {
+  margin: 0;
+  padding: 0.65rem;
+  font-size: 0.72rem;
+}
+.admin-member-role-badge {
+  margin-top: 0.3rem;
+  background: var(--green-deep);
+  color: white;
 }
 .admin-content-tabs {
   display: inline-flex;
