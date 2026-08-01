@@ -99,7 +99,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     .from("products")
     .select(
       `
-      id, slug, status, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
+      id, slug, status, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
       thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
       product_translations(*),
       product_media(*),
@@ -108,12 +108,29 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     `,
     )
     .in("status", statuses)
+    .order("display_order", { ascending: true })
     .order("created_at", { ascending: false });
-  if (error?.code === "42703" && error.message.includes("hover_image_")) {
+  if (error?.code === "42703" && error.message.includes("display_order")) {
     const compatibleResult = await client
       .from("products")
       .select(`
         id, slug, status, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
+        thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
+        product_translations(*),
+        product_media(*),
+        product_editorial_blocks(*),
+        product_variants(*, variant_offers(*))
+      `)
+      .in("status", statuses)
+      .order("created_at", { ascending: false });
+    if (compatibleResult.error) throw new Error(`Unable to load catalog: ${compatibleResult.error.message}`);
+    return (compatibleResult.data ?? []).map(mapDatabaseProduct);
+  }
+  if (error?.code === "42703" && error.message.includes("hover_image_")) {
+    const compatibleResult = await client
+      .from("products")
+      .select(`
+        id, slug, status, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
         thumbnail_label_public_url, thumbnail_background_color,
         product_translations(*),
         product_media(*),
@@ -121,6 +138,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
         product_variants(*, variant_offers(*))
       `)
       .in("status", statuses)
+      .order("display_order", { ascending: true })
       .order("created_at", { ascending: false });
     if (compatibleResult.error) throw new Error(`Unable to load catalog: ${compatibleResult.error.message}`);
     return (compatibleResult.data ?? []).map(mapDatabaseProduct);
@@ -144,13 +162,14 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const legacyResult = await client
       .from("products")
       .select(`
-        id, slug, status, altitude_meters, featured,
+        id, slug, status, display_order, altitude_meters, featured,
         product_translations(*),
         product_media(*),
         product_editorial_blocks(*),
         product_variants(*, variant_offers(*))
       `)
       .in("status", statuses)
+      .order("display_order", { ascending: true })
       .order("created_at", { ascending: false });
     if (legacyResult.error) throw new Error(`Unable to load catalog: ${legacyResult.error.message}`);
     return (legacyResult.data ?? []).map(mapDatabaseProduct);
