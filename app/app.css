@@ -3791,6 +3791,27 @@ button:disabled {
 .admin-quick-form button {
   grid-column: 1 / -1;
 }
+.admin-coffee-tabs .ui-table {
+  min-width: 62rem;
+  table-layout: fixed;
+}
+.admin-coffee-tabs .ui-table th:nth-child(1),
+.admin-coffee-tabs .ui-table td:nth-child(1) { width: 13%; }
+.admin-coffee-tabs .ui-table th:nth-child(2),
+.admin-coffee-tabs .ui-table td:nth-child(2) { width: 10%; }
+.admin-coffee-tabs .ui-table th:nth-child(3),
+.admin-coffee-tabs .ui-table td:nth-child(3) { width: 13%; }
+.admin-coffee-tabs .ui-table th:nth-child(4),
+.admin-coffee-tabs .ui-table td:nth-child(4) { width: 17%; }
+.admin-coffee-tabs .ui-table th:nth-child(5),
+.admin-coffee-tabs .ui-table td:nth-child(5) { width: 12%; }
+.admin-coffee-tabs .ui-table th:nth-child(6),
+.admin-coffee-tabs .ui-table td:nth-child(6) { width: 35%; }
+.admin-coffee-tabs .ui-table td:nth-child(1),
+.admin-coffee-tabs .ui-table td:nth-child(3) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .admin-coffee-tabs { display: grid; gap: 0.85rem; }
 .admin-coffee-tabs__list { display: flex; gap: 0.4rem; overflow-x: auto; padding: 0.2rem 0; }
 .admin-coffee-tabs__tab { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 0.5rem; min-height: 2.5rem; padding: 0.55rem 0.8rem; border: 1px solid #d5dbd1; border-radius: 999px; background: #fff; color: #44513f; font: 650 0.82rem/1 var(--sans); cursor: pointer; }
