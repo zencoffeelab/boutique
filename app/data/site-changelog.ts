@@ -11,6 +11,7 @@ export type ChangelogEntry = Readonly<{
 
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
+  { id: "2026-08-01-product-detail-logo-axis", date: "2026-08-01", kind: "Design", title: "Fiche café alignée sur l’axe du logo", description: "La séparation entre l’image et les informations de la fiche produit est désormais placée au centre exact de la page, dans l’axe du logo Zen Coffee Lab." },
   { id: "2026-08-01-admin-product-order-collapsed", date: "2026-08-01", kind: "Design", title: "Réorganisation des cafés repliée par défaut", description: "Les panneaux Ordre d’affichage des catalogues actuel et archivé sont désormais fermés à l’ouverture de la page Produits et s’ouvrent par un clic." },
   { id: "2026-08-01-product-display-order-migration-compatibility", date: "2026-08-01", kind: "Correction", title: "Catalogue accessible avant la migration d’ordre", description: "Le site conserve temporairement son ordre existant lorsqu’une base Supabase n’a pas encore reçu la migration des positions d’affichage, afin d’éviter toute indisponibilité pendant la mise à jour." },
   { id: "2026-08-01-admin-product-display-order", date: "2026-08-01", kind: "Fonctionnalité", title: "Ordre des cafés configurable par glisser-déposer", description: "La page Produits du back-office permet désormais de réorganiser séparément les cafés du catalogue actuel et des archives. L’ordre choisi est enregistré et appliqué aux pages Boutique et Archives." },
