@@ -7,7 +7,9 @@ import type { Audience, Locale, Product } from "~/domain/types";
 import { dictionary } from "~/lib/i18n";
 
 export function ProductPurchase({ product, locale, audience = "retail" }: { product: Product; locale: Locale; audience?: Audience }) {
-  const variants = useMemo(() => product.variants.filter((variant) => variant.offers.some((offer) => offer.audience === audience && offer.active)), [audience, product.variants]);
+  const variants = useMemo(() => product.variants
+    .filter((variant) => variant.offers.some((offer) => offer.audience === audience && offer.active))
+    .sort((left, right) => left.weightGrams - right.weightGrams), [audience, product.variants]);
   const firstAvailableVariant = variants.find((variant) => {
     const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active);
     return offer ? variant.stockOnHand - variant.stockReserved >= offer.minimumQuantity : false;

@@ -167,28 +167,16 @@ export default function ProductDetail() {
         <ProductGallery product={product} locale={locale} />
         <div className="product-info">
           <h1>{t.name}</h1>
-          <dl className="origin-grid">
-            <div>
-              <dt>{english ? "Producer" : "Producteur"}</dt>
-              <dd>{t.producer}</dd>
-            </div>
-            <div>
-              <dt>{english ? "Region" : "Région"}</dt>
-              <dd>{t.region}</dd>
-            </div>
-            <div>
-              <dt>{english ? "Variety" : "Variété"}</dt>
-              <dd>{t.variety}</dd>
-            </div>
-            <div>
-              <dt>{english ? "Process" : "Traitement"}</dt>
-              <dd>{t.process}</dd>
-            </div>
-            <div>
-              <dt>Altitude</dt>
-              <dd>{product.altitudeMeters} m</dd>
-            </div>
-          </dl>
+          <table className="product-specifications">
+            <tbody>
+              <tr><th scope="row">{english ? "Producer" : "Producteur"}</th><td>{t.producer}</td></tr>
+              <tr><th scope="row">{english ? "Region" : "Région"}</th><td>{t.region}</td></tr>
+              <tr><th scope="row">{english ? "Variety" : "Variété"}</th><td>{t.variety}</td></tr>
+              <tr><th scope="row">{english ? "Process" : "Traitement"}</th><td>{t.process}</td></tr>
+              <tr><th scope="row">Altitude</th><td>{product.altitudeMeters} m</td></tr>
+              <tr><th scope="row">{english ? "Roast" : "Torréfaction"}</th><td>{english ? "Light" : "Légère"}</td></tr>
+            </tbody>
+          </table>
           <p className="product-info__description">{t.shortDescription}</p>
           {archived ? <section className="product-archive-notice" aria-label={english ? "Archived coffee" : "Café archivé"}>
             <p className="eyebrow">{english ? "Coffee archives" : "Archives café"}</p>
