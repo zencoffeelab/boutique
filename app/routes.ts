@@ -74,6 +74,7 @@ export default [
   route("api/webhooks/sendcloud", "routes/api.webhook-sendcloud.ts"),
   route("api/admin/pro-applications/:id/decision", "routes/api.admin-pro-decision.ts"),
   route("api/admin/members/:id/role", "routes/api.admin-member-role.ts"),
+  route("api/admin/mail/unread-count", "routes/api.admin-mail-unread-count.ts"),
   route("api/admin/orders/:id/label", "routes/api.admin-order-label.ts"),
   route("api/admin/shipments/:id/label", "routes/api.admin-sendcloud-label.ts"),
   route("api/admin/orders/:orderId/shipments/:shipmentId/refund-label", "routes/api.admin-shipment-label-refund.ts"),

@@ -435,7 +435,7 @@ function MailDetail({ message, view, query, labels, labelFilter }: { message: Ad
 export default function AdminMail() {
   const { demo, view, query, labelFilter, labels, compose, composeToken, messages, selected, stats } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
-  return <AdminShell active="mail">
+  return <AdminShell active="mail" unreadMailCount={stats.unread}>
     <header className="admin-heading">
       <div><p className="eyebrow">Contact</p><h1>Messagerie</h1><p className="admin-heading__description">Consultez les messages reçus sur contact@zencoffeelab.com et répondez directement depuis le back-office.</p></div>
       <Link className="ui-button ui-button--default" to="/admin/messagerie?compose=1"><PenLine aria-hidden="true" /> Nouveau message</Link>
@@ -443,7 +443,7 @@ export default function AdminMail() {
     {demo ? <p className="admin-notice">Mode démonstration local : la messagerie est masquée et aucun e-mail ne peut être envoyé.</p> : null}
     {!compose && result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
     <nav className="admin-mail-tabs" aria-label="Dossiers de messagerie">
-      <Link className={view === "inbox" ? "is-active" : undefined} aria-current={view === "inbox" ? "page" : undefined} to="/admin/messagerie?view=inbox"><Inbox aria-hidden="true" /> Boîte de réception <span>{stats.inbox}</span>{stats.unread > 0 ? <strong>{stats.unread} non lu{stats.unread > 1 ? "s" : ""}</strong> : null}</Link>
+      <Link className={view === "inbox" ? "is-active" : undefined} aria-current={view === "inbox" ? "page" : undefined} to="/admin/messagerie?view=inbox"><Inbox aria-hidden="true" /> Boîte de réception <span>{stats.inbox}</span></Link>
       <Link className={view === "sent" ? "is-active" : undefined} aria-current={view === "sent" ? "page" : undefined} to="/admin/messagerie?view=sent"><Send aria-hidden="true" /> Envoyés <span>{stats.sent}</span></Link>
     </nav>
     <MailLabelManager labels={labels} view={view} query={query} labelFilter={labelFilter} selectedId={selected?.id} />

@@ -116,12 +116,39 @@ function AdminFeedbackModal() {
   </dialog>;
 }
 
-export function AdminShell({ active, children }: { active: AdminSection; children: ReactNode }) {
+function AdminMailUnreadBadge({ initialCount }: { initialCount?: number }) {
+  const [remoteCount, setRemoteCount] = useState(0);
+
+  useEffect(() => {
+    if (initialCount !== undefined) return;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const response = await fetch("/api/admin/mail/unread-count", { credentials: "same-origin", headers: { Accept: "application/json" } });
+        if (!response.ok) return;
+        const result = await response.json() as { unread?: unknown };
+        if (active && typeof result.unread === "number") setRemoteCount(result.unread);
+      } catch {
+        // Le compteur sera retenté au prochain rafraîchissement sans interrompre le back-office.
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [initialCount]);
+
+  const unread = initialCount ?? remoteCount;
+  if (unread <= 0) return null;
+  const label = `${unread} e-mail${unread > 1 ? "s" : ""} non lu${unread > 1 ? "s" : ""}`;
+  return <span className="admin-sidebar__mail-count" aria-label={label} title={label}>{unread > 99 ? "99+" : unread}</span>;
+}
+
+export function AdminShell({ active, children, unreadMailCount }: { active: AdminSection; children: ReactNode; unreadMailCount?: number }) {
   return <div className="admin-shell">
     <aside className="admin-sidebar">
       <Logo />
       <nav aria-label="Administration">
-        {navigation.map(({ section, label, href, icon: Icon }) => <Link aria-current={section === active ? "page" : undefined} to={href} key={section}><Icon aria-hidden="true" /> {label}</Link>)}
+        {navigation.map(({ section, label, href, icon: Icon }) => <Link aria-current={section === active ? "page" : undefined} to={href} key={section}><Icon aria-hidden="true" /> {label}{section === "mail" ? <AdminMailUnreadBadge initialCount={unreadMailCount} /> : null}</Link>)}
       </nav>
       <form className="admin-logout" method="post" action="/mon-compte">
         <input type="hidden" name="intent" value="logout" />

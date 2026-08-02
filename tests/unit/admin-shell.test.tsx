@@ -26,6 +26,15 @@ describe("admin navigation", () => {
     expect(html).toContain("Se déconnecter");
   });
 
+  it("shows the unread message count beside the mailbox label", () => {
+    const router = createMemoryRouter([{ path: "/", element: <AdminShell active="products" unreadMailCount={3}><h1>Produits</h1></AdminShell> }]);
+    const html = renderToStaticMarkup(<RouterProvider router={router} />);
+
+    expect(html).toContain('class="admin-sidebar__mail-count"');
+    expect(html).toContain('aria-label="3 e-mails non lus"');
+    expect(html).toContain(">3</span>");
+  });
+
   it("only accepts successful mutation results as confirmations", () => {
     expect(successfulAdminMessage({ ok: true, message: "Produit enregistré." })).toBe("Produit enregistré.");
     expect(successfulAdminMessage({ ok: true })).toBe("La modification a bien été enregistrée.");
