@@ -1,4 +1,4 @@
-import { ChevronRight, MapPin, Package, ShieldCheck, ShoppingBag, UserRound } from "lucide-react";
+import { CircleAlert, CircleCheck, ChevronRight, MapPin, Package, ShieldCheck, ShoppingBag, UserRound } from "lucide-react";
 import type { FormEventHandler, PropsWithChildren } from "react";
 import { Form, Link, useFetcher } from "react-router";
 import { ProfessionalQuotePreview } from "~/components/professional-quote/quote-preview-modal";
@@ -167,9 +167,10 @@ function AccountSections({ data, result, mode, activeSection, onNavigate }: { da
   const accountPath = english ? "/en/my-account" : "/mon-compte";
   const professionalPath = english ? "/en/professional" : "/professionnel";
   const professional = viewer.profile?.professional_status === "approved";
+  const passwordResetResult = result?.scope === "password_reset" ? result : null;
 
   return <main className="account-sections">
-    {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
+    {result?.message && !passwordResetResult ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
     {professional ? <section className="account-section" id={`${prefix}-professional-quotes`} aria-labelledby={drawer ? "account-drawer-tab-professional-quotes" : `${prefix}-professional-quotes-title`} role={drawer ? "tabpanel" : undefined} hidden={sectionVisibility(mode, activeSection, "professional-quotes")}>
       <div className="account-section__heading"><div><p className="eyebrow">{english ? "Professional purchasing" : "Achats professionnels"}</p><h2 id={`${prefix}-professional-quotes-title`}>{english ? "Professional shop" : "Boutique pro"}</h2></div><div className="account-section__actions"><span>{professionalQuotes.length} {english ? (professionalQuotes.length === 1 ? "quote" : "quotes") : "devis"}</span><Link className="ui-button ui-button--outline" to={professionalPath} onClick={onNavigate}>{english ? "Open the pro shop" : "Voir la boutique pro"}</Link></div></div>
       {professionalQuotes.length ? <div className="account-panel account-table-wrap"><table className="ui-table"><thead><tr><th>{english ? "Quote" : "Devis"}</th><th>Date</th><th>{english ? "Status" : "Statut"}</th><th>{english ? "Weight" : "Poids"}</th><th>Total</th><th>Documents</th></tr></thead><tbody>{professionalQuotes.map((quote) => {
@@ -193,7 +194,18 @@ function AccountSections({ data, result, mode, activeSection, onNavigate }: { da
       <div className="account-section__heading"><div><p className="eyebrow">{english ? "Access" : "Accès"}</p><h2 id={`${prefix}-settings-title`}>{english ? "Settings & security" : "Paramètres & sécurité"}</h2></div></div>
       {setPassword ? <AccountMutationForm drawer={drawer} method="post" action={accountPath} className="account-panel account-form account-password-form"><input type="hidden" name="intent" value="update_password" /><input type="hidden" name="next" value={next} /><div className="account-form__heading"><div><p className="eyebrow">{english ? "Password" : "Mot de passe"}</p><h3>{english ? "Choose your password" : "Choisissez votre mot de passe"}</h3></div><ShieldCheck aria-hidden="true" /></div><div className="field"><label>{english ? "New password" : "Nouveau mot de passe"}<input name="password" type="password" minLength={10} required autoComplete="new-password" /></label></div><button className="button button--dark" type="submit">{english ? "Save password" : "Enregistrer le mot de passe"}</button></AccountMutationForm> : null}
       <AccountMfaPanel mfa={mfa} result={result} drawer={drawer} accountPath={accountPath} english={english} prefix={prefix} />
-      <div className="account-panel account-settings-card"><div className="account-settings-card__identity"><span><UserRound aria-hidden="true" /></span><div><small>{english ? "Login email" : "E-mail de connexion"}</small><strong>{viewer.user.email}</strong><small>{professional ? (english ? "Approved professional account" : "Compte professionnel validé") : (english ? "Customer account" : "Compte client")}</small></div></div><div className="account-settings-actions"><AccountMutationForm drawer={drawer} method="post" action={accountPath}><input type="hidden" name="intent" value="reset" /><input type="hidden" name="email" value={viewer.user.email ?? ""} /><input type="hidden" name="next" value="#account-settings" /><button className="ui-button ui-button--outline" type="submit">{english ? "Change password by email" : "Modifier le mot de passe par e-mail"}</button></AccountMutationForm>{drawer ? null : <AccountMutationForm drawer={false} method="post" action={accountPath}><input type="hidden" name="intent" value="logout" /><button className="ui-button ui-button--ghost" type="submit">{english ? "Sign out" : "Se déconnecter"}</button></AccountMutationForm>}</div></div>
+      <div className="account-panel account-settings-card">
+        <div className="account-settings-card__identity"><span><UserRound aria-hidden="true" /></span><div><small>{english ? "Login email" : "E-mail de connexion"}</small><strong>{viewer.user.email}</strong><small>{professional ? (english ? "Approved professional account" : "Compte professionnel validé") : (english ? "Customer account" : "Compte client")}</small></div></div>
+        <div className="account-settings-actions"><AccountMutationForm drawer={drawer} method="post" action={accountPath}><input type="hidden" name="intent" value="reset" /><input type="hidden" name="email" value={viewer.user.email ?? ""} /><input type="hidden" name="next" value="#account-settings" /><button className="ui-button ui-button--outline" type="submit">{english ? "Change password by email" : "Modifier le mot de passe par e-mail"}</button></AccountMutationForm>{drawer ? null : <AccountMutationForm drawer={false} method="post" action={accountPath}><input type="hidden" name="intent" value="logout" /><button className="ui-button ui-button--ghost" type="submit">{english ? "Sign out" : "Se déconnecter"}</button></AccountMutationForm>}</div>
+        {passwordResetResult?.message ? <div
+          className={`account-password-reset-feedback${passwordResetResult.ok ? " is-success" : " is-error"}`}
+          role={passwordResetResult.ok ? "status" : "alert"}
+          aria-live={passwordResetResult.ok ? "polite" : "assertive"}
+        >
+          {passwordResetResult.ok ? <CircleCheck aria-hidden="true" /> : <CircleAlert aria-hidden="true" />}
+          <div><strong>{passwordResetResult.ok ? (english ? "Email sent" : "E-mail envoyé") : (english ? "Unable to send" : "Envoi impossible")}</strong><p>{passwordResetResult.message}</p></div>
+        </div> : null}
+      </div>
     </section>
   </main>;
 }

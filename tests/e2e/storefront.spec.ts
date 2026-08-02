@@ -18,7 +18,7 @@ test("global brand surfaces and language flags use the updated artwork", async (
   await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", "/favicon.svg?v=3");
 });
 
-test("home hero overlays its centered white content on a full-width 70vh image", async ({
+test("home hero overlays its centered white content on a balanced full-width image", async ({
   page,
 }) => {
   await page.goto("/");
@@ -43,7 +43,7 @@ test("home hero overlays its centered white content on a full-width 70vh image",
   expect(mediaBox).not.toBeNull();
   expect(copyBox).not.toBeNull();
   expect(mediaBox!.width).toBeCloseTo(viewport!.width, 0);
-  expect(mediaBox!.height).toBeCloseTo(viewport!.height * 0.7, 0);
+  expect(mediaBox!.height).toBeCloseTo(viewport!.height - 176, 0);
   expect(copyBox!.x).toBeCloseTo(mediaBox!.x, 0);
   expect(copyBox!.y).toBeCloseTo(mediaBox!.y, 0);
   expect(copyBox!.height).toBeCloseTo(mediaBox!.height, 0);
@@ -128,13 +128,13 @@ test("product page shows compact origins, prominent notes and alternating editor
   await page.goto("/boutique/kenya-kaiguri-ab");
   const detail = page.locator(".product-detail");
   await expect(detail.locator(".product-info__description")).toHaveCSS("font-size", "16.8px");
-  const origin = page.locator(".origin-grid");
+  const origin = page.locator(".product-specifications");
   const tastingNotes = page.locator(".product-tasting-notes");
   const story = page.locator(".product-story");
   await expect(detail.locator(".stock-note")).toHaveCount(0);
   await expect(detail.getByText(/unités disponibles/)).toHaveCount(0);
-  await expect(detail.locator(".product-info").locator(".origin-grid")).toHaveCount(1);
-  await expect(origin.locator("div")).toHaveCount(5);
+  await expect(detail.locator(".product-info").locator(".product-specifications")).toHaveCount(1);
+  await expect(origin.locator("tr")).toHaveCount(6);
   await expect(tastingNotes.getByRole("heading", { name: "Notes de dégustation" })).toBeVisible();
   expect(await tastingNotes.locator("li").count()).toBeGreaterThan(0);
   await expect(page.getByText("De la graine à la tasse")).toHaveCount(0);

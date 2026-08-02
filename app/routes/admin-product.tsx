@@ -1583,6 +1583,16 @@ export function adminProductProgressMessage(intent: string) {
   return messages[intent] ?? "Modification en cours…";
 }
 
+const adminProductImageUploadIntents = new Set([
+  "upload_media",
+  "upload_thumbnail_label",
+  "upload_hover_image",
+]);
+
+export function isAdminProductImageUpload(intent: string) {
+  return adminProductImageUploadIntents.has(intent);
+}
+
 function AdminProductProgress({ message }: { message: string }) {
   return <div className="admin-product-progress" role="status" aria-live="polite">
     <span>{message}</span>
@@ -1592,6 +1602,72 @@ function AdminProductProgress({ message }: { message: string }) {
       aria-label={message}
       aria-valuetext="En cours"
     ><span /></div>
+  </div>;
+}
+
+function UploadLockedProductSave() {
+  const [saveAttempted, setSaveAttempted] = useState(false);
+
+  return <div
+    className="admin-product-save-control is-uploading"
+    role="group"
+    aria-label="Enregistrement du produit"
+  >
+    <p
+      id="admin-product-upload-notice"
+      className={`admin-product-upload-notice${saveAttempted ? " is-blocked" : ""}`}
+      role={saveAttempted ? "alert" : "status"}
+      aria-live={saveAttempted ? "assertive" : "polite"}
+    >
+      {saveAttempted
+        ? "Impossible d’enregistrer maintenant : une photo est en cours d’import. Attendez la fin du transfert."
+        : "Import de la photo en cours… L’enregistrement sera disponible à la fin du transfert."}
+    </p>
+    <div className="admin-product-save-lock">
+      <button
+        className="ui-button ui-button--default admin-product-save-fab"
+        type="submit"
+        form="product-editor-form"
+        disabled
+        aria-describedby="admin-product-upload-notice"
+        aria-busy="true"
+      >
+        <Save aria-hidden="true" /> Enregistrer
+      </button>
+      <button
+        className="admin-product-save-blocker"
+        type="button"
+        aria-label="Pourquoi l’enregistrement est indisponible"
+        aria-describedby="admin-product-upload-notice"
+        onClick={() => setSaveAttempted(true)}
+      />
+    </div>
+  </div>;
+}
+
+export function AdminProductSaveControl({
+  demo,
+  modifying,
+  pendingIntent,
+}: {
+  demo: boolean;
+  modifying: boolean;
+  pendingIntent: string;
+}) {
+  if (modifying && isAdminProductImageUpload(pendingIntent))
+    return <UploadLockedProductSave />;
+
+  const savingProduct = modifying && pendingIntent === "save_product";
+  return <div className="admin-product-save-control">
+    <button
+      className="ui-button ui-button--default admin-product-save-fab"
+      type="submit"
+      form="product-editor-form"
+      disabled={demo || modifying}
+      aria-busy={savingProduct}
+    >
+      <Save aria-hidden="true" /> {savingProduct ? "Enregistrement…" : "Enregistrer"}
+    </button>
   </div>;
 }
 
@@ -1664,7 +1740,6 @@ export default function AdminProduct() {
   const navigation = useNavigation();
   const pendingIntent = String(navigation.formData?.get("intent") ?? "");
   const modifying = navigation.state !== "idle" && Boolean(navigation.formData);
-  const savingProduct = modifying && pendingIntent === "save_product";
   return (
     <AdminShell active="products">
       {modifying ? <AdminProductProgress message={adminProductProgressMessage(pendingIntent)} /> : null}
@@ -1682,15 +1757,11 @@ export default function AdminProduct() {
               Voir la fiche
             </Link>
           ) : null}
-          <button
-            className="ui-button ui-button--default admin-product-save-fab"
-            type="submit"
-            form="product-editor-form"
-            disabled={demo || modifying}
-            aria-busy={savingProduct}
-          >
-            <Save aria-hidden="true" /> {savingProduct ? "Enregistrement…" : "Enregistrer"}
-          </button>
+          <AdminProductSaveControl
+            demo={demo}
+            modifying={modifying}
+            pendingIntent={pendingIntent}
+          />
         </div>
       </header>
       {demo ? (

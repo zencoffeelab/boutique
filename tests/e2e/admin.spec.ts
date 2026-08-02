@@ -36,11 +36,11 @@ test("dashboard and product management use distinct pages", async ({
   ).toBeVisible();
   await expect(
     page
-      .getByRole("table", { name: "Produits publiés et brouillons" })
+      .getByRole("table", { name: "Cafés publiés et brouillons" })
       .getByRole("columnheader", { name: "Mise à jour rapide" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("table", { name: "Produits archivés" }),
+    page.getByRole("table", { name: "Cafés archivés" }),
   ).toBeVisible();
 });
 

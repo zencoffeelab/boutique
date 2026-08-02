@@ -34,6 +34,7 @@ const schema = z.object({
   SHIP_FROM_EMAIL: z.email().default("contact@zencoffeelab.com"),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().default("Zen Coffee Lab <commandes@zencoffeelab.com>"),
+  CONTACT_FROM_EMAIL: z.string().default("Zen Coffee Lab <contact@zencoffeelab.com>"),
   ADMIN_NOTIFICATION_EMAIL: z.email().default("contact@zencoffeelab.com"),
   CRON_SECRET: z.string().optional(),
   ALLOW_DEMO_DATA: booleanString,

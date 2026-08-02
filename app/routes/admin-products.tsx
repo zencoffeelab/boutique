@@ -82,9 +82,18 @@ export const meta: MetaFunction = () => [{ title: "Produits | Administration Zen
 const statusLabels: Record<ProductStatus, string> = { draft: "Brouillon", published: "Publié", archived: "Archivé" };
 type ProductGroup = Readonly<{ id: string; name: string; products: readonly Product[] }>;
 
+function adminCoffeeId(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("fr-FR")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "cafe";
+}
+
 function groupProductsByName(products: readonly Product[]): ProductGroup[] {
   const groups = new Map<string, ProductGroup>();
-  for (const product of products) { const name = product.translations["fr-FR"].name.trim() || "Café sans nom"; const id = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr-FR"); const previous = groups.get(id); groups.set(id, previous ? { ...previous, products: [...previous.products, product] } : { id, name, products: [product] }); }
+  for (const product of products) { const name = product.translations["fr-FR"].name.trim() || "Café sans nom"; const key = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr-FR"); const previous = groups.get(key); groups.set(key, previous ? { ...previous, products: [...previous.products, product] } : { id: `${adminCoffeeId(name)}-${adminCoffeeId(product.id)}`, name, products: [product] }); }
   return [...groups.values()].sort((left, right) => left.name.localeCompare(right.name, "fr-FR"));
 }
 function ProductTable({ products, emptyMessage, label }: { products: readonly Product[]; emptyMessage: string; label: string }) {
@@ -92,8 +101,9 @@ function ProductTable({ products, emptyMessage, label }: { products: readonly Pr
 }
 function CoffeeTabs({ products, emptyMessage, label }: { products: readonly Product[]; emptyMessage: string; label: string }) {
   const groups = groupProductsByName(products); const [activeTab, setActiveTab] = useState(groups[0]?.id ?? ""); useEffect(() => { if (!groups.some((group) => group.id === activeTab)) setActiveTab(groups[0]?.id ?? ""); }, [activeTab, groups]);
+  const tabsId = `admin-coffee-${adminCoffeeId(label)}`;
   if (groups.length === 0) return <Card><ProductTable products={[]} label={label} emptyMessage={emptyMessage} /></Card>;
-  return <div className="admin-coffee-tabs"><div className="admin-coffee-tabs__list" role="tablist" aria-label={label}>{groups.map((group) => <button key={group.id} id={`${label}-${group.id}-tab`} className="admin-coffee-tabs__tab" type="button" role="tab" aria-selected={group.id === activeTab} aria-controls={`${label}-${group.id}-panel`} onClick={() => setActiveTab(group.id)}>{group.name}<span>{group.products.reduce((count, product) => count + product.variants.length, 0)}</span></button>)}</div>{groups.map((group) => { const variantCount = group.products.reduce((count, product) => count + product.variants.length, 0); return <div key={group.id} id={`${label}-${group.id}-panel`} role="tabpanel" aria-labelledby={`${label}-${group.id}-tab`} hidden={group.id !== activeTab}><div className="admin-coffee-tabs__summary"><strong>{group.name}</strong><span>{variantCount} variante{variantCount > 1 ? "s" : ""}{group.products.length > 1 ? ` réunies depuis ${group.products.length} fiches` : ""}</span></div><Card><ProductTable products={group.products} label={`${label} — ${group.name}`} emptyMessage={emptyMessage} /></Card></div>; })}</div>;
+  return <div className="admin-coffee-tabs"><div className="admin-coffee-tabs__list" role="tablist" aria-label={label}>{groups.map((group) => <button key={group.id} id={`${tabsId}-${group.id}-tab`} className="admin-coffee-tabs__tab" type="button" role="tab" aria-selected={group.id === activeTab} aria-controls={`${tabsId}-${group.id}-panel`} onClick={() => setActiveTab(group.id)}>{group.name}<span>{group.products.reduce((count, product) => count + product.variants.length, 0)}</span></button>)}</div>{groups.map((group) => { const variantCount = group.products.reduce((count, product) => count + product.variants.length, 0); return <div key={group.id} id={`${tabsId}-${group.id}-panel`} role="tabpanel" aria-labelledby={`${tabsId}-${group.id}-tab`} hidden={group.id !== activeTab}><div className="admin-coffee-tabs__summary"><strong>{group.name}</strong><span>{variantCount} variante{variantCount > 1 ? "s" : ""}{group.products.length > 1 ? ` réunies depuis ${group.products.length} fiches` : ""}</span></div><Card><ProductTable products={group.products} label={`${label} — ${group.name}`} emptyMessage={emptyMessage} /></Card></div>; })}</div>;
 }
 function ProductOrderList({
   products,

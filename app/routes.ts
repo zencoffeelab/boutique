@@ -31,6 +31,8 @@ export default [
   route("admin/expedition", "routes/admin-shipping.tsx"),
   route("admin/clients", "routes/admin-customers.tsx"),
   route("admin/professionnels", "routes/admin-professionals.tsx"),
+  route("admin/messagerie", "routes/admin-mail.tsx"),
+  route("admin/messagerie/:messageId/pieces-jointes/:attachmentId", "routes/admin-mail-attachment.ts"),
   route("admin/contenus", "routes/admin-content.tsx"),
   route("admin/bandeau", "routes/admin-announcement.tsx"),
   route("admin/editorial", "routes/admin-editorial.tsx"),
