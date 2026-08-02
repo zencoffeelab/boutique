@@ -6166,6 +6166,161 @@ button:disabled {
   background: #fff;
 }
 
+.admin-mail-label-manager {
+  margin: 0 0 1rem;
+  border: 1px solid #d5dbd1;
+  border-radius: 0.8rem;
+  background: #fff;
+}
+
+.admin-mail-label-manager summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 1rem;
+  color: #3d4938;
+  font: 700 0.82rem/1.2 var(--sans);
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-mail-label-manager summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-mail-label-manager summary > span,
+.admin-mail-label-manager summary > strong {
+  display: inline-flex;
+  align-items: center;
+}
+
+.admin-mail-label-manager summary > span {
+  gap: 0.45rem;
+}
+
+.admin-mail-label-manager summary svg {
+  width: 1rem;
+}
+
+.admin-mail-label-manager summary > strong {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  justify-content: center;
+  border-radius: 999px;
+  background: #eef1eb;
+  font-size: 0.72rem;
+}
+
+.admin-mail-label-manager__content {
+  display: grid;
+  gap: 0.8rem;
+  padding: 0.85rem 1rem 1rem;
+  border-top: 1px solid #e2e5df;
+}
+
+.admin-mail-label-create {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto auto;
+  align-items: end;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.admin-mail-label-create label {
+  display: grid;
+  gap: 0.3rem;
+  color: #697064;
+  font: 700 0.7rem/1.2 var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-mail-label-create input[type="text"],
+.admin-mail-label-create input:not([type]) {
+  min-height: 2.35rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #c9cec5;
+  border-radius: 0.55rem;
+  color: #252c22;
+  font: 500 0.86rem/1.2 var(--sans);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.admin-mail-label-create .admin-mail-label-color input {
+  width: 3rem;
+  height: 2.35rem;
+  padding: 0.2rem;
+  border: 1px solid #c9cec5;
+  border-radius: 0.55rem;
+  background: #fff;
+}
+
+.admin-mail-label-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-mail-label-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.admin-mail-label-list form {
+  margin: 0;
+}
+
+.admin-mail-label-list form button {
+  display: grid;
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #747b70;
+  cursor: pointer;
+}
+
+.admin-mail-label-list form button:hover {
+  background: #f3e8e5;
+  color: #9f3d2f;
+}
+
+.admin-mail-label-list form svg {
+  width: 0.8rem;
+}
+
+.admin-mail-label-manager__empty {
+  margin: 0;
+  color: #737a6f;
+  font-size: 0.78rem;
+}
+
+.admin-mail-label {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: #fff;
+  font: 750 0.68rem/1 var(--sans);
+}
+
+.admin-mail-label svg {
+  width: 0.72rem;
+  height: 0.72rem;
+}
+
 .admin-mail-list {
   min-width: 0;
   border-right: 1px solid #d5dbd1;
@@ -6174,7 +6329,7 @@ button:disabled {
 
 .admin-mail-search {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, 0.7fr) auto;
   gap: 0.5rem;
   padding: 0.8rem;
   border-bottom: 1px solid #d5dbd1;
@@ -6202,6 +6357,16 @@ button:disabled {
   border: 1px solid #c9cec5;
   border-radius: 0.55rem;
   background: #fff;
+}
+
+.admin-mail-search select {
+  width: 100%;
+  min-height: 2.35rem;
+  padding: 0.55rem 0.7rem 0.55rem 2.15rem;
+  border: 1px solid #c9cec5;
+  border-radius: 0.55rem;
+  background: #fff;
+  color: #30372d;
 }
 
 .admin-mail-list__items {
@@ -6320,6 +6485,36 @@ button:disabled {
 
 .admin-mail-detail__actions form {
   margin: 0;
+}
+
+.admin-mail-label-assignment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid #edf0ea;
+}
+
+.admin-mail-label-assignment label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #5a6256;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.admin-mail-label-assignment label svg {
+  width: 0.9rem;
+}
+
+.admin-mail-label-assignment select {
+  min-height: 2.25rem;
+  padding: 0.45rem 2rem 0.45rem 0.65rem;
+  border: 1px solid #c9cec5;
+  border-radius: 0.5rem;
+  background: #fff;
 }
 
 .admin-mail-detail__meta {
@@ -6499,6 +6694,12 @@ button:disabled {
   }
   .admin-mail-search {
     grid-template-columns: 1fr;
+  }
+  .admin-mail-label-create {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .admin-mail-label-create > button {
+    grid-column: 1 / -1;
   }
   .admin-mail-search button,
   .admin-mail-compose__form > button {

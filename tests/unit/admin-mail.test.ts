@@ -61,4 +61,73 @@ describe("administrator mailbox", () => {
     expect(archivedInsert).toHaveBeenCalledWith(expect.objectContaining({ direction: "outbound", provider_id: "resend-message-id" }));
     expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ action: "admin_mail.sent" }));
   });
+
+  it("assigns a custom label to a message", async () => {
+    const update = vi.fn(() => ({ eq: async () => ({ error: null }) }));
+    const auditInsert = vi.fn(async () => ({ error: null }));
+    const client = {
+      from: vi.fn((table: string) => {
+        if (table === "admin_mail_messages") return { update };
+        if (table === "audit_log") return { insert: auditInsert };
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+    vi.mocked(createServiceSupabase).mockReturnValue(client as never);
+    const form = new FormData();
+    form.set("intent", "assign_label");
+    form.set("messageId", "22222222-2222-4222-8222-222222222222");
+    form.set("labelId", "44444444-4444-4444-8444-444444444444");
+    form.set("view", "inbox");
+    form.set("q", "");
+    form.set("label", "");
+
+    let response: Response | undefined;
+    try {
+      await action({ request: new Request("http://localhost/admin/messagerie", { method: "POST", body: form }), params: {}, context: {} } as never);
+    } catch (cause) {
+      response = cause as Response;
+    }
+
+    expect(response?.status).toBe(302);
+    expect(response?.headers.get("location")).toContain("confirmation=mail-labeled");
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ label_id: "44444444-4444-4444-8444-444444444444" }));
+    expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ action: "admin_mail.label_assigned" }));
+  });
+
+  it("deletes attachments from storage before deleting a message", async () => {
+    const remove = vi.fn(async () => ({ data: [], error: null }));
+    const deleteEq = vi.fn(async () => ({ error: null }));
+    const auditInsert = vi.fn(async () => ({ error: null }));
+    const client = {
+      storage: { from: vi.fn(() => ({ remove })) },
+      from: vi.fn((table: string) => {
+        if (table === "admin_mail_messages") return {
+          select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "22222222-2222-4222-8222-222222222222", direction: "inbound", sender_address: "client@example.com", subject: "Question", admin_mail_attachments: [{ storage_path: "22222222/message.pdf" }] }, error: null }) }) }),
+          delete: () => ({ eq: deleteEq }),
+        };
+        if (table === "audit_log") return { insert: auditInsert };
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+    vi.mocked(createServiceSupabase).mockReturnValue(client as never);
+    const form = new FormData();
+    form.set("intent", "delete_message");
+    form.set("messageId", "22222222-2222-4222-8222-222222222222");
+    form.set("view", "inbox");
+    form.set("q", "");
+    form.set("label", "");
+
+    let response: Response | undefined;
+    try {
+      await action({ request: new Request("http://localhost/admin/messagerie", { method: "POST", body: form }), params: {}, context: {} } as never);
+    } catch (cause) {
+      response = cause as Response;
+    }
+
+    expect(response?.status).toBe(302);
+    expect(response?.headers.get("location")).toContain("confirmation=mail-deleted");
+    expect(remove).toHaveBeenCalledWith(["22222222/message.pdf"]);
+    expect(deleteEq).toHaveBeenCalledWith("id", "22222222-2222-4222-8222-222222222222");
+    expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ action: "admin_mail.deleted" }));
+  });
 });

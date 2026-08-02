@@ -28,6 +28,10 @@ type AdminMutationResult = {
 const redirectedConfirmationMessages: Readonly<Record<string, string>> = {
   "product-created": "Produit créé.",
   "mail-sent": "E-mail envoyé et archivé dans la messagerie.",
+  "mail-deleted": "E-mail supprimé définitivement.",
+  "mail-labeled": "Label du message mis à jour.",
+  "mail-label-created": "Label créé.",
+  "mail-label-deleted": "Label supprimé.",
 };
 
 export function successfulAdminMessage(result: unknown) {
