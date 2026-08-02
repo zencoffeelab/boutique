@@ -1752,9 +1752,9 @@ export default function AdminProduct() {
           {!isNew ? (
             <Link
               className="ui-button ui-button--outline"
-              to={`/boutique/${product.slug}`}
+              to={product.status === "draft" ? `/boutique/${product.slug}?preview=${product.id}` : `/boutique/${product.slug}`}
             >
-              Voir la fiche
+              {product.status === "draft" ? "Aperçu du brouillon" : "Voir la fiche"}
             </Link>
           ) : null}
           <AdminProductSaveControl

@@ -7,16 +7,18 @@ import { ProductPurchase } from "~/components/product-purchase";
 import { ProductPackArtwork } from "~/components/product-thumbnail-label";
 import { ProfessionalQuoteAdd } from "~/components/professional-quote/professional-quote-add";
 import type { Audience, Locale, Product, ProductEditorialBlock } from "~/domain/types";
-import { getAudience } from "~/lib/auth.server";
-import { getProducts, hasPurchasableVariant } from "~/lib/catalog.server";
+import { getAudience, requireAdmin } from "~/lib/auth.server";
+import { getAdminProducts, getProducts, hasPurchasableVariant } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { getRelatedProducts } from "~/lib/product-recommendations";
 import { JsonLd, pageMeta, productStructuredData } from "~/lib/seo";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const locale = getLocale(request);
-  const wantsProfessional =
-    new URL(request.url).searchParams.get("audience") === "professional";
+  const url = new URL(request.url);
+  const previewId = url.searchParams.get("preview");
+  const preview = Boolean(previewId);
+  const wantsProfessional = url.searchParams.get("audience") === "professional";
   const authorizedAudience = wantsProfessional
     ? await getAudience(request)
     : "retail";
@@ -24,9 +26,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     wantsProfessional && authorizedAudience === "professional"
       ? "professional"
       : "retail";
-  const products = await getProducts({ audience });
-  const product = products.find((item) => item.slug === params.slug) ?? null;
-  if (!product || (product.status !== "published" && product.status !== "archived") || (product.status === "published" && audience === "professional" && !product.professionalEnabled))
+  if (preview) await requireAdmin(request);
+  const products = preview
+    ? await getAdminProducts()
+    : await getProducts({ audience });
+  const product =
+    products.find((item) =>
+      preview
+        ? item.id === previewId && item.slug === params.slug
+        : item.slug === params.slug,
+    ) ?? null;
+  if (
+    !product ||
+    (!preview &&
+      product.status !== "published" &&
+      product.status !== "archived") ||
+    (!preview &&
+      product.status === "published" &&
+      audience === "professional" &&
+      !product.professionalEnabled)
+  )
     throw new Response(
       locale === "fr-FR" ? "Café introuvable" : "Coffee not found",
       { status: 404 },
@@ -37,20 +56,23 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     products.filter((candidate) => candidate.status === "published" && hasPurchasableVariant(candidate, audience)),
     locale,
   );
-  return { locale, product, audience, archived, relatedProducts };
+  return { locale, product, audience, archived, preview, relatedProducts };
 }
 
-export const meta: MetaFunction<typeof loader> = ({ data }) =>
-  data
-    ? pageMeta(
-        data.product.translations[data.locale].seoTitle,
-        data.product.translations[data.locale].seoDescription,
-        data.locale === "fr-FR"
-          ? `/boutique/${data.product.slug}`
-          : `/en/shop/${data.product.slug}`,
-        data.product.media[0]?.url,
-      )
-    : [{ title: "Café introuvable | Zen Coffee Lab" }];
+export const meta: MetaFunction<typeof loader> = ({ data }) => {
+  if (!data) return [{ title: "Café introuvable | Zen Coffee Lab" }];
+  const metadata = pageMeta(
+    data.product.translations[data.locale].seoTitle,
+    data.product.translations[data.locale].seoDescription,
+    data.locale === "fr-FR"
+      ? `/boutique/${data.product.slug}`
+      : `/en/shop/${data.product.slug}`,
+    data.product.media[0]?.url,
+  );
+  return data.preview
+    ? [...metadata, { name: "robots", content: "noindex,nofollow" }]
+    : metadata;
+};
 
 export function productReturnLink(locale: Locale, audience: Audience, archived = false) {
   if (archived) {
@@ -146,14 +168,37 @@ export function ProductGallery({ product, locale }: { product: Product; locale: 
 }
 
 export default function ProductDetail() {
-  const { locale, product, audience, archived, relatedProducts } =
+  const { locale, product, audience, archived, preview, relatedProducts } =
     useLoaderData<typeof loader>();
   const t = product.translations[locale];
   const english = locale === "en-GB";
-  const returnLink = productReturnLink(locale, audience, archived);
+  const returnLink = preview
+    ? { href: `/admin/produits/${product.id}`, label: english ? "Back to editing" : "Retour à l’édition" }
+    : productReturnLink(locale, audience, archived);
   return (
     <>
-      <JsonLd value={productStructuredData(product, locale)} />
+      {preview ? null : <JsonLd value={productStructuredData(product, locale)} />}
+      {preview ? (
+        <aside
+          className="product-preview-banner"
+          aria-label={english ? "Draft preview" : "Aperçu du brouillon"}
+        >
+          <div>
+            <strong>{english ? "Private preview" : "Aperçu privé"}</strong>
+            <span>
+              {english
+                ? "This draft is visible only to signed-in administrators and cannot be purchased."
+                : "Ce brouillon est visible uniquement par les administrateurs connectés et ne peut pas être acheté."}
+            </span>
+          </div>
+          <Link
+            className="button button--dark"
+            to={`/admin/produits/${product.id}`}
+          >
+            {english ? "Edit this coffee" : "Modifier ce café"}
+          </Link>
+        </aside>
+      ) : null}
       <nav
         className="page-shell"
         aria-label="Breadcrumb"
@@ -178,7 +223,10 @@ export default function ProductDetail() {
             </tbody>
           </table>
           <p className="product-info__description">{t.shortDescription}</p>
-          {archived ? <section className="product-archive-notice" aria-label={english ? "Archived coffee" : "Café archivé"}>
+          {preview ? <section className="product-archive-notice" aria-label={english ? "Draft coffee" : "Café en brouillon"}>
+            <p className="eyebrow">{english ? "Draft" : "Brouillon"}</p>
+            <p>{english ? "Purchasing is disabled while you review this page." : "L’achat est désactivé pendant la consultation de cet aperçu."}</p>
+          </section> : archived ? <section className="product-archive-notice" aria-label={english ? "Archived coffee" : "Café archivé"}>
             <p className="eyebrow">{english ? "Coffee archives" : "Archives café"}</p>
             <p>{english ? "This limited lot is no longer available for purchase, but its complete story remains available to read." : "Ce lot éphémère n’est plus disponible à l’achat, mais son histoire complète reste accessible."}</p>
           </section> : audience === "professional" ? <ProfessionalQuoteAdd product={product} locale={locale} /> : <ProductPurchase product={product} locale={locale} audience={audience} />}
