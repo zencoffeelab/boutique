@@ -1,8 +1,6 @@
 import PostalMime, { type Address, type Attachment } from "postal-mime";
 
 export interface EmailForwardingEnv {
-  EMAIL_FORWARD_PRIMARY?: string;
-  EMAIL_FORWARD_SECONDARY?: string;
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
 }
@@ -23,12 +21,6 @@ const HTML_BLOCKS = /<\/(p|div|li|h[1-6]|blockquote|tr)>/gi;
 const HTML_BREAKS = /<br\s*\/?>/gi;
 const HTML_TAGS = /<[^>]+>/g;
 const HTML_SPACING = /\n{3,}/g;
-
-export function forwardingDestinations(env: EmailForwardingEnv) {
-  return [...new Set([env.EMAIL_FORWARD_PRIMARY, env.EMAIL_FORWARD_SECONDARY]
-    .map((address) => address?.trim().toLocaleLowerCase("en-US"))
-    .filter((address): address is string => Boolean(address)))];
-}
 
 function flattenAddresses(addresses: Address[] | undefined): StoredAddress[] {
   return (addresses ?? []).flatMap((entry) => {
@@ -158,17 +150,12 @@ export async function persistIncomingEmail(message: ForwardableEmail, env: Email
 
 export default {
   async email(message: ForwardableEmail, env: EmailForwardingEnv) {
-    const destinations = forwardingDestinations(env);
-    if (destinations.length !== 2) {
-      message.setReject("Email forwarding destinations are not configured.");
-      return;
-    }
-
     try {
-      await persistIncomingEmail(message, env);
+      const storedMessageId = await persistIncomingEmail(message, env);
+      if (!storedMessageId) throw new Error("Incoming email storage is not configured.");
     } catch (cause) {
       console.error("incoming_email_storage_failed", { message: cause instanceof Error ? cause.message : String(cause) });
+      message.setReject("La messagerie Zen Coffee Lab est temporairement indisponible. Veuillez réessayer plus tard.");
     }
-    await Promise.all(destinations.map((destination) => message.forward(destination)));
   },
 };
