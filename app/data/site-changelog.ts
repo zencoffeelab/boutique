@@ -11,6 +11,7 @@ export type ChangelogEntry = Readonly<{
 
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
+  { id: "2026-08-03-admin-order-columns-equidistant", date: "2026-08-03", kind: "Design", title: "Colonnes de commande équilibrées", description: "Les trois colonnes du détail de commande ont désormais la même largeur, afin que la colonne centrale soit à égale distance des colonnes latérales." },
   { id: "2026-08-03-admin-order-status-dividers-more-visible", date: "2026-08-03", kind: "Design", title: "Séparateurs de commande encore plus visibles", description: "L’épaisseur des lignes colorées entre les commandes est de nouveau augmentée afin de renforcer leur visibilité." },
   { id: "2026-08-03-admin-order-status-dividers-strengthened", date: "2026-08-03", kind: "Design", title: "Séparateurs de commande colorés renforcés", description: "Les lignes colorées qui distinguent les commandes sont désormais plus épaisses afin d’être plus visibles." },
   { id: "2026-08-03-admin-order-status-colored-dividers", date: "2026-08-03", kind: "Design", title: "Séparateurs de commande colorés par statut", description: "La ligne qui sépare chaque commande reprend désormais la couleur du label associé à son statut." },

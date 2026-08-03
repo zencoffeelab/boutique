@@ -4844,7 +4844,7 @@ button:disabled {
 }
 .admin-order__content {
   display: grid;
-  grid-template-columns: minmax(15rem, 1fr) minmax(18rem, 1.2fr) minmax(15rem, 0.75fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   column-gap: 2rem;
   row-gap: 0;
   padding: 1.5rem;
