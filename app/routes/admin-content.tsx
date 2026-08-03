@@ -45,6 +45,14 @@ const pageSchema = z.object({
   seoDescriptionEn: z.string().trim().min(10),
   contentFr: z.string().trim().min(10),
   contentEn: z.string().trim().min(10),
+  homeStatementFr: z.string().trim().max(500).optional(),
+  homeStatementEn: z.string().trim().max(500).optional(),
+  homeValue1TitleFr: z.string().trim().max(120).optional(), homeValue1TextFr: z.string().trim().max(500).optional(),
+  homeValue2TitleFr: z.string().trim().max(120).optional(), homeValue2TextFr: z.string().trim().max(500).optional(),
+  homeValue3TitleFr: z.string().trim().max(120).optional(), homeValue3TextFr: z.string().trim().max(500).optional(),
+  homeValue1TitleEn: z.string().trim().max(120).optional(), homeValue1TextEn: z.string().trim().max(500).optional(),
+  homeValue2TitleEn: z.string().trim().max(120).optional(), homeValue2TextEn: z.string().trim().max(500).optional(),
+  homeValue3TitleEn: z.string().trim().max(120).optional(), homeValue3TextEn: z.string().trim().max(500).optional(),
 });
 const navigationSchema = z.object({
   intent: z.literal("save_navigation"),
@@ -161,6 +169,19 @@ export async function action({ request }: ActionFunctionArgs) {
   const parsed = pageSchema.safeParse(fields);
   if (!parsed.success) return { ok: false, message: "Les contenus français et anglais sont requis." };
 
+  const homeFields = parsed.data as unknown as Record<string, string | undefined>;
+  const homeContent = parsed.data.pageKey === "accueil"
+    ? (["Fr", "En"] as const).map((suffix) => ({
+        statement: homeFields[`homeStatement${suffix}`]?.trim() ?? "",
+        cards: [1, 2, 3].map((index) => ({
+          title: homeFields[`homeValue${index}Title${suffix}`]?.trim() ?? "",
+          text: homeFields[`homeValue${index}Text${suffix}`]?.trim() ?? "",
+        })),
+      }))
+    : null;
+  if (homeContent && homeContent.some((content) => !content.statement || content.cards.some((card) => !card.title || !card.text)))
+    return { ok: false, message: "Complétez la phrase et les trois engagements de l’accueil dans les deux langues." };
+
   const contentFr = parseRichTextInput(parsed.data.contentFr, 10);
   const contentEn = parseRichTextInput(parsed.data.contentEn, 10);
   if (!contentFr || !contentEn)
@@ -187,14 +208,20 @@ export async function action({ request }: ActionFunctionArgs) {
       title: parsed.data.titleFr,
       seo_title: parsed.data.seoTitleFr,
       seo_description: parsed.data.seoDescriptionFr,
-      blocks: [{ type: "richText", content: contentFr }],
+      blocks: [
+        { type: "richText", content: contentFr },
+        ...(homeContent ? [{ type: "homeStatement", content: { text: homeContent[0].statement } }, { type: "homeValues", content: { cards: homeContent[0].cards } }] : []),
+      ],
     },
     {
       locale: "en-GB",
       title: parsed.data.titleEn,
       seo_title: parsed.data.seoTitleEn,
       seo_description: parsed.data.seoDescriptionEn,
-      blocks: [{ type: "richText", content: contentEn }],
+      blocks: [
+        { type: "richText", content: contentEn },
+        ...(homeContent ? [{ type: "homeStatement", content: { text: homeContent[1].statement } }, { type: "homeValues", content: { cards: homeContent[1].cards } }] : []),
+      ],
     },
   ].map((translation) => ({ ...translation, page_id: page.id }));
   const { error: translationError } = await client
@@ -222,9 +249,47 @@ function initialContent(translation: ContentTranslation | undefined, placeholder
   return document.content.length ? document : paragraphsToRichTextDocument([placeholder]);
 }
 
+const homeDefaults = {
+  "fr-FR": {
+    statement: "Chaque café raconte un lieu, une personne et une *intention.*",
+    values: [
+      ["Sourcé avec soin", "Des lots traçables choisis pour leur singularité et la qualité du travail à l’origine."],
+      ["Torréfié avec légèreté", "Une torréfaction précise qui préserve douceur, acidité et clarté aromatique."],
+      ["Partagé simplement", "Des conseils clairs pour révéler chaque café, à la maison comme derrière le bar."],
+    ],
+  },
+  "en-GB": {
+    statement: "Every coffee carries a place, a person and an *intention.*",
+    values: [
+      ["Sourced with care", "Traceable lots chosen for their singularity and the quality of the work at origin."],
+      ["Roasted lightly", "A precise roasting profile that preserves sweetness, acidity and aromatic clarity."],
+      ["Shared simply", "Clear brewing advice to help each coffee shine, at home or behind the bar."],
+    ],
+  },
+} as const;
+
+function homeSettings(translation: ContentTranslation | undefined, locale: "fr-FR" | "en-GB"): { statement: string; values: Array<readonly [string, string]> } {
+  const blocks = translation?.blocks ?? [];
+  const statementBlock = blocks.find((block) => block.type === "homeStatement")?.content;
+  const valuesBlock = blocks.find((block) => block.type === "homeValues")?.content;
+  const statement = statementBlock && typeof statementBlock === "object" && typeof (statementBlock as { text?: unknown }).text === "string"
+    ? (statementBlock as { text: string }).text : homeDefaults[locale].statement;
+  const storedValues = valuesBlock && typeof valuesBlock === "object" && Array.isArray((valuesBlock as { cards?: unknown }).cards)
+    ? (valuesBlock as { cards: unknown[] }).cards : [];
+  const values: Array<readonly [string, string]> = homeDefaults[locale].values.map((fallback, index) => {
+    const card = storedValues[index];
+    return card && typeof card === "object"
+      ? [typeof (card as { title?: unknown }).title === "string" ? (card as { title: string }).title : fallback[0], typeof (card as { text?: unknown }).text === "string" ? (card as { text: string }).text : fallback[1]] as const
+      : [fallback[0], fallback[1]] as const;
+  });
+  return { statement, values };
+}
+
 function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: ContentPage; demo: boolean }) {
   const fr = page?.content_page_translations.find((translation) => translation.locale === "fr-FR");
   const en = page?.content_page_translations.find((translation) => translation.locale === "en-GB");
+  const homeFr = homeSettings(fr, "fr-FR");
+  const homeEn = homeSettings(en, "en-GB");
 
   return <Form method="post">
     <input type="hidden" name="intent" value="save_page" />
@@ -245,6 +310,7 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
         <div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? pageKey} required /></label></div>
         <div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? "Description à compléter avant publication."} required /></label></div>
         <RichTextEditor name="contentFr" label="Paragraphes" initialContent={initialContent(fr, placeholderFr)} disabled={demo} />
+        {pageKey === "accueil" ? <HomeFields language="Français" statement={homeFr.statement} values={homeFr.values} /> : null}
       </fieldset>
       <fieldset>
         <legend>English</legend>
@@ -252,10 +318,24 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
         <div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? pageKey} required /></label></div>
         <div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? "Description to complete before publication."} required /></label></div>
         <RichTextEditor name="contentEn" label="Paragraphs" initialContent={initialContent(en, placeholderEn)} disabled={demo} />
+        {pageKey === "accueil" ? <HomeFields language="English" statement={homeEn.statement} values={homeEn.values} /> : null}
       </fieldset>
     </div>
     <button className="ui-button ui-button--default" type="submit" disabled={demo}>Enregistrer</button>
   </Form>;
+}
+
+function HomeFields({ language, statement, values }: { language: "Français" | "English"; statement: string; values: readonly (readonly [string, string])[] }) {
+  const suffix = language === "Français" ? "Fr" : "En";
+  return <fieldset className="admin-home-fields">
+    <legend>{language === "Français" ? "Blocs spécifiques à l’accueil" : "Home-specific blocks"}</legend>
+    <div className="field"><label>{language === "Français" ? "Phrase sur fond vert" : "Green-background statement"}<textarea name={`homeStatement${suffix}`} defaultValue={statement} required /><small>Utilisez des astérisques pour mettre un passage en italique, par exemple *intention.*</small></label></div>
+    <p>{language === "Français" ? "Tableau des engagements" : "Commitments grid"}</p>
+    {values.map(([title, text], index) => <div className="form-grid" key={index}>
+      <div className="field"><label>{language === "Français" ? `Engagement ${index + 1} — titre` : `Commitment ${index + 1} — title`}<input name={`homeValue${index + 1}Title${suffix}`} defaultValue={title} required /></label></div>
+      <div className="field"><label>{language === "Français" ? `Engagement ${index + 1} — texte` : `Commitment ${index + 1} — text`}<textarea name={`homeValue${index + 1}Text${suffix}`} defaultValue={text} required /></label></div>
+    </div>)}
+  </fieldset>;
 }
 
 export default function AdminContent() {

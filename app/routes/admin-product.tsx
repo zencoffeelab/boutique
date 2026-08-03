@@ -10,6 +10,7 @@ import {
   Link,
   redirect,
   useActionData,
+  useFetcher,
   useLoaderData,
   useNavigation,
 } from "react-router";
@@ -54,6 +55,19 @@ const productSchema = z.object({
   seoTitleEn: z.string().trim().min(2),
   seoDescriptionFr: z.string().trim().min(10),
   seoDescriptionEn: z.string().trim().min(10),
+});
+const automaticTranslationSchema = z.object({
+  intent: z.literal("translate_product_to_english"),
+  nameFr: z.string().trim().min(2), shortFr: z.string().trim().min(10),
+  producerFr: z.string().trim().min(1), regionFr: z.string().trim().min(1),
+  varietyFr: z.string().trim().min(1), processFr: z.string().trim().min(1), notesFr: z.string(),
+  seoTitleFr: z.string().trim().min(2), seoDescriptionFr: z.string().trim().min(10),
+});
+const englishTranslationSchema = z.object({
+  nameEn: z.string().trim().min(2), shortEn: z.string().trim().min(10),
+  producerEn: z.string().trim().min(1), regionEn: z.string().trim().min(1),
+  varietyEn: z.string().trim().min(1), processEn: z.string().trim().min(1), notesEn: z.string(),
+  seoTitleEn: z.string().trim().min(2), seoDescriptionEn: z.string().trim().min(10),
 });
 const variantFieldsSchema = {
   sku: z.string().trim().min(2).max(80),
@@ -132,7 +146,46 @@ const emptyTranslation = (locale: "fr-FR" | "en-GB") => ({
 });
 
 type EditorialBlockFields = z.infer<typeof editorialBlockFieldsSchema>;
+type EnglishTranslation = z.infer<typeof englishTranslationSchema>;
+type TranslationResponse = { ok: boolean; message: string; translation?: EnglishTranslation };
 type ServiceSupabase = NonNullable<ReturnType<typeof createServiceSupabase>>;
+
+async function translateProductToEnglish(fields: z.infer<typeof automaticTranslationSchema>) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return { ok: false as const, message: "La traduction automatique n’est pas configurée. Ajoutez OPENAI_API_KEY aux variables d’environnement du serveur." };
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: process.env.OPENAI_TRANSLATION_MODEL ?? "gpt-5-mini",
+      input: [{ role: "user", content: [{ type: "input_text", text: `Translate this coffee product content from French to natural British English. Preserve proper names, geographical names, coffee varieties and factual details. Return only a JSON object with exactly these keys: nameEn, shortEn, producerEn, regionEn, varietyEn, processEn, notesEn, seoTitleEn, seoDescriptionEn.\n\n${JSON.stringify(fields)}` }] }],
+      text: { format: { type: "json_schema", name: "coffee_product_translation", strict: true, schema: { type: "object", additionalProperties: false, properties: Object.fromEntries(Object.keys(englishTranslationSchema.shape).map((key) => [key, { type: "string" }])), required: Object.keys(englishTranslationSchema.shape) } } },
+    }),
+  });
+  if (!response.ok) return { ok: false as const, message: "La traduction automatique est temporairement indisponible." };
+  const payload = await response.json() as {
+    output_text?: unknown;
+    output?: Array<{ type?: unknown; content?: Array<{ type?: unknown; text?: unknown; refusal?: unknown }> }>;
+  };
+  const outputText = typeof payload.output_text === "string"
+    ? payload.output_text
+    : payload.output
+      ?.filter((item) => item.type === "message")
+      .flatMap((item) => item.content ?? [])
+      .filter((part) => part.type === "output_text" && typeof part.text === "string")
+      .map((part) => part.text as string)
+      .join("");
+  if (!outputText) return { ok: false as const, message: "La traduction automatique n’a pas renvoyé de texte exploitable." };
+  let translatedFields: unknown;
+  try {
+    translatedFields = JSON.parse(outputText);
+  } catch {
+    return { ok: false as const, message: "La traduction automatique a renvoyé un format invalide. Réessayez." };
+  }
+  const translation = englishTranslationSchema.safeParse(translatedFields);
+  if (!translation.success) return { ok: false as const, message: "La traduction automatique est incomplète. Réessayez ou complétez les champs anglais." };
+  return { ok: true as const, message: "Les champs anglais ont été traduits automatiquement.", translation: translation.data };
+}
 
 async function saveEditorialBlock({
   client,
@@ -270,6 +323,16 @@ export async function action({ request }: ActionFunctionArgs) {
     };
   const form = await request.formData();
   const intent = String(form.get("intent"));
+  if (intent === "translate_product_to_english") {
+    const parsed = automaticTranslationSchema.safeParse(Object.fromEntries(form));
+    if (!parsed.success)
+      return { ok: false, message: "Complétez d’abord tous les champs français obligatoires pour lancer la traduction." };
+    try {
+      return await translateProductToEnglish(parsed.data);
+    } catch {
+      return { ok: false, message: "La traduction automatique est temporairement indisponible." };
+    }
+  }
   const client = createServiceSupabase();
   if (!client) return { ok: false, message: "Base de données indisponible." };
   if (intent === "upload_thumbnail_label") {
@@ -1019,9 +1082,11 @@ function LanguageTabs({
 function TranslationFields({
   language,
   translation,
+  altitudeMeters,
 }: {
   language: "Français" | "English";
   translation: any;
+  altitudeMeters?: number;
 }) {
   const suffix = language === "Français" ? "Fr" : "En";
   return (
@@ -1044,6 +1109,26 @@ function TranslationFields({
             <textarea
               name={`short${suffix}`}
               defaultValue={translation.shortDescription}
+              required
+            />
+          </label>
+        </div>
+        <div className="field field--wide">
+          <label>
+            Titre SEO
+            <input
+              name={`seoTitle${suffix}`}
+              defaultValue={translation.seoTitle}
+              required
+            />
+          </label>
+        </div>
+        <div className="field field--wide">
+          <label>
+            Description SEO
+            <textarea
+              name={`seoDescription${suffix}`}
+              defaultValue={translation.seoDescription}
               required
             />
           </label>
@@ -1078,6 +1163,12 @@ function TranslationFields({
             />
           </label>
         </div>
+        {language === "Français" ? <div className="field">
+          <label>
+            Altitude (m)
+            <input name="altitudeMeters" type="number" min="0" defaultValue={altitudeMeters ?? 0} />
+          </label>
+        </div> : null}
         <div className="field">
           <label>
             Traitement
@@ -1097,29 +1188,40 @@ function TranslationFields({
             />
           </label>
         </div>
-        <div className="field field--wide">
-          <label>
-            Titre SEO
-            <input
-              name={`seoTitle${suffix}`}
-              defaultValue={translation.seoTitle}
-              required
-            />
-          </label>
-        </div>
-        <div className="field field--wide">
-          <label>
-            Description SEO
-            <textarea
-              name={`seoDescription${suffix}`}
-              defaultValue={translation.seoDescription}
-              required
-            />
-          </label>
-        </div>
       </div>
     </fieldset>
   );
+}
+
+function AutomaticEnglishTranslation() {
+  const fetcher = useFetcher<TranslationResponse>();
+  useEffect(() => {
+    const translation = fetcher.data?.translation;
+    if (!translation) return;
+    for (const [name, value] of Object.entries(translation)) {
+      const field = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#product-editor-form [name="${name}"]`);
+      if (!field) continue;
+      field.value = value;
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }, [fetcher.data]);
+
+  const translate = () => {
+    const values = Object.fromEntries(
+      ["nameFr", "shortFr", "producerFr", "regionFr", "varietyFr", "processFr", "notesFr", "seoTitleFr", "seoDescriptionFr"].map((name) => [
+        name,
+        document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#product-editor-form [name="${name}"]`)?.value ?? "",
+      ]),
+    );
+    fetcher.submit({ intent: "translate_product_to_english", ...values }, { method: "post" });
+  };
+
+  return <div className="admin-editor__translation-action">
+    <button className="ui-button ui-button--outline" type="button" onClick={translate} disabled={fetcher.state !== "idle"}>
+      {fetcher.state === "idle" ? "Traduire en anglais" : "Traduction en cours…"}
+    </button>
+    <small aria-live="polite">{fetcher.data?.message ?? "Remplit l’onglet English à partir du contenu français."}</small>
+  </div>;
 }
 
 function EditorialBlockFields({
@@ -1782,8 +1884,10 @@ export default function AdminProduct() {
         <input type="hidden" name="intent" value="save_product" />
         <input type="hidden" name="productId" value={product.id} />
         <section className="ui-card admin-editor">
-          <h2 className="admin-editor__title">Contenu</h2>
-          <div className="form-grid">
+          <div className="admin-product-content-layout">
+            <div>
+              <h2 className="admin-editor__title">Contenu</h2>
+              <div className="form-grid">
           <div className="field">
             <label>
               Slug
@@ -1809,33 +1913,6 @@ export default function AdminProduct() {
           </div>
           <div className="field">
             <label>
-              Altitude (m)
-              <input
-                name="altitudeMeters"
-                type="number"
-                min="0"
-                defaultValue={product.altitudeMeters}
-              />
-            </label>
-          </div>
-          <label>
-            <input
-              name="featured"
-              type="checkbox"
-              defaultChecked={product.featured}
-            />{" "}
-            Mis en avant
-          </label>
-          <label>
-            <input
-              name="professionalEnabled"
-              type="checkbox"
-              defaultChecked={product.professionalEnabled}
-            />{" "}
-            Activer sur la boutique professionnelle
-          </label>
-          <div className="field">
-            <label>
               Stock professionnel disponible (kg)
               <input
                 name="professionalStockKg"
@@ -1849,12 +1926,23 @@ export default function AdminProduct() {
               <small>{product.professionalStockReservedKg} kg supplémentaires sont actuellement réservés par des devis.</small>
             ) : null}
           </div>
+          <label>
+            <input
+              name="professionalEnabled"
+              type="checkbox"
+              defaultChecked={product.professionalEnabled}
+            />{" "}
+            Activer sur la boutique professionnelle
+          </label>
+          <input type="hidden" name="featured" value={product.featured ? "true" : ""} />
+              </div>
+            </div>
+            <LanguageTabs
+              label="Langue du contenu produit"
+              french={<TranslationFields language="Français" translation={product.translations["fr-FR"]} altitudeMeters={product.altitudeMeters} />}
+              english={<>{isNew ? <AutomaticEnglishTranslation /> : null}<TranslationFields language="English" translation={product.translations["en-GB"]} /></>}
+            />
           </div>
-          <LanguageTabs
-            label="Langue du contenu produit"
-            french={<TranslationFields language="Français" translation={product.translations["fr-FR"]} />}
-            english={<TranslationFields language="English" translation={product.translations["en-GB"]} />}
-          />
         </section>
         {!isNew ? (
           <EditorialBlocksSection blocks={product.editorialBlocks} />

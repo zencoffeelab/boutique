@@ -15,8 +15,8 @@ import { Form, useActionData, useFetcher, useLoaderData } from "react-router";
 import { AdminShell } from "~/components/admin-shell";
 import { Badge } from "~/components/ui/badge";
 import { labelIsRefundable } from "~/domain/label-refunds";
-import { formatMoney, formatSignedMoney } from "~/domain/money";
-import { orderStatuses } from "~/domain/types";
+import { formatMoney } from "~/domain/money";
+import { orderStatuses, type OrderStatus } from "~/domain/types";
 import { requireAdmin } from "~/lib/auth.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { orderStatusEmail } from "~/services/email-templates.server";
@@ -147,15 +147,14 @@ export const meta: MetaFunction = () => [
   { name: "robots", content: "noindex,nofollow" },
 ];
 
-function OrderActions({ order }: { order: any }) {
+function LabelPurchaseAction({ order }: { order: any }) {
   const label = useFetcher<{
     ok?: boolean;
     message?: string;
     labels?: Array<{ url: string }>;
   }>();
-  const refund = useFetcher<{ ok?: boolean; message?: string }>();
   return (
-    <div className="admin-order-actions">
+    <div className="admin-order-actions admin-order-label-purchase">
       <label.Form method="post" action={`/api/admin/orders/${order.id}/label`}>
         <button
           className="ui-button ui-button--outline ui-button--sm"
@@ -175,7 +174,16 @@ function OrderActions({ order }: { order: any }) {
           Colis {index + 1} <ExternalLink aria-hidden="true" />
         </a>
       ))}
+    </div>
+  );
+}
+
+function RefundOrderAction({ order }: { order: any }) {
+  const refund = useFetcher<{ ok?: boolean; message?: string }>();
+  return (
+    <div className="admin-order-actions admin-order-refund-action">
       <refund.Form
+        className="admin-order-refund-form"
         method="post"
         action={`/api/admin/orders/${order.id}/refund`}
       >
@@ -213,6 +221,22 @@ const refundStatusLabels: Record<LabelRefundState["status"], string> = {
   SUCCESS: "Étiquette remboursée",
   ERROR: "Remboursement refusé ou en erreur",
 };
+
+const orderStatusLabels: Record<OrderStatus, string> = {
+  pending_payment: "En attente de paiement",
+  paid: "Payée",
+  preparing: "En préparation",
+  ready_to_ship: "Prête à expédier",
+  shipped: "Expédiée",
+  delivered: "Livrée",
+  canceled: "Annulée",
+  partially_refunded: "Partiellement remboursée",
+  refunded: "Remboursée",
+};
+
+function OrderStatusBadge({ status }: { status: OrderStatus }) {
+  return <Badge className={`admin-order-status admin-order-status--${status}`}>{orderStatusLabels[status]}</Badge>;
+}
 
 export function orderContentsLabel(
   lines: readonly {
@@ -376,15 +400,9 @@ export default function AdminOrders() {
       </Form>
       <div className="admin-order-list">
         {orders.map((order) => {
-          const contribution =
-            order.subtotal_cents +
-            order.shipping_charged_cents -
-            order.cost_of_goods_cents -
-            order.actual_shipping_cost_cents -
-            order.stripe_fee_cents;
           const pickupPoint = order.shipping_address?.pickupPoint;
           return (
-            <details className="ui-card admin-order" key={order.id}>
+            <details className={`ui-card admin-order admin-order--${order.status}`} key={order.id}>
               <summary>
                 <span>
                   <strong>{order.order_number}</strong>
@@ -396,25 +414,20 @@ export default function AdminOrders() {
                     {orderContentsLabel(order.order_lines)}
                   </small>
                 </span>
-                <Badge>{order.status}</Badge>
+                <OrderStatusBadge status={order.status as OrderStatus} />
                 <strong>{formatMoney(order.total_cents, "fr-FR")}</strong>
               </summary>
               <div className="admin-order__content">
-                <div>
-                  <h2>Lignes</h2>
-                  {order.order_lines.map((line: any) => (
-                    <p key={line.id}>
-                      {line.quantity} × {line.product_name} ·{" "}
-                      {line.variant_label}{" "}
-                      <strong>
-                        {formatMoney(line.line_total_cents, "fr-FR")}
-                      </strong>
-                    </p>
-                  ))}
-                  <p>
-                    <strong>Livraison :</strong> {order.shipping_carrier} ·{" "}
-                    {order.shipping_service}
-                  </p>
+                <div className="admin-order__summary">
+                  <div className="admin-order__left-column">
+                  <section>
+                    <h2>Résumé de la commande</h2>
+                    <p>{orderContentsLabel(order.order_lines)}</p>
+                    <p><strong>Total :</strong> {formatMoney(order.total_cents, "fr-FR")}</p>
+                  </section>
+                  <section className="admin-order-delivery">
+                    <h2>Livraison</h2>
+                    <p><strong>{order.shipping_carrier}</strong> · {order.shipping_service}</p>
                   {pickupPoint ? (
                     <p>
                       <strong>Point relais :</strong> {pickupPoint.name}
@@ -437,44 +450,41 @@ export default function AdminOrders() {
                       {order.shipping_address.city}
                     </p>
                   )}
-                  <p>
-                    Port facturé :{" "}
-                    {formatMoney(order.shipping_charged_cents, "fr-FR")} · Port
-                    réel :{" "}
-                    {formatMoney(order.actual_shipping_cost_cents, "fr-FR")}
-                  </p>
-                  <p>
-                    Contribution :{" "}
-                    <strong>{formatSignedMoney(contribution, "fr-FR")}</strong>
-                  </p>
-                  <OrderActions order={order} />
-                  {order.shipments?.length ? (
-                    <section className="admin-shipments">
-                      <h3>Étiquettes achetées</h3>
-                      <p>
-                        <small>
-                          L’annulation crédite le transporteur ayant émis
-                          l’étiquette. Elle ne rembourse pas le paiement du client.
-                        </small>
-                      </p>
-                      {order.shipments
-                        .toSorted(
-                          (a: any, b: any) => a.parcel_index - b.parcel_index,
-                        )
-                        .map((shipment: any) => (
-                          <ShipmentActions
-                            orderId={order.id}
-                            shipment={shipment}
-                            key={shipment.id}
-                          />
-                        ))}
-                    </section>
-                  ) : null}
+                  <p>Port facturé : <strong>{formatMoney(order.shipping_charged_cents, "fr-FR")}</strong> · Port réel : <strong>{formatMoney(order.actual_shipping_cost_cents, "fr-FR")}</strong></p>
+                  </section>
+                  </div>
+                  <section className="admin-order-labels">
+                    <h2>Étiquettes achetées</h2>
+                    {order.shipments?.length ? (
+                      <section className="admin-shipments">
+                        <p>
+                          <small>
+                            L’annulation crédite le transporteur ayant émis
+                            l’étiquette. Elle ne rembourse pas le paiement du client.
+                          </small>
+                        </p>
+                        {order.shipments
+                          .toSorted(
+                            (a: any, b: any) => a.parcel_index - b.parcel_index,
+                          )
+                          .map((shipment: any) => (
+                            <ShipmentActions
+                              orderId={order.id}
+                              shipment={shipment}
+                              key={shipment.id}
+                            />
+                          ))}
+                      </section>
+                    ) : null}
+                  </section>
                 </div>
-                <Form method="post" className="form-grid">
+                <aside className="admin-order__operations">
+                  <RefundOrderAction order={order} />
+                  <LabelPurchaseAction order={order} />
+                  <Form method="post" className="admin-order__update-form">
                   <input type="hidden" name="intent" value="update_order" />
                   <input type="hidden" name="orderId" value={order.id} />
-                  <div className="field field--wide">
+                  <div className="field">
                     <label>
                       Statut
                       <select name="status" defaultValue={order.status}>
@@ -484,19 +494,20 @@ export default function AdminOrders() {
                       </select>
                     </label>
                   </div>
-                  <div className="field field--wide">
+                  <div className="field">
                     <label>
                       Notes
-                      <textarea name="notes" defaultValue={order.notes ?? ""} />
+                      <textarea name="notes" defaultValue={order.notes ?? ""} rows={1} />
                     </label>
                   </div>
                   <button
-                    className="ui-button ui-button--default"
+                    className="ui-button ui-button--default ui-button--sm"
                     type="submit"
                   >
                     Enregistrer
                   </button>
-                </Form>
+                  </Form>
+                </aside>
               </div>
             </details>
           );

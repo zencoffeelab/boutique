@@ -23,9 +23,32 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
   );
 };
 
+const defaultHomeContent = {
+  fr: { statement: "Chaque café raconte un lieu, une personne et une *intention.*", values: [["Sourcé avec soin", "Des lots traçables choisis pour leur singularité et la qualité du travail à l’origine."], ["Torréfié avec légèreté", "Une torréfaction précise qui préserve douceur, acidité et clarté aromatique."], ["Partagé simplement", "Des conseils clairs pour révéler chaque café, à la maison comme derrière le bar."]] },
+  en: { statement: "Every coffee carries a place, a person and an *intention.*", values: [["Sourced with care", "Traceable lots chosen for their singularity and the quality of the work at origin."], ["Roasted lightly", "A precise roasting profile that preserves sweetness, acidity and aromatic clarity."], ["Shared simply", "Clear brewing advice to help each coffee shine, at home or behind the bar."]] },
+} as const;
+
+function getHomeContent(blocks: Array<{ type?: unknown; content?: unknown }> | undefined, english: boolean) {
+  const fallback = english ? defaultHomeContent.en : defaultHomeContent.fr;
+  const statementContent = blocks?.find((block) => block.type === "homeStatement")?.content;
+  const valuesContent = blocks?.find((block) => block.type === "homeValues")?.content;
+  const statement = statementContent && typeof statementContent === "object" && typeof (statementContent as { text?: unknown }).text === "string" ? (statementContent as { text: string }).text : fallback.statement;
+  const cards = valuesContent && typeof valuesContent === "object" && Array.isArray((valuesContent as { cards?: unknown }).cards) ? (valuesContent as { cards: unknown[] }).cards : [];
+  const values = fallback.values.map(([fallbackTitle, fallbackText], index) => {
+    const card = cards[index];
+    return card && typeof card === "object" ? [typeof (card as { title?: unknown }).title === "string" ? (card as { title: string }).title : fallbackTitle, typeof (card as { text?: unknown }).text === "string" ? (card as { text: string }).text : fallbackText] : [fallbackTitle, fallbackText];
+  });
+  return { statement, values };
+}
+
+function StatementText({ text }: { text: string }) {
+  return <>{text.split("*").map((part, index) => index % 2 ? <em key={index}>{part}</em> : part)}</>;
+}
+
 export default function Home() {
   const { locale, products, articles, content } = useLoaderData<typeof loader>();
   const english = locale === "en-GB";
+  const home = getHomeContent(content?.blocks, english);
   return (
     <>
       <JsonLd value={{
@@ -62,7 +85,7 @@ export default function Home() {
       </section>
 
       <section className="statement">
-        <p>{english ? <>Every coffee carries a place, a person and an <em>intention.</em></> : <>Chaque café raconte un lieu, une personne et une <em>intention.</em></>}</p>
+        <p><StatementText text={home.statement} /></p>
       </section>
       <ContentBlocks
         blocks={content?.blocks}
@@ -75,9 +98,7 @@ export default function Home() {
       />
 
       <section className="value-grid" aria-label={english ? "Our commitments" : "Nos engagements"}>
-        <article className="value-card"><b>01</b><h3>{english ? "Sourced with care" : "Sourcé avec soin"}</h3><p>{english ? "Traceable lots chosen for their singularity and the quality of the work at origin." : "Des lots traçables choisis pour leur singularité et la qualité du travail à l’origine."}</p></article>
-        <article className="value-card"><b>02</b><h3>{english ? "Roasted lightly" : "Torréfié avec légèreté"}</h3><p>{english ? "A precise roasting profile that preserves sweetness, acidity and aromatic clarity." : "Une torréfaction précise qui préserve douceur, acidité et clarté aromatique."}</p></article>
-        <article className="value-card"><b>03</b><h3>{english ? "Shared simply" : "Partagé simplement"}</h3><p>{english ? "Clear brewing advice to help each coffee shine, at home or behind the bar." : "Des conseils clairs pour révéler chaque café, à la maison comme derrière le bar."}</p></article>
+        {home.values.map(([title, text], index) => <article className="value-card" key={index}><b>{String(index + 1).padStart(2, "0")}</b><h3>{title}</h3><p>{text}</p></article>)}
       </section>
 
       <section className="section page-shell">
