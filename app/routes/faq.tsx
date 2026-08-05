@@ -1,4 +1,5 @@
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
+import { useState } from "react";
 import { useLoaderData } from "react-router";
 import { getFaqItems } from "~/lib/content.server";
 import { getLocale } from "~/lib/i18n";
@@ -10,9 +11,21 @@ const items = [
   { fr: ["Quels sont les délais d’expédition ?", "Les commandes sont généralement préparées sous deux jours ouvrés. Le délai du transporteur s’ajoute ensuite."], en: ["How long does shipping take?", "Orders are usually prepared within two business days, followed by the carrier transit time."] },
   { fr: ["Livrez-vous hors de France ?", "Nous livrons dans l’Union européenne et au Royaume-Uni. Les droits éventuels au Royaume-Uni restent à la charge du destinataire."], en: ["Do you ship outside France?", "We ship within the European Union and to the United Kingdom. Any UK duties remain payable by the recipient."] },
 ];
+const faqSections = [
+  { count: 3, fr: "Notre style de torréfaction", en: "Our roasting style" },
+  { count: 4, fr: "Commande", en: "Ordering" },
+  { count: 4, fr: "Livraison", en: "Delivery" },
+  { count: Number.POSITIVE_INFINITY, fr: "Retours", en: "Returns" },
+];
 export async function loader({ request }: LoaderFunctionArgs) { const locale = getLocale(request); return { locale, managedItems: await getFaqItems(locale) }; }
 export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(`FAQ | Zen Coffee Lab`, data?.locale === "en-GB" ? "Answers about coffee, roasting, orders and delivery." : "Réponses sur le café, la torréfaction, les commandes et la livraison.", data?.locale === "en-GB" ? "/en/faq" : "/faq");
 export default function FAQ() {
   const { locale, managedItems } = useLoaderData<typeof loader>(); const english = locale === "en-GB"; const translated = managedItems?.length ? managedItems : items.map((item) => english ? item.en : item.fr);
-  return <><JsonLd value={{ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: translated.map(([question, answer]) => ({ "@type": "Question", name: question, acceptedAnswer: { "@type": "Answer", text: answer } })) }} /><header className="page-hero"><p className="eyebrow">{english ? "Need help?" : "Besoin d’aide ?"}</p><h1>{english ? "Frequently asked questions" : "Questions fréquentes"}</h1></header><section className="faq-list">{translated.map(([question, answer]) => <details key={question}><summary>{question}</summary><p>{answer}</p></details>)}</section></>;
+  const [openQuestion, setOpenQuestion] = useState<string | null>(null);
+  let offset = 0;
+  const sections = faqSections.flatMap((section) => {
+    const entries = translated.slice(offset, offset + section.count); offset += section.count;
+    return entries.length ? [{ ...section, entries }] : [];
+  });
+  return <><JsonLd value={{ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: translated.map(([question, answer]) => ({ "@type": "Question", name: question, acceptedAnswer: { "@type": "Answer", text: answer } })) }} /><header className="page-hero"><p className="eyebrow">{english ? "Need help?" : "Besoin d’aide ?"}</p><h1>{english ? "Frequently asked questions" : "Questions fréquentes"}</h1></header><section className="faq-list">{sections.map((section) => <section className="faq-list__section" key={section.fr}><h2>{english ? section.en : section.fr}</h2>{section.entries.map(([question, answer]) => <details key={question} open={openQuestion === question}><summary onClick={(event) => { event.preventDefault(); setOpenQuestion(question); }}>{question}</summary><p>{answer}</p></details>)}</section>)}</section></>;
 }

@@ -375,6 +375,7 @@ export const demoArticles: AdviceArticle[] = [
         "Pour in four stages with soft water at 94°C, aiming for a total brew time close to three minutes.",
       ],
     },
+    story: { "fr-FR": {}, "en-GB": {} },
   },
   {
     slug: "importance-de-leau",
@@ -399,5 +400,6 @@ export const demoArticles: AdviceArticle[] = [
         "Start with lightly mineralised water and adjust the recipe from there.",
       ],
     },
+    story: { "fr-FR": {}, "en-GB": {} },
   },
 ];

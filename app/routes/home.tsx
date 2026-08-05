@@ -24,9 +24,14 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 const defaultHomeContent = {
-  fr: { statement: "Chaque café raconte un lieu, une personne et une *intention.*", values: [["Sourcé avec soin", "Des lots traçables choisis pour leur singularité et la qualité du travail à l’origine."], ["Torréfié avec légèreté", "Une torréfaction précise qui préserve douceur, acidité et clarté aromatique."], ["Partagé simplement", "Des conseils clairs pour révéler chaque café, à la maison comme derrière le bar."]] },
-  en: { statement: "Every coffee carries a place, a person and an *intention.*", values: [["Sourced with care", "Traceable lots chosen for their singularity and the quality of the work at origin."], ["Roasted lightly", "A precise roasting profile that preserves sweetness, acidity and aromatic clarity."], ["Shared simply", "Clear brewing advice to help each coffee shine, at home or behind the bar."]] },
+  fr: { statement: "Le café est un voyage. Notre torréfaction en est le plus fidèle guide.\nChaque tasse est une invitation au départ, une origine à découvrir, une histoire à *partager*.", values: [["Sourcé avec soin", "Des lots traçables choisis pour leur singularité et la qualité du travail à l’origine."], ["Torréfié avec légèreté", "Une torréfaction précise qui préserve douceur, acidité et clarté aromatique."], ["Partagé simplement", "Des conseils clairs pour révéler chaque café, à la maison comme derrière le bar."]] },
+  en: { statement: "Coffee is a journey. Our roast is its most faithful guide.\nEvery cup is an invitation to set off, an origin to discover,\na story to *share*.", values: [["Sourced with care", "Traceable lots chosen for their singularity and the quality of the work at origin."], ["Roasted lightly", "A precise roasting profile that preserves sweetness, acidity and aromatic clarity."], ["Shared simply", "Clear brewing advice to help each coffee shine, at home or behind the bar."]] },
 } as const;
+
+const legacyHomeStatements = new Set([
+  "Chaque café raconte un lieu, une personne et une *intention.*",
+  "Every coffee carries a place, a person and an *intention.*",
+]);
 
 function getHomeContent(blocks: Array<{ type?: unknown; content?: unknown }> | undefined, english: boolean) {
   const fallback = english ? defaultHomeContent.en : defaultHomeContent.fr;
@@ -38,11 +43,11 @@ function getHomeContent(blocks: Array<{ type?: unknown; content?: unknown }> | u
     const card = cards[index];
     return card && typeof card === "object" ? [typeof (card as { title?: unknown }).title === "string" ? (card as { title: string }).title : fallbackTitle, typeof (card as { text?: unknown }).text === "string" ? (card as { text: string }).text : fallbackText] : [fallbackTitle, fallbackText];
   });
-  return { statement, values };
+  return { statement: legacyHomeStatements.has(statement) ? fallback.statement : statement, values };
 }
 
 function StatementText({ text }: { text: string }) {
-  return <>{text.split("*").map((part, index) => index % 2 ? <em key={index}>{part}</em> : part)}</>;
+  return <>{text.split("\n").map((line, lineIndex) => <span key={lineIndex}>{lineIndex === 1 ? <><br /><br /></> : lineIndex > 1 ? <br /> : null}{line.split("*").map((part, index) => index % 2 ? <em key={index}>{part}</em> : part)}</span>)}</>;
 }
 
 export default function Home() {
@@ -64,8 +69,8 @@ export default function Home() {
         <div className="hero__media">
           <img src="/media/home-hero-coffee-cherries.jpg" alt={english ? "Coffee cherries ripening on a coffee plant" : "Cerises de café mûrissant sur un caféier"} width="1674" height="941" fetchPriority="high" />
           <div className="hero__copy">
-            <p className="eyebrow">Micro-roastery · Tours</p>
-            <h1>{english ? <>Coffee with <em>clarity.</em></> : <>Le café en toute <em>clarté.</em></>}</h1>
+            <p className="eyebrow">{english ? "Micro-roastery" : "micro-torréfacteur"} · Tours</p>
+            <h1>{english ? <>A roast tailored to the <em>origin.</em></> : <>Une torréfaction pensée pour l’<em>origine.</em></>}</h1>
             <div className="hero__actions">
               <Link className="button hero__button hero__button--primary" to={english ? "/en/shop" : "/boutique"}>{english ? "Shop our coffees" : "Découvrir les cafés"}<ArrowRight aria-hidden="true" /></Link>
               <Link className="button hero__button hero__button--secondary" to={english ? "/en/about-us" : "/a-propos"}>{english ? "Our approach" : "Notre approche"}</Link>

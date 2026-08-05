@@ -104,7 +104,7 @@ export default function App() {
         <Links />
       </head>
       <body className={isAdmin ? "admin-body" : isPasswordSetup ? "password-setup-body" : constructionMode ? "coming-soon-body" : undefined}>
-        {constructionMode ? <ComingSoonPage title={comingSoon.title} message={comingSoon.message} /> : <CartProvider locale={locale}>
+        {constructionMode ? <ComingSoonPage title={comingSoon.title} message={comingSoon.message} locale={locale} /> : <CartProvider locale={locale}>
           <QuoteCartProvider key={professionalUserId ?? "guest"} storageNamespace={professionalUserId ?? "guest"}>
             {shellHidden ? null : <SiteHeader signedIn={signedIn} professional={professional} accountInitials={accountInitials} announcement={announcement ?? undefined} navigation={navigation} />}
             <main id="main-content" tabIndex={-1}>

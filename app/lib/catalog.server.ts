@@ -309,6 +309,10 @@ export async function getArticles(): Promise<AdviceArticle[]> {
     );
     if (!fr || !en) return [];
     const body = (translation: any) => storedBlocksToRichTextDocument(translation.blocks ?? []);
+    const story = (translation: any) => {
+      const layout = translation.blocks?.find((block: any) => block.type === "storyLayout")?.content ?? {};
+      return { ...layout, introImageUrl: layout.introImageUrl ?? layout.imageUrl, introImageAlt: layout.introImageAlt ?? layout.imageAlt, bodyImageUrl: layout.bodyImageUrl ?? layout.imageUrl, bodyImageAlt: layout.bodyImageAlt ?? layout.imageAlt, bodyImageFirst: layout.bodyImageFirst ?? layout.imageFirst };
+    };
     return [
       {
         slug: article.slug,
@@ -316,6 +320,7 @@ export async function getArticles(): Promise<AdviceArticle[]> {
         title: { "fr-FR": fr.title, "en-GB": en.title },
         excerpt: { "fr-FR": fr.excerpt, "en-GB": en.excerpt },
         body: { "fr-FR": body(fr), "en-GB": body(en) },
+        story: { "fr-FR": story(fr), "en-GB": story(en) },
       },
     ];
   });

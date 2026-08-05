@@ -62,7 +62,7 @@ export function AdminComingSoonEditor({ initialSettings, demo }: { initialSettin
       </div>
       <div className="admin-coming-soon-preview__screen">
         <img src="/media/logo-black.svg" alt="Zen Coffee Lab" width="156" height="84" />
-        <p className="eyebrow">Micro-roastery · Tours</p>
+        <p className="eyebrow">{previewLocale === "en-GB" ? "Micro-roastery" : "micro-torréfacteur"} · Tours</p>
         <h3>{preview.title || "—"}</h3>
         <p>{preview.message || "—"}</p>
         <span>contact@zencoffeelab.com</span>

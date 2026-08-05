@@ -3,6 +3,7 @@ import { Link, useLoaderData } from "react-router";
 import { ContentBlocks } from "~/components/content-blocks";
 import { getContentPage } from "~/lib/content.server";
 import { getLocale } from "~/lib/i18n";
+import { richTextPlainText, storedBlocksToRichTextDocument } from "~/lib/rich-text";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url); const locale = getLocale(request);
@@ -59,9 +60,83 @@ export function FrenchPrivacyPolicy() {
   </section>;
 }
 
+const termsArticleTitlesFr: Record<string, string> = {
+  "1": "Identification de l’entreprise",
+  "2": "Objet",
+  "3": "Produits",
+  "4": "Prix",
+  "5": "Commande",
+  "6": "Paiement",
+  "7": "Livraison",
+  "8": "Droit de rétractation",
+  "9": "Garanties",
+  "10": "Responsabilité",
+  "11": "Données personnelles",
+  "12": "Litiges et médiation",
+  "13": "Droit applicable",
+  "14": "Acceptation des CGV",
+};
+const termsArticleTitlesEn: Record<string, string> = {
+  "1": "Company Identification", "2": "Purpose", "3": "Products", "4": "Prices", "5": "Ordering", "6": "Payment", "7": "Delivery", "8": "Right of Withdrawal", "9": "Warranties", "10": "Liability", "11": "Personal Data", "12": "Disputes and Mediation", "13": "Applicable Law", "14": "Acceptance of the Terms",
+};
+const legalNoticeTitlesEn: Record<string, string> = {
+  "1": "Website Publisher", "2": "Website Hosting", "3": "Intellectual Property", "4": "Liability", "5": "Personal Data", "6": "Cookies", "7": "Applicable Law",
+};
+const privacyPolicyTitlesEn: Record<string, string> = {
+  "1": "Data Collection", "2": "Purpose of the Data", "3": "Legal Basis", "4": "Data Recipients", "5": "Data Retention Period", "6": "Security", "7": "User Rights", "8": "Cookies", "9": "Changes",
+};
+
+type TermsSection = { number: string; title: string; paragraphs: string[] };
+
+function articleSections(blocks: Array<{ type?: unknown; content?: unknown }>, titles: Record<string, string>, articleLabel = "Article"): TermsSection[] {
+  const text = richTextPlainText(storedBlocksToRichTextDocument(blocks)).replace(/\u00a0/g, " ").trim();
+  const matches = [...text.matchAll(new RegExp(`${articleLabel}\\s+(\\d+)\\.\\s*`, "gi"))];
+  if (!matches.length) return [];
+
+  return matches.map((match, index) => {
+    const number = match[1];
+    const body = text.slice((match.index ?? 0) + match[0].length, matches[index + 1]?.index).trim();
+    const title = titles[number] ?? `${articleLabel} ${number}`;
+    const withoutRepeatedTitle = body.replace(new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?: test)?\\s*`, "i"), "");
+    return {
+      number,
+      title: `${articleLabel} ${number}. ${title}`,
+      paragraphs: withoutRepeatedTitle.split(/\n+/).map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph && paragraph !== "—"),
+    };
+  });
+}
+
+export function TermsConditionsDocument({ blocks, english = false }: { blocks: Array<{ type?: unknown; content?: unknown }>; english?: boolean }) {
+  const sections = articleSections(blocks, english ? termsArticleTitlesEn : termsArticleTitlesFr);
+  if (!sections.length) return <ContentBlocks blocks={blocks} className="terms-document" />;
+  return <section className="article-body rich-text-content legal-document terms-document" aria-label={english ? "General Terms and Conditions of Sale" : "Conditions générales de vente"}>
+    {sections.map((section) => <section key={section.number}>
+      <h2>{section.title}</h2>
+      {section.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+    </section>)}
+  </section>;
+}
+
+function EnglishLegalDocument({ blocks, titles, label }: { blocks: Array<{ type?: unknown; content?: unknown }>; titles: Record<string, string>; label: string }) {
+  const text = richTextPlainText(storedBlocksToRichTextDocument(blocks)).replace(/\u00a0/g, " ").trim();
+  const matches = [...text.matchAll(/(?:^|\n)(\d+)\.\s*/g)];
+  if (!matches.length) return <ContentBlocks blocks={blocks} className="legal-document" />;
+  const sections = matches.map((match, index) => {
+    const number = match[1];
+    const body = text.slice((match.index ?? 0) + match[0].length, matches[index + 1]?.index).trim();
+    const title = titles[number] ?? `${label} ${number}`;
+    const withoutRepeatedTitle = body.replace(new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i"), "");
+    return { number, title: `${number}. ${title}`, paragraphs: withoutRepeatedTitle.split(/\n+/).map((paragraph) => paragraph.trim()).filter(Boolean) };
+  });
+  return <section className="article-body rich-text-content legal-document" aria-label={label}>
+    {sections.map((section) => <section key={section.number}><h2>{section.title}</h2>{section.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</section>)}
+  </section>;
+}
+
 export default function Legal() {
   const { locale, kind, content } = useLoaderData<typeof loader>(); const english = locale === "en-GB";
   const title = kind === "terms" ? (english ? "Terms and conditions of sale" : "Conditions générales de vente") : kind === "privacy" ? (english ? "Privacy policy" : "Politique de confidentialité") : (english ? "Legal notice" : "Mentions légales");
   const sourceDocument = !english && kind === "legal" ? <FrenchLegalNotice /> : !english && kind === "privacy" ? <FrenchPrivacyPolicy /> : null;
-  return <article><header className="page-hero"><p className="eyebrow">Zen Coffee Lab</p><h1>{content?.title ?? title}</h1></header>{sourceDocument ?? (content ? <ContentBlocks blocks={content.blocks} /> : <div className="article-body"><p>{english ? "This document is a pre-production template. Company registration, tax, hosting and consumer mediation details must be reviewed by the owner or legal counsel before launch." : "Ce document est un modèle de préproduction. Les informations d’immatriculation, fiscales, d’hébergement et de médiation doivent être validées par le propriétaire ou son conseil avant la mise en ligne."}</p><h2>{english ? "Publisher" : "Éditeur"}</h2><p>Zen Coffee Lab · Tours, France · contact@zencoffeelab.com</p><h2>{english ? "Data and orders" : "Données et commandes"}</h2><p>{english ? "Personal data is used only to process applications, accounts, orders, delivery and legal obligations. Analytics is loaded only after consent." : "Les données personnelles sont utilisées uniquement pour traiter les demandes, comptes, commandes, livraisons et obligations légales. La mesure d’audience n’est chargée qu’après consentement."}</p></div>)}</article>;
+  const renderedContent = sourceDocument ?? (content ? (kind === "terms" ? <TermsConditionsDocument blocks={content.blocks} english={english} /> : english && kind === "legal" ? <EnglishLegalDocument blocks={content.blocks} titles={legalNoticeTitlesEn} label="Legal notice" /> : english && kind === "privacy" ? <EnglishLegalDocument blocks={content.blocks} titles={privacyPolicyTitlesEn} label="Privacy Policy" /> : <ContentBlocks blocks={content.blocks} />) : <div className="article-body"><p>{english ? "This document is a pre-production template. Company registration, tax, hosting and consumer mediation details must be reviewed by the owner or legal counsel before launch." : "Ce document est un modèle de préproduction. Les informations d’immatriculation, fiscales, d’hébergement et de médiation doivent être validées par le propriétaire ou son conseil avant la mise en ligne."}</p><h2>{english ? "Publisher" : "Éditeur"}</h2><p>Zen Coffee Lab · Tours, France · contact@zencoffeelab.com</p><h2>{english ? "Data and orders" : "Données et commandes"}</h2><p>{english ? "Personal data is used only to process applications, accounts, orders, delivery and legal obligations. Analytics is loaded only after consent." : "Les données personnelles sont utilisées uniquement pour traiter les demandes, comptes, commandes, livraisons et obligations légales. La mesure d’audience n’est chargée qu’après consentement."}</p></div>);
+  return <article><header className="page-hero"><p className="eyebrow">Zen Coffee Lab</p><h1>{content?.title ?? title}</h1></header>{renderedContent}</article>;
 }
