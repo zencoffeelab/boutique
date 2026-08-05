@@ -11,6 +11,7 @@ export type ChangelogEntry = Readonly<{
 
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
+  { id: "2026-08-05-coming-soon-admin-access", date: "2026-08-05", kind: "Correction", title: "Accès administrateur maintenu pendant le mode construction", description: "Lorsque le mode Site en construction est activé, les administrateurs connectés peuvent désormais continuer à consulter le site public et à accéder au back-office." },
   { id: "2026-08-05-journal-editor-slug-spacing", date: "2026-08-05", kind: "Design", title: "Espacement du champ Slug", description: "Le champ Slug de l’éditeur du Journal bénéficie maintenant du même espace entre son libellé et sa zone de saisie." },
   { id: "2026-08-05-journal-editor-field-order", date: "2026-08-05", kind: "Design", title: "Informations d’article regroupées en tête", description: "Dans l’éditeur du Journal, les informations générales sont affichées avant la mise en page, avec des espacements réguliers entre les champs." },
   { id: "2026-08-05-journal-three-block-structure", date: "2026-08-05", kind: "Fonctionnalité", title: "Journal organisé en trois blocs éditables", description: "Les articles du Journal sont préparés pour une introduction, un bloc texte-image et un bloc image-texte distincts." },

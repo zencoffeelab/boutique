@@ -4,6 +4,7 @@ import {
   defaultComingSoonSettings,
   isComingSoonExemptPath,
   parseComingSoonSettings,
+  shouldShowComingSoon,
 } from "~/lib/coming-soon";
 
 describe("coming soon settings", () => {
@@ -36,5 +37,10 @@ describe("coming soon settings", () => {
     expect(isComingSoonExemptPath("/activation/mot-de-passe")).toBe(true);
     expect(isComingSoonExemptPath("/en/activate/password")).toBe(true);
     expect(isComingSoonExemptPath("/boutique")).toBe(false);
+  });
+
+  it("keeps the public site available to authenticated administrators", () => {
+    expect(shouldShowComingSoon(true, "/boutique", true)).toBe(false);
+    expect(shouldShowComingSoon(true, "/boutique", false)).toBe(true);
   });
 });

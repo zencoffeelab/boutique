@@ -22,7 +22,7 @@ import { getSessionStatus } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
 import { getContentPage } from "~/lib/content.server";
 import { getComingSoon } from "~/lib/coming-soon.server";
-import { comingSoonCopy, defaultComingSoonSettings, isComingSoonExemptPath } from "~/lib/coming-soon";
+import { comingSoonCopy, defaultComingSoonSettings, isComingSoonExemptPath, shouldShowComingSoon } from "~/lib/coming-soon";
 import { getLocale } from "~/lib/i18n";
 import { defaultSiteNavigation } from "~/lib/site-navigation";
 import { getSiteNavigation } from "~/lib/site-navigation.server";
@@ -93,7 +93,7 @@ export default function App() {
   const isAdmin = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
   const isPasswordSetup = location.pathname === "/activation/mot-de-passe" || location.pathname === "/en/activate/password";
   const shellHidden = isComingSoonExemptPath(location.pathname);
-  const constructionMode = comingSoon.active && !shellHidden;
+  const constructionMode = shouldShowComingSoon(comingSoon.active, location.pathname, admin);
   return (
     <html lang={locale === "fr-FR" ? "fr" : "en"}>
       <head>
