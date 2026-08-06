@@ -58,6 +58,8 @@ export function comingSoonCopy(settings: ComingSoonSettings, locale: Locale) {
 export function isComingSoonExemptPath(pathname: string) {
   return pathname === "/admin"
     || pathname.startsWith("/admin/")
+    || pathname === "/mon-compte"
+    || pathname === "/en/my-account"
     || pathname === "/activation/mot-de-passe"
     || pathname === "/en/activate/password";
 }

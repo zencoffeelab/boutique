@@ -34,6 +34,8 @@ describe("coming soon settings", () => {
 
   it("keeps administration and mandatory password setup reachable", () => {
     expect(isComingSoonExemptPath("/admin/contenus")).toBe(true);
+    expect(isComingSoonExemptPath("/mon-compte")).toBe(true);
+    expect(isComingSoonExemptPath("/en/my-account")).toBe(true);
     expect(isComingSoonExemptPath("/activation/mot-de-passe")).toBe(true);
     expect(isComingSoonExemptPath("/en/activate/password")).toBe(true);
     expect(isComingSoonExemptPath("/boutique")).toBe(false);

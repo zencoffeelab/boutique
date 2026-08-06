@@ -211,5 +211,6 @@ export type AdviceArticle = Readonly<{
   title: Record<Locale, string>;
   excerpt: Record<Locale, string>;
   body: Record<Locale, import("~/lib/rich-text").RichTextDocument | readonly string[]>;
-  story: Record<Locale, { introImageUrl?: string; introImageAlt?: string; introImageFirst?: boolean; bodyImageUrl?: string; bodyImageAlt?: string; bodyImageFirst?: boolean }>;
+  body2?: Record<Locale, import("~/lib/rich-text").RichTextDocument>;
+  story: Record<Locale, { introImageUrl?: string; introImageAlt?: string; introImageFirst?: boolean; bodyImageUrl?: string; bodyImageAlt?: string; bodyImageFirst?: boolean; body2ImageUrl?: string; body2ImageAlt?: string }>;
 }>;

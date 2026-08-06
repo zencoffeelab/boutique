@@ -71,6 +71,8 @@ describe("advice administration", () => {
       excerptEn: "A sufficiently detailed excerpt.",
       bodyFr: richText,
       bodyEn: richText,
+      body2Fr: richText,
+      body2En: richText,
       seoTitleFr: "Guide complet du café",
       seoTitleEn: "Complete coffee guide",
       seoDescriptionFr: "Une description SEO suffisamment complète.",
@@ -79,7 +81,10 @@ describe("advice administration", () => {
 
     await expect(action({ request: new Request("http://localhost/admin/conseils", { method: "POST", body: form }), params: {}, context: {} } as never)).resolves.toEqual({ ok: true, message: "Conseil enregistré." });
     expect(upsert).toHaveBeenCalledWith(expect.arrayContaining([
-      expect.objectContaining({ blocks: [expect.objectContaining({ type: "richText", content: expect.objectContaining({ type: "doc" }) })] }),
+      expect.objectContaining({ blocks: expect.arrayContaining([
+        expect.objectContaining({ type: "richText", content: expect.objectContaining({ type: "doc" }) }),
+        expect.objectContaining({ type: "storyLayout", content: expect.objectContaining({ introImageFirst: false, bodyImageFirst: true }) }),
+      ]) }),
     ]), { onConflict: "article_id,locale" });
   });
 });
