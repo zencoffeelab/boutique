@@ -42,7 +42,7 @@ export async function processNotificationQueue(limit = notificationBatchSize) {
   for (const item of data ?? []) {
     const claimedAttempts = item.attempts + 1; const { data: claimed } = await client.from("notification_outbox").update({ attempts: claimedAttempts, next_attempt_at: new Date(Date.now() + 10 * 60_000).toISOString() }).eq("id", item.id).eq("attempts", item.attempts).is("sent_at", null).select("id").maybeSingle(); if (!claimed) continue;
     let attachments: Array<{ filename: string; content: Buffer }> | undefined;
-    if (item.kind === "invoice" && item.payload?.orderId) {
+    if ((item.kind === "invoice" || item.kind === "order_confirmation") && item.payload?.orderId) {
       const { data: invoice } = await client.from("invoices").select("invoice_number,storage_path").eq("order_id", String(item.payload.orderId)).maybeSingle();
       if (invoice?.storage_path) { const { data: file } = await client.storage.from("invoices").download(invoice.storage_path); if (file) attachments = [{ filename: `${invoice.invoice_number}.pdf`, content: Buffer.from(await file.arrayBuffer()) }]; }
     }

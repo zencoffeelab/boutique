@@ -3,7 +3,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { constructStripeEvent, createStripe } from "~/lib/stripe.server";
-import { invoiceEmail, orderConfirmationEmail, professionalQuotePaidEmail, refundEmail } from "~/services/email-templates.server";
+import { orderConfirmationEmail, professionalQuotePaidEmail, refundEmail } from "~/services/email-templates.server";
 import { dispatchNotificationQueue, enqueueNotification } from "~/services/notifications.server";
 import { generateInvoicePdf } from "~/services/invoice.server";
 
@@ -72,9 +72,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
         const { data: snapshot } = await client.from("orders").select("order_number,locale,email,shipping_address,shipping_carrier,shipping_service,subtotal_cents,shipping_charged_cents,total_cents,order_lines(product_name,variant_label,quantity,line_total_cents)").eq("id", orderId).single();
         if (!snapshot) throw new Error("Order confirmation snapshot is unavailable.");
         const confirmation = orderConfirmationEmail(snapshot as never);
-        const invoice = invoiceEmail({ locale: order.locale, orderNumber: order.order_number });
         await enqueueNotification({ kind: "order_confirmation", to: order.email, locale: order.locale, ...confirmation, payload: { orderId }, dedupeKey: `order-confirmation/${orderId}` });
-        await enqueueNotification({ kind: "invoice", to: order.email, locale: order.locale, ...invoice, payload: { orderId }, dedupeKey: `invoice/${orderId}` });
         dispatchNotificationQueue(context, "order_confirmation_delivery_failed");
       }
     }
