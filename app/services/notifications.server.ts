@@ -5,6 +5,15 @@ export { escapeEmailHtml } from "~/services/email-templates.server";
 
 export type NotificationKind = "pro_application" | "pro_application_confirmation" | "pro_decision" | "professional_quote" | "professional_quote_paid" | "invitation" | "order_confirmation" | "invoice" | "order_status" | "shipped" | "tracking" | "delivered" | "refund" | "password_reset" | "contact_message" | "contact_confirmation";
 
+// A notification can need five subrequests (claim, metadata, download, Resend,
+// and final status update). Keep each invocation safely below Workers Free's
+// 50-subrequest ceiling, including the cron maintenance queries.
+export const notificationBatchSize = 5;
+
+export function notificationBatchLimit(limit = notificationBatchSize) {
+  return Math.max(1, Math.min(Math.floor(limit), notificationBatchSize));
+}
+
 export async function enqueueNotification(input: { kind: NotificationKind; to: string; locale: "fr-FR" | "en-GB"; subject: string; html: string; payload?: Record<string, unknown>; dedupeKey?: string }) {
   const client = createServiceSupabase();
   if (!client) return { queued: false, demo: true };
@@ -14,7 +23,7 @@ export async function enqueueNotification(input: { kind: NotificationKind; to: s
   return { queued: true, demo: false };
 }
 
-export function dispatchNotificationQueue(context: unknown, logLabel: string, limit = 25) {
+export function dispatchNotificationQueue(context: unknown, logLabel: string, limit = notificationBatchSize) {
   const task = processNotificationQueue(limit).catch((cause) => {
     console.error(logLabel, { message: cause instanceof Error ? cause.message : String(cause) });
   });
@@ -23,11 +32,11 @@ export function dispatchNotificationQueue(context: unknown, logLabel: string, li
   else void task;
 }
 
-export async function processNotificationQueue(limit = 25) {
+export async function processNotificationQueue(limit = notificationBatchSize) {
   const config = env(); const client = createServiceSupabase();
   if (!client || !config.RESEND_API_KEY) return { processed: 0, skipped: true };
   const dueBefore = new Date(Date.now() + 5_000).toISOString();
-  const { data, error } = await client.from("notification_outbox").select("*").is("sent_at", null).lte("next_attempt_at", dueBefore).order("created_at").limit(limit);
+  const { data, error } = await client.from("notification_outbox").select("*").is("sent_at", null).lte("next_attempt_at", dueBefore).order("created_at").limit(notificationBatchLimit(limit));
   if (error) throw new Error(`Unable to read notification queue: ${error.message}`);
   const resend = new Resend(config.RESEND_API_KEY); let processed = 0;
   for (const item of data ?? []) {

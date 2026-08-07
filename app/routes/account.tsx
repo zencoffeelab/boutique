@@ -1,17 +1,40 @@
 import { ShieldCheck } from "lucide-react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
-import { Form, Link, redirect, useActionData, useLoaderData } from "react-router";
+import { data, Form, Link, redirect, useActionData, useLoaderData } from "react-router";
 import { z } from "zod";
 import { AccountDashboard } from "~/components/account/account-dashboard";
 import { getViewer } from "~/lib/auth.server";
 import { getLocale } from "~/lib/i18n";
 import { safeInternalPath } from "~/lib/redirects";
 import { pageMeta } from "~/lib/seo";
-import { createRequestSupabase, createServiceSupabase } from "~/lib/supabase.server";
+import { authConfirmationUrl, createRequestSupabase, createServiceSupabase } from "~/lib/supabase.server";
+import { SHIPPING_COUNTRY_CODES } from "~/domain/shipping-countries";
 
-const addressSchema = z.object({ label: z.string().trim().max(80).default(""), company: z.string().trim().max(120).default(""), firstName: z.string().trim().min(1).max(80), lastName: z.string().trim().min(1).max(80), line1: z.string().trim().min(3).max(160), line2: z.string().trim().max(160).default(""), postalCode: z.string().trim().min(2).max(20), city: z.string().trim().min(1).max(100), countryCode: z.string().trim().regex(/^[A-Z]{2}$/), phone: z.string().trim().max(30).default("") });
+const addressSchema = z.object({ label: z.string().trim().max(80).default(""), company: z.string().trim().max(120).default(""), firstName: z.string().trim().min(1).max(80), lastName: z.string().trim().min(1).max(80), line1: z.string().trim().min(3).max(160), line2: z.string().trim().max(160).default(""), postalCode: z.string().trim().min(2).max(20), city: z.string().trim().min(1).max(100), countryCode: z.enum(SHIPPING_COUNTRY_CODES), phone: z.string().trim().max(30).default("") });
 const mfaVerificationSchema = z.object({ factorId: z.uuid(), code: z.string().trim().regex(/^\d{6}$/), purpose: z.enum(["login", "setup"]).default("login") });
 const mfaUnenrollmentSchema = z.object({ factorId: z.uuid() });
+
+export function signupConfirmationMessage(locale: "fr-FR" | "en-GB") {
+  return locale === "en-GB"
+    ? "An email has been sent to you. Please confirm your email address."
+    : "Un mail vous a été envoyé. Veuillez confirmer votre adresse mail.";
+}
+
+export function AccountLanguageSwitch({ english }: { english: boolean }) {
+  return <Link className="account-language-switch" to={english ? "/mon-compte" : "/en/my-account"}>
+    {english ? "Français" : "English"}
+  </Link>;
+}
+
+export function accountWelcomeDestination(locale: "fr-FR" | "en-GB") {
+  return locale === "en-GB" ? "/en?account=welcome" : "/?account=welcome";
+}
+
+export function customerLoginDestination(locale: "fr-FR" | "en-GB", accountPath: string, requestedNext: string, showWelcome: boolean) {
+  if (requestedNext !== accountPath) return requestedNext;
+  if (showWelcome) return accountWelcomeDestination(locale);
+  return locale === "en-GB" ? "/en" : "/";
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request); const accountPath = locale === "en-GB" ? "/en/my-account" : "/mon-compte"; const viewer = await getViewer(request); const url = new URL(request.url); const setPassword = url.searchParams.get("set-password") === "1"; const authError = url.searchParams.get("auth_error"); const next = safeInternalPath(url.searchParams.get("next"), accountPath);
@@ -91,16 +114,18 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "logout") { await supabase.client.auth.signOut(); return redirect(safeInternalPath(form.get("next"), accountPath), { headers: supabase.responseHeaders }); }
   const email = String(form.get("email") ?? ""); const password = String(form.get("password") ?? "");
   if (intent === "register" && password.length < 10) return { ok: false, message: locale === "en-GB" ? "Use at least 10 characters to create an account." : "Utilisez au moins 10 caractères pour créer un compte." };
-  if (intent === "reset") { const next = safeInternalPath(form.get("next"), accountPath); const confirm = `${new URL(request.url).origin}/auth/confirm?next=${encodeURIComponent(`${accountPath}?set-password=1&next=${encodeURIComponent(next)}`)}`; const { error } = await supabase.client.auth.resetPasswordForEmail(email, { redirectTo: confirm }); return { ok: !error, scope: "password_reset" as const, message: error?.message ?? (locale === "en-GB" ? "Request confirmed. Check your inbox: the password change link has been sent." : "Demande confirmée. Consultez votre boîte de réception : le lien de modification du mot de passe a été envoyé.") }; }
-  const result = intent === "register" ? await supabase.client.auth.signUp({ email, password, options: { data: { signup_source: "account" }, emailRedirectTo: `${new URL(request.url).origin}/auth/confirm?next=${encodeURIComponent(accountPath)}` } }) : await supabase.client.auth.signInWithPassword({ email, password });
+  if (intent === "reset") { const next = safeInternalPath(form.get("next"), accountPath); const confirm = authConfirmationUrl(request, `${accountPath}?set-password=1&next=${encodeURIComponent(next)}`); const { error } = await supabase.client.auth.resetPasswordForEmail(email, { redirectTo: confirm }); return { ok: !error, scope: "password_reset" as const, message: error?.message ?? (locale === "en-GB" ? "Request confirmed. Check your inbox: the password change link has been sent." : "Demande confirmée. Consultez votre boîte de réception : le lien de modification du mot de passe a été envoyé.") }; }
+  const result = intent === "register" ? await supabase.client.auth.signUp({ email, password, options: { data: { signup_source: "account", welcome_drawer_pending: true }, emailRedirectTo: authConfirmationUrl(request, accountPath) } }) : await supabase.client.auth.signInWithPassword({ email, password });
   if (result.error) return { ok: false, message: result.error.message };
+  if (intent === "register" && (!result.data.user || result.data.user.identities?.length === 0)) return { ok: false, message: locale === "en-GB" ? "An account already exists for this email. Sign in instead." : "Un compte existe déjà pour cet e-mail. Connectez-vous." };
+  if (intent === "register") return data({ ok: true, message: signupConfirmationMessage(locale) }, { headers: supabase.responseHeaders });
   const { data: profile } = result.data.user ? await supabase.client.from("profiles").select("role,professional_status").eq("id", result.data.user.id).maybeSingle() : { data: null };
   const requestedNext = safeInternalPath(form.get("next"), accountPath);
+  const firstCustomerLogin = intent === "login" && result.data.user?.user_metadata?.welcome_drawer_pending === true;
+  if (firstCustomerLogin) await supabase.client.auth.updateUser({ data: { ...result.data.user?.user_metadata, welcome_drawer_pending: false } });
   const destination = profile?.role === "admin"
     ? (requestedNext === accountPath ? "/admin" : requestedNext)
-    : profile?.professional_status === "approved" && !requestedNext.startsWith("/admin")
-      ? requestedNext
-      : accountPath;
+    : customerLoginDestination(locale, accountPath, requestedNext, firstCustomerLogin);
   return redirect(destination, { headers: supabase.responseHeaders });
 }
 
@@ -150,7 +175,7 @@ export default function Account() {
     return <AccountDashboard data={{ locale, viewer, orders, addresses, professionalQuotes, setPassword, next, mfa }} result={result} />;
   }
   return <>
-    <header className="page-hero"><p className="eyebrow">{english ? "Private space" : "Espace privé"}</p><h1>{english ? "Your account" : "Votre compte"}</h1><p className="lede">{english ? "Find your orders, invoices, addresses and tracking." : "Retrouvez vos commandes, factures, adresses et suivis."}</p></header>
-    <Form method="post" className="form-card"><input type="hidden" name="next" value={next} /><h2>{english ? "Sign in" : "Se connecter"}</h2>{authError ? <p className="form-message form-error" role="alert">{authError}</p> : null}{result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}<div className="form-grid"><div className="field field--wide"><label htmlFor="account-email">Email</label><input id="account-email" name="email" type="email" required autoComplete="email" /></div><div className="field field--wide"><label htmlFor="account-password">{english ? "Password" : "Mot de passe"}</label><input id="account-password" name="password" type="password" minLength={8} required autoComplete="current-password" /></div></div><div className="account-login-actions"><button className="button button--dark" name="intent" value="login" type="submit">{english ? "Sign in" : "Se connecter"}</button><button className="button button--ghost" name="intent" value="register" type="submit">{english ? "Create an account" : "Créer un compte"}</button><button className="button button--ghost" formNoValidate name="intent" value="reset" type="submit">{english ? "Reset password" : "Mot de passe oublié"}</button></div></Form>
+    <header className="page-hero account-welcome-hero"><AccountLanguageSwitch english={english} /><p className="eyebrow">{english ? "Private space" : "Espace privé"}</p><h1>{english ? "Your account" : "Votre compte"}</h1><p className="lede">{english ? "Find your orders, invoices, addresses and tracking." : "Retrouvez vos commandes, factures, adresses et suivis."}</p></header>
+    <Form method="post" className="form-card"><input type="hidden" name="next" value={next} /><h2>{english ? "Sign in" : "Se connecter"}</h2>{authError ? <p className="form-message form-error" role="alert">{authError}</p> : null}{result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}<div className="form-grid"><div className="field field--wide"><label htmlFor="account-email">Email</label><input id="account-email" name="email" type="email" required autoComplete="email" /></div><div className="field field--wide"><label htmlFor="account-password">{english ? "Password" : "Mot de passe"}</label><input id="account-password" name="password" type="password" minLength={10} required autoComplete="current-password" /></div></div><div className="account-login-actions"><button className="button button--dark" name="intent" value="login" type="submit">{english ? "Sign in" : "Se connecter"}</button><button className="button button--ghost" name="intent" value="register" type="submit">{english ? "Create an account" : "Créer un compte"}</button><button className="button button--ghost" formNoValidate name="intent" value="reset" type="submit">{english ? "Reset password" : "Mot de passe oublié"}</button></div></Form>
   </>;
 }

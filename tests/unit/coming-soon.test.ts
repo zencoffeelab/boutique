@@ -3,6 +3,7 @@ import {
   comingSoonCopy,
   defaultComingSoonSettings,
   isComingSoonExemptPath,
+  isSiteShellHiddenPath,
   parseComingSoonSettings,
   shouldShowComingSoon,
 } from "~/lib/coming-soon";
@@ -39,6 +40,13 @@ describe("coming soon settings", () => {
     expect(isComingSoonExemptPath("/activation/mot-de-passe")).toBe(true);
     expect(isComingSoonExemptPath("/en/activate/password")).toBe(true);
     expect(isComingSoonExemptPath("/boutique")).toBe(false);
+  });
+
+  it("keeps the regular site shell on the complete customer account page", () => {
+    expect(isSiteShellHiddenPath("/mon-compte")).toBe(false);
+    expect(isSiteShellHiddenPath("/en/my-account")).toBe(false);
+    expect(isSiteShellHiddenPath("/admin")).toBe(true);
+    expect(isSiteShellHiddenPath("/activation/mot-de-passe")).toBe(true);
   });
 
   it("keeps the public site available to authenticated administrators", () => {

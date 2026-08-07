@@ -1,9 +1,38 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
-import { AccountNavigation, MfaLoginGate } from "~/routes/account";
+import { AccountLanguageSwitch, accountWelcomeDestination, AccountNavigation, customerLoginDestination, MfaLoginGate } from "~/routes/account";
+import { accountShippingCountryOptions } from "~/components/account/account-dashboard";
+import { SHIPPING_COUNTRY_CODES } from "~/domain/shipping-countries";
 
 describe("account anchor navigation", () => {
+  it("offers the other storefront language from the private-space welcome screen", () => {
+    const frenchHtml = renderToStaticMarkup(<MemoryRouter><AccountLanguageSwitch english={false} /></MemoryRouter>);
+    const englishHtml = renderToStaticMarkup(<MemoryRouter><AccountLanguageSwitch english /></MemoryRouter>);
+
+    expect(frenchHtml).toContain('href="/en/my-account"');
+    expect(frenchHtml).toContain("English");
+    expect(englishHtml).toContain('href="/mon-compte"');
+    expect(englishHtml).toContain("Français");
+  });
+
+  it("opens the account drawer only after the first login", () => {
+    expect(accountWelcomeDestination("fr-FR")).toBe("/?account=welcome");
+    expect(accountWelcomeDestination("en-GB")).toBe("/en?account=welcome");
+    expect(customerLoginDestination("fr-FR", "/mon-compte", "/mon-compte", true)).toBe("/?account=welcome");
+    expect(customerLoginDestination("fr-FR", "/mon-compte", "/mon-compte", false)).toBe("/");
+    expect(customerLoginDestination("en-GB", "/en/my-account", "/en/my-account", false)).toBe("/en");
+    expect(customerLoginDestination("fr-FR", "/mon-compte", "/professionnel", true)).toBe("/professionnel");
+  });
+
+  it("lists exactly the countries currently available for delivery in the address form", () => {
+    const countries = accountShippingCountryOptions("fr-FR");
+
+    expect(countries).toHaveLength(SHIPPING_COUNTRY_CODES.length);
+    expect(countries).toContain("FR");
+    expect(countries).not.toContain("US");
+  });
+
   it("links every customer section and exposes the current counts", () => {
     const html = renderToStaticMarkup(<MemoryRouter><AccountNavigation english={false} orderCount={3} addressCount={2} quoteCount={0} professional={false} /></MemoryRouter>);
 

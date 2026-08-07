@@ -55,6 +55,13 @@ describe("public account navigation", () => {
     expect(englishHtml).toContain("language-selector__chevron");
   });
 
+  it("opens the private-space drawer when arriving from a standard login", () => {
+    const html = renderHeader(true, false, "AL", "/?account=welcome");
+
+    expect(html).toContain('aria-controls="account-drawer"');
+    expect(html).toContain('aria-expanded="true"');
+  });
+
   it("uses the configured menu order and only its selected pages", () => {
     const navigation: SiteNavigationConfiguration = {
       menu: ["contact", "shop"],

@@ -22,7 +22,7 @@ import { getSessionStatus } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
 import { getContentPage } from "~/lib/content.server";
 import { getComingSoon } from "~/lib/coming-soon.server";
-import { comingSoonCopy, defaultComingSoonSettings, isComingSoonExemptPath, shouldShowComingSoon } from "~/lib/coming-soon";
+import { comingSoonCopy, defaultComingSoonSettings, isSiteShellHiddenPath, shouldShowComingSoon } from "~/lib/coming-soon";
 import { getLocale } from "~/lib/i18n";
 import { defaultSiteNavigation } from "~/lib/site-navigation";
 import { getSiteNavigation } from "~/lib/site-navigation.server";
@@ -45,7 +45,7 @@ export const meta: MetaFunction = () => [
 export async function loader({ request }: LoaderFunctionArgs) {
   const requestUrl = new URL(request.url);
   const locale = getLocale(request);
-  const shellHidden = isComingSoonExemptPath(requestUrl.pathname);
+  const shellHidden = isSiteShellHiddenPath(requestUrl.pathname);
   const [session, footerProducts, announcementContent, navigation, comingSoon] = await Promise.all([
     getSessionStatus(request),
     shellHidden
@@ -92,7 +92,7 @@ export default function App() {
   const location = useLocation();
   const isAdmin = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
   const isPasswordSetup = location.pathname === "/activation/mot-de-passe" || location.pathname === "/en/activate/password";
-  const shellHidden = isComingSoonExemptPath(location.pathname);
+  const shellHidden = isSiteShellHiddenPath(location.pathname);
   const constructionMode = shouldShowComingSoon(comingSoon.active, location.pathname, admin);
   return (
     <html lang={locale === "fr-FR" ? "fr" : "en"}>

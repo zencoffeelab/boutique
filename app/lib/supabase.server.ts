@@ -22,6 +22,16 @@ function serializeCookie(name: string, value: string, options: CookieOptions): s
   return segments.join("; ");
 }
 
+export function authConfirmationUrl(request: Request, next: string) {
+  // VITE_SITE_URL is optional in local development. Falling back to the
+  // request origin prevents confirmation links from ever pointing to the
+  // localhost schema default in a deployed Worker with a missing variable.
+  const siteUrl = process.env.VITE_SITE_URL || new URL(request.url).origin;
+  const confirmation = new URL("/auth/confirm", siteUrl);
+  confirmation.searchParams.set("next", next);
+  return confirmation.toString();
+}
+
 export function createRequestSupabase(request: Request) {
   const config = env();
   if (!config.VITE_SUPABASE_URL || !config.VITE_SUPABASE_ANON_KEY) return null;

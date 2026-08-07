@@ -64,6 +64,13 @@ export function isComingSoonExemptPath(pathname: string) {
     || pathname === "/en/activate/password";
 }
 
+export function isSiteShellHiddenPath(pathname: string) {
+  return pathname === "/admin"
+    || pathname.startsWith("/admin/")
+    || pathname === "/activation/mot-de-passe"
+    || pathname === "/en/activate/password";
+}
+
 export function shouldShowComingSoon(active: boolean, pathname: string, isAdmin: boolean) {
   return active && !isAdmin && !isComingSoonExemptPath(pathname);
 }

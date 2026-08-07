@@ -105,7 +105,7 @@ export function SiteHeader({ signedIn, professional, accountInitials, announceme
   const locale = location.pathname === "/en" || location.pathname.startsWith("/en/") ? "en-GB" : "fr-FR";
   const t = dictionary[locale];
   const [menuOpen, setMenuOpen] = useState(false);
-  const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
+  const [accountDrawerOpen, setAccountDrawerOpen] = useState(() => new URLSearchParams(location.search).get("account") === "welcome");
   const { itemCount, drawerOpen, openDrawer, closeDrawer } = useCart();
   const quoteCart = useQuoteCart();
   const paths = locale === "fr-FR"
