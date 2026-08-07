@@ -30,7 +30,7 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
     return Response.json({ ok: false, message: `Ce devis ne contient pas les données ${provider === "shippo" ? "Shippo" : "Sendcloud"} requises. Recalculez la livraison avant d’acheter l’étiquette.` }, { status: 409 });
   }
 
-  const { data: existingRows } = await client.from("shipments").select("parcel_index,label_provider,shippo_transaction_id,sendcloud_parcel_id,label_url,tracking_number").eq("order_id", order.id);
+  const { data: existingRows } = await client.from("shipments").select("id,parcel_index,label_provider,shippo_transaction_id,sendcloud_parcel_id,label_url,tracking_number").eq("order_id", order.id);
   const existingByParcel = new Map((existingRows ?? []).map((shipment) => [shipment.parcel_index, shipment]));
   if (env().SHIPPING_MOCK) return Response.json({ ok: true, demo: true, labels: quote.parcels.map((_: unknown, index: number) => ({ parcel: index + 1, url: "about:blank", provider })) });
 
@@ -38,7 +38,13 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
   for (const [index, providerRateId] of providerRateIds.entries()) {
     const existing = existingByParcel.get(index);
     if (existing?.sendcloud_parcel_id || existing?.shippo_transaction_id) {
-      labels.push({ parcel: index + 1, url: existing.label_url, trackingNumber: existing.tracking_number, provider: existing.label_provider === "sendcloud" ? "sendcloud" : "shippo" });
+      const provider = existing.label_provider === "sendcloud" ? "sendcloud" : "shippo";
+      const privateSendcloudUrl = provider === "sendcloud" ? `/api/admin/shipments/${existing.id}/label` : null;
+      if (privateSendcloudUrl && existing.label_url !== privateSendcloudUrl) {
+        const { error } = await client.from("shipments").update({ label_url: privateSendcloudUrl }).eq("id", existing.id);
+        if (error) return Response.json({ ok: false, message: `L’étiquette Sendcloud existante n’a pas pu être reliée à la commande : ${error.message}` }, { status: 500 });
+      }
+      labels.push({ parcel: index + 1, url: privateSendcloudUrl ?? existing.label_url, trackingNumber: existing.tracking_number, provider });
       continue;
     }
 
