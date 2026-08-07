@@ -42,7 +42,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (admin.demo) return { demo: true, orders: [], search, status };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
-  await client.from("orders").update({ admin_viewed_at: new Date().toISOString() }).not("paid_at", "is", null).is("admin_viewed_at", null);
+  const { error: viewedUpdateError } = await client.from("orders").update({ admin_viewed_at: new Date().toISOString() }).not("paid_at", "is", null).is("admin_viewed_at", null);
+  // La page Commandes reste disponible pendant le court intervalle entre le
+  // déploiement du Worker et l'application de la migration associée.
+  if (viewedUpdateError && viewedUpdateError.code !== "42703") throw new Response(viewedUpdateError.message, { status: 500 });
   let query = client
     .from("orders")
     .select("*,order_lines(*),shipments(*),payments(*)")
