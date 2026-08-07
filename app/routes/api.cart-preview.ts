@@ -4,7 +4,7 @@ import { cartLineSchema } from "~/domain/schemas";
 import type { Audience } from "~/domain/types";
 import { getAudience } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
-import { env } from "~/lib/env.server";
+import { getFreeShippingThresholds } from "~/services/site-settings.server";
 
 const previewSchema = z.object({
   locale: z.enum(["fr-FR", "en-GB"]),
@@ -52,6 +52,6 @@ export async function action({ request }: ActionFunctionArgs) {
     ok: true,
     lines,
     unavailableKeys,
-    freeShippingFranceThresholdCents: env().FREE_SHIPPING_FR_CENTS,
+    freeShippingFranceThresholdCents: (await getFreeShippingThresholds()).fr,
   }, { headers: { "cache-control": "private, no-store" } });
 }

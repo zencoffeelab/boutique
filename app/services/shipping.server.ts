@@ -8,6 +8,7 @@ import { getPackagingPresets, resolveCartLines } from "~/lib/catalog.server";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { getPickupPointById } from "~/services/pickup-points.server";
+import { getFreeShippingThresholds } from "~/services/site-settings.server";
 
 export type QuoteAddress = {
   firstName: string; lastName: string; company?: string; email: string; phone: string;
@@ -36,7 +37,7 @@ type SendcloudOption = {
 
 const localQuotes = new Map<string, ShippingQuoteRecord>();
 
-function mockRates(parcels: PackedParcel[], subtotalCents: number, countryCode: string, pickupPoint?: PickupPoint): StoredRate[] {
+async function mockRates(parcels: PackedParcel[], subtotalCents: number, countryCode: string, pickupPoint?: PickupPoint): Promise<StoredRate[]> {
   const totalWeight = parcels.reduce((sum, parcel) => sum + parcel.shippingWeightGrams, 0);
   const deliveryMethod = pickupPoint ? "pickup" : "home";
   const services = configuredShippingServicesForDelivery(countryCode, deliveryMethod);
@@ -188,10 +189,9 @@ async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, pi
   });
 }
 
-function applyFreeShipping(rates: StoredRate[], countryCode: string, subtotalCents: number): StoredRate[] {
+async function applyFreeShipping(rates: StoredRate[], countryCode: string, subtotalCents: number): Promise<StoredRate[]> {
   const sorted = rates.toSorted((left, right) => left.amountCents - right.amountCents || left.carrier.localeCompare(right.carrier));
-  const config = env();
-  const threshold = freeShippingThresholdCents(countryCode, { fr: config.FREE_SHIPPING_FR_CENTS, euUk: config.FREE_SHIPPING_EU_UK_CENTS });
+  const threshold = freeShippingThresholdCents(countryCode, await getFreeShippingThresholds());
   if (threshold === null || subtotalCents < threshold || !sorted.length) return sorted;
   return sorted.map((rate, index) => index === 0 ? { ...rate, amountCents: 0, freeShippingApplied: true } : rate);
 }
@@ -209,9 +209,9 @@ export async function createShippingQuote(input: { cartId: string; locale: Local
   const parcels = packCartByWeight(lines, await getPackagingPresets());
   const pickupPoint = input.pickupPointId ? await getPickupPointById({ id: input.pickupPointId, locale: input.locale, countryCode: input.address.countryCode }) : undefined;
   let rates: StoredRate[];
-  if (env().SHIPPING_MOCK) rates = mockRates(parcels, subtotalCents, input.address.countryCode, pickupPoint);
+  if (env().SHIPPING_MOCK) rates = await mockRates(parcels, subtotalCents, input.address.countryCode, pickupPoint);
   else {
-    rates = applyFreeShipping(await sendcloudRates(parcels, input.address, pickupPoint), input.address.countryCode, subtotalCents);
+    rates = await applyFreeShipping(await sendcloudRates(parcels, input.address, pickupPoint), input.address.countryCode, subtotalCents);
   }
   if (rates.length === 0) throw new Error("No matching shipping service is available for all parcels.");
   const quote: ShippingQuoteRecord = { id: randomUUID(), cartId: input.cartId, locale: input.locale, audience: input.audience, address: input.address, lines, parcels, rates, subtotalCents, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() };

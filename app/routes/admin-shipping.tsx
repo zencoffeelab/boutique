@@ -5,8 +5,8 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react
 import { Form, useActionData, useLoaderData } from "react-router";
 import { AdminShell } from "~/components/admin-shell";
 import { requireAdmin } from "~/lib/auth.server";
-import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
+import { getFreeShippingThresholds, saveFreeShippingThresholds } from "~/services/site-settings.server";
 
 type PackagingPresetRow = {
   id: string;
@@ -32,6 +32,7 @@ const presetSchema = z.object({
 });
 
 const deletePresetSchema = z.object({ intent: z.literal("delete_preset"), id: z.uuid() });
+const thresholdsSchema = z.object({ intent: z.literal("save_thresholds"), france: z.coerce.number().finite().nonnegative().max(100_000), europe: z.coerce.number().finite().nonnegative().max(100_000) });
 
 export function canDeletePackagingPreset(presetActive: boolean, activePresetCount: number) {
   return !presetActive || activePresetCount > 1;
@@ -39,13 +40,12 @@ export function canDeletePackagingPreset(presetActive: boolean, activePresetCoun
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
-  const config = env();
-  if (admin.demo) return { demo: true, presets: [] as PackagingPresetRow[], thresholds: { fr: config.FREE_SHIPPING_FR_CENTS, euUk: config.FREE_SHIPPING_EU_UK_CENTS } };
+  if (admin.demo) return { demo: true, presets: [] as PackagingPresetRow[], thresholds: await getFreeShippingThresholds() };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
   const { data, error } = await client.from("packaging_presets").select("*").order("max_net_weight_grams");
   if (error) throw new Response(error.message, { status: 500 });
-  return { demo: false, presets: (data ?? []) as PackagingPresetRow[], thresholds: { fr: config.FREE_SHIPPING_FR_CENTS, euUk: config.FREE_SHIPPING_EU_UK_CENTS } };
+  return { demo: false, presets: (data ?? []) as PackagingPresetRow[], thresholds: await getFreeShippingThresholds() };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -54,6 +54,17 @@ export async function action({ request }: ActionFunctionArgs) {
   const form = Object.fromEntries(await request.formData());
   const client = createServiceSupabase();
   if (!client) return { ok: false, message: "Base indisponible." };
+
+  if (form.intent === "save_thresholds") {
+    const parsed = thresholdsSchema.safeParse(form);
+    if (!parsed.success) return { ok: false, message: "Les seuils doivent être des montants en euros valides." };
+    try {
+      await saveFreeShippingThresholds({ fr: Math.round(parsed.data.france * 100), euUk: Math.round(parsed.data.europe * 100) }, admin.id);
+      return { ok: true, message: "Seuils de livraison gratuite enregistrés." };
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : "Seuils non enregistrés." };
+    }
+  }
 
   if (form.intent === "delete_preset") {
     const parsed = deletePresetSchema.safeParse(form);
@@ -116,7 +127,7 @@ export function ShippingHelp({ presets, thresholds }: { presets: PackagingPreset
           <section><h3>À quoi servent les emballages ?</h3><p>Le site transforme automatiquement le panier en un ou plusieurs colis avant d’interroger les services de livraison.</p><dl className="admin-help-definitions"><div><dt>Poids net maximal</dt><dd>Quantité maximale de café dans le carton, sans l’emballage.</dd></div><div><dt>Tare</dt><dd>Poids du carton vide et du calage, ajouté au poids du café.</dd></div><div><dt>Dimensions</dt><dd>Longueur, largeur et hauteur extérieures transmises au transporteur.</dd></div><div><dt>Actif</dt><dd>Autorise l’utilisation de cet emballage dans les nouveaux devis.</dd></div></dl><p><strong>Exemple :</strong> quatre paquets de 200 g représentent 800 g de café. Avec un carton de 180 g, le transporteur reçoit un colis de 980 g.</p></section>
           <section><h3>Emballages actuellement configurés</h3><div className="admin-help-table-wrap"><table className="admin-help-table"><thead><tr><th>Emballage</th><th>Café maximal</th><th>Tare</th><th>Dimensions</th><th>État</th></tr></thead><tbody>{presets.length > 0 ? presets.map((preset) => <tr key={preset.id}><td>{preset.name}</td><td>{preset.max_net_weight_grams} g</td><td>{preset.tare_weight_grams} g</td><td>{preset.length_cm} × {preset.width_cm} × {preset.height_cm} cm</td><td>{preset.active ? "Actif" : "Inactif"}</td></tr>) : <tr><td colSpan={5}>Aucun emballage configuré.</td></tr>}</tbody></table></div><p>Le site choisit le plus petit emballage adapté. Si le panier dépasse la capacité maximale, il crée plusieurs colis.</p></section>
           <section><h3>Calcul des tarifs transporteur</h3><ol><li>Le poids des paquets est additionné.</li><li>La commande est répartie dans les emballages actifs.</li><li>La tare et les dimensions de chaque colis sont ajoutées.</li><li>Sendcloud renvoie les services techniquement disponibles.</li><li>Le site conserve uniquement les transporteurs autorisés dans la zone et applique la grille commerciale selon le poids total expédié.</li><li>En zones 1 et 2, Mondial Relay est proposé uniquement en point relais ; les offres à domicile sont assurées par FedEx.</li><li>Le coût réel Sendcloud reste enregistré séparément lors de l’achat de l’étiquette.</li></ol><p>Shippo sert uniquement à l’historique des anciennes étiquettes. Le devis est valable 15 minutes.</p></section>
-          <section><h3>Franco de port</h3><p>La livraison est offerte à partir de <strong>{euros(thresholds.fr)} en France</strong> et de <strong>{euros(thresholds.euUk)} dans l’Union européenne et au Royaume-Uni</strong>, selon le sous-total des cafés.</p><p>Le service compatible le moins cher passe à 0 € pour le client. Sendcloud facture toujours l’étiquette à Zen Coffee Lab : son coût reste donc à votre charge. Les seuils sont configurés dans les variables Cloudflare et ne sont pas modifiables sur cet écran.</p></section>
+          <section><h3>Franco de port</h3><p>La livraison est offerte à partir de <strong>{euros(thresholds.fr)} en France</strong> et de <strong>{euros(thresholds.euUk)} dans l’Union européenne et au Royaume-Uni</strong>, selon le sous-total des cafés.</p><p>Le service compatible le moins cher passe à 0 € pour le client. Sendcloud facture toujours l’étiquette à Zen Coffee Lab : son coût reste donc à votre charge. Les seuils sont modifiables dans la carte dédiée de cet écran.</p></section>
           <section><h3>Après le paiement</h3><ol><li>Stripe confirme le paiement.</li><li>La commande apparaît dans le back-office.</li><li>Vous ouvrez la commande et cliquez sur « Acheter les étiquettes ».</li><li>Une étiquette PDF est achetée pour chaque colis.</li><li>Le suivi et le coût réel sont enregistrés.</li></ol><p>L’achat des étiquettes n’est jamais automatique. Une modification d’emballage s’applique uniquement aux nouveaux devis.</p></section>
         </div>
       </div>
@@ -132,7 +143,7 @@ export default function AdminShipping() {
     <header className="admin-heading"><div><p className="eyebrow">Sendcloud</p><div className="admin-title-with-help"><h1>Emballages & franco</h1><ShippingHelp presets={presets} thresholds={thresholds} /></div></div></header>
     {demo ? <p className="admin-notice">Connectez Supabase pour modifier les emballages.</p> : null}
     {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
-    <section className="ui-card admin-editor"><h2>Seuils de livraison gratuite</h2><p>France : <strong>{thresholds.fr / 100} €</strong> · UE et Royaume-Uni : <strong>{thresholds.euUk / 100} €</strong></p><p><small>Ces seuils sont configurés par environnement avec <code>FREE_SHIPPING_FR_CENTS</code> et <code>FREE_SHIPPING_EU_UK_CENTS</code>.</small></p></section>
+    <section className="ui-card admin-editor"><h2>Seuils de livraison gratuite</h2><p>Modifiez les montants à partir desquels la livraison la moins chère devient gratuite.</p><Form method="post" className="form-grid"><input type="hidden" name="intent" value="save_thresholds" /><div className="field"><label>France (€)<input name="france" type="number" min="0" max="100000" step="0.01" defaultValue={(thresholds.fr / 100).toFixed(2)} required /></label></div><div className="field"><label>Europe et Royaume-Uni (€)<input name="europe" type="number" min="0" max="100000" step="0.01" defaultValue={(thresholds.euUk / 100).toFixed(2)} required /></label></div><div><button className="ui-button ui-button--default" type="submit" disabled={demo}>Enregistrer les seuils</button></div></Form></section>
     <section className="admin-content-list" aria-label="Emballages">{presets.map((preset) => {
       const canDelete = canDeletePackagingPreset(preset.active, activePresetCount);
       return <details className="ui-card admin-content-page" key={preset.id}><summary><strong>{preset.name}</strong><span className="ui-badge">{preset.active ? "actif" : "inactif"}</span></summary><PresetForm preset={preset} demo={demo} /><Form method="post" className="admin-delete-form" onSubmit={(event) => { if (!window.confirm(`Supprimer définitivement l’emballage « ${preset.name} » ?`)) event.preventDefault(); }}><input type="hidden" name="intent" value="delete_preset" /><input type="hidden" name="id" value={preset.id} /><button className="ui-button ui-button--danger ui-button--sm" type="submit" disabled={demo || !canDelete} title={!canDelete ? "Activez d’abord un autre emballage" : undefined}><Trash2 aria-hidden="true" /> Supprimer l’emballage</button></Form></details>;
