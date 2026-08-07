@@ -69,7 +69,7 @@ test("pages separate content editing from menu and footer arrangement", async ({
 
   await page.getByRole("tab", { name: "Contenu" }).click();
   await expect(page).toHaveURL(/\/admin\/contenus$/);
-  await expect(page.locator(".admin-content-page")).toHaveCount(8);
+  await expect(page.locator(".admin-content-page")).toHaveCount(9);
 });
 
 test("product editor provides a save action at the top", async ({ page }) => {
@@ -213,7 +213,9 @@ test("FAQ and advice management use separate pages", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Nouvelle question" }),
   ).toHaveCount(0);
-  const richTextToolbar = page.getByRole("toolbar", { name: "Mise en forme — Paragraphes" });
+  await page.getByRole("link", { name: "Nouveau blog" }).click();
+  await expect(page).toHaveURL(/\/admin\/conseils\?new=1$/);
+  const richTextToolbar = page.getByRole("toolbar", { name: "Mise en forme — Texte" }).first();
   await expect(richTextToolbar).toBeVisible();
   await expect(richTextToolbar.getByRole("button", { name: "Gras" })).toBeVisible();
   await expect(richTextToolbar.getByRole("button", { name: "Liste à puces" })).toBeVisible();

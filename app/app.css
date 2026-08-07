@@ -4245,11 +4245,11 @@ button:disabled {
   box-shadow: 0 1px 4px #1720150d;
 }
 .admin-language-tabs__list button[id$="-fr-tab"] { border-color: #1d1d1b; background: #f2f2f0; color: #1d1d1b; }
-.admin-language-tabs__list button[id$="-en-tab"] { border-color: #c9e2c3; background: #edf7ea; color: #4f7b46; }
+.admin-language-tabs__list button[id$="-en-tab"] { border-color: #c9e2c3; background: #edf7ea; color: #4d7945; }
 .admin-language-tabs__list button[id$="-fr-tab"][aria-selected="true"] { border-color: #1d1d1b; background: #1d1d1b; color: #fff; }
-.admin-language-tabs__list button[id$="-en-tab"][aria-selected="true"] { border-color: #4f7b46; background: #4f7b46; color: #fff; }
+.admin-language-tabs__list button[id$="-en-tab"][aria-selected="true"] { border-color: #4d7945; background: #4d7945; color: #fff; }
 .admin-language-tabs [id$="-fr-panel"] fieldset > legend { color: #1d1d1b; }
-.admin-language-tabs [id$="-en-panel"] fieldset > legend { color: #4f7b46; }
+.admin-language-tabs [id$="-en-panel"] fieldset > legend { color: #4d7945; }
 .admin-language-tabs__list button:focus-visible {
   outline: 2px solid var(--orange);
   outline-offset: 2px;

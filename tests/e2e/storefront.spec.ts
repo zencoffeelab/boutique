@@ -296,7 +296,7 @@ test("English URLs, language switch and professional form are accessible", async
   page.on("pageerror", (error) => consoleErrors.push(error.message));
   await page.goto("/en");
   await expect(
-    page.getByRole("heading", { name: /Coffee with clarity/ }),
+    page.getByRole("heading", { name: /A roast tailored to the origin/ }),
   ).toBeVisible();
   await page.goto("/en/professional");
   await expect(
