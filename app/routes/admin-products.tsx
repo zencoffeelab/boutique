@@ -18,26 +18,6 @@ const variantUpdateSchema = z.object({
 });
 const productOrderSchema = z.object({ catalogue: z.enum(["current", "archived"]), productIds: z.array(z.uuid()).min(1) });
 
-async function saveVariant(client: any, actorId: string, data: z.infer<typeof variantUpdateSchema>) {
-  const before = await client.from("product_variants").select("*").eq("id", data.variantId).single();
-  if (before.error || !before.data) return { ok: false, message: before.error?.message ?? "Variante introuvable." };
-  if (data.stockOnHand < Number(before.data.stock_reserved ?? 0)) return { ok: false, message: `Le stock total ne peut pas être inférieur aux ${before.data.stock_reserved} unité(s) actuellement réservée(s).` };
-  const { error } = await client.from("product_variants").update({ stock_on_hand: data.stockOnHand, low_stock_threshold: data.lowStockThreshold, internal_cost_cents: data.internalCostCents, updated_at: new Date().toISOString() }).eq("id", data.variantId);
-  if (error) return { ok: false, message: error.message };
-  const professionalOffer = data.proOfferId
-    ? client.from("variant_offers").update({ price_cents: data.proPriceCents }).eq("id", data.proOfferId).eq("variant_id", data.variantId)
-    : client.from("variant_offers").upsert({ variant_id: data.variantId, audience: "professional", price_cents: data.proPriceCents, minimum_quantity: 1, active: false }, { onConflict: "variant_id,audience" });
-  const { error: professionalOfferError } = await professionalOffer;
-  if (professionalOfferError) return { ok: false, message: professionalOfferError.message };
-  const stockDelta = data.stockOnHand - Number(before.data.stock_on_hand);
-  if (stockDelta !== 0) {
-    const { error: movementError } = await client.from("stock_movements").insert({ variant_id: data.variantId, quantity_delta: stockDelta, reason: "Ajustement global depuis le catalogue", actor_id: actorId });
-    if (movementError) return { ok: false, message: movementError.message };
-  }
-  await client.from("audit_log").insert({ actor_id: actorId, action: "variant.updated", entity_type: "product_variant", entity_id: data.variantId, before_data: before.data, after_data: data });
-  return { ok: true };
-}
-
 export async function action({ request }: ActionFunctionArgs) {
   const admin = await requireAdmin(request);
   if (admin.demo) return { ok: false, message: "Les mutations sont désactivées en mode démonstration." };
@@ -66,11 +46,17 @@ export async function action({ request }: ActionFunctionArgs) {
   if (updates.length === 0 || updates.some((update) => !update.success)) return { ok: false, message: "Valeurs invalides." };
   const client = createServiceSupabase();
   if (!client) return { ok: false, message: "Base de données indisponible." };
-  for (const update of updates) {
-    if (!update.success) continue;
-    const result = await saveVariant(client, admin.id, update.data);
-    if (!result.ok) return result;
-  }
+  const { error } = await client.rpc("admin_update_product_variants", {
+    p_actor_id: admin.id,
+    p_updates: updates.filter((update): update is { success: true; data: z.infer<typeof variantUpdateSchema> } => update.success).map(({ data }) => ({
+      variantId: data.variantId,
+      stockOnHand: data.stockOnHand,
+      lowStockThreshold: data.lowStockThreshold,
+      internalCostCents: data.internalCostCents,
+      proPriceCents: data.proPriceCents,
+    })),
+  });
+  if (error) return { ok: false, message: error.message };
   return { ok: true, message: `${updates.length} variante${updates.length > 1 ? "s" : ""} enregistrée${updates.length > 1 ? "s" : ""}.` };
 }
 
