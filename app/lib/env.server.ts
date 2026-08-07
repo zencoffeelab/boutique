@@ -48,7 +48,10 @@ let cached: z.infer<typeof schema> | undefined;
 export function env(): z.infer<typeof schema> {
   if (!cached) {
     const parsed = schema.parse(process.env);
-    const localDefault = parsed.NODE_ENV !== "production";
+    // Vite can inline the default values used during the Worker build.  A
+    // Cloudflare build must therefore use production-safe defaults even when
+    // the local shell did not explicitly provide NODE_ENV.
+    const localDefault = parsed.NODE_ENV !== "production" && process.env.CLOUDFLARE_BUILD !== "1";
     cached = {
       ...parsed,
       ALLOW_DEMO_DATA: process.env.ALLOW_DEMO_DATA === undefined ? localDefault : parsed.ALLOW_DEMO_DATA,

@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "react-router dev",
     "build": "react-router build",
-    "build:cloudflare": "cross-env CLOUDFLARE_BUILD=1 react-router build",
+    "build:cloudflare": "cross-env NODE_ENV=production CLOUDFLARE_BUILD=1 react-router build",
     "deploy": "npm run build:cloudflare && wrangler deploy",
     "deploy:email": "wrangler deploy --config wrangler.email.jsonc",
     "preview:cloudflare": "npm run build:cloudflare && wrangler dev",
