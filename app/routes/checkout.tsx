@@ -11,11 +11,30 @@ import { getViewer } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
+import { createRequestSupabase } from "~/lib/supabase.server";
 import { pickupPointsConfigured } from "~/services/pickup-points.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request); const viewer = await getViewer(request); const audience = viewer?.profile?.professional_status === "approved" ? "professional" : "retail";
-  return { locale, audience, account: viewer ? { email: viewer.user.email ?? "", firstName: viewer.profile?.first_name ?? "", lastName: viewer.profile?.last_name ?? "" } : null, pickupConfigured: pickupPointsConfigured(), products: await getProducts({ status: "published", audience }) };
+  const requestSupabase = viewer ? createRequestSupabase(request) : null;
+  const savedAddress = requestSupabase
+    ? (await requestSupabase.client.from("addresses").select("first_name,last_name,company,line1,line2,postal_code,city,country_code,phone").eq("profile_id", viewer!.user.id).order("created_at").limit(1).maybeSingle()).data
+    : null;
+  return {
+    locale,
+    audience,
+    account: viewer ? {
+      email: viewer.user.email ?? "",
+      firstName: savedAddress?.first_name ?? viewer.profile?.first_name ?? "",
+      lastName: savedAddress?.last_name ?? viewer.profile?.last_name ?? "",
+      address: savedAddress ? {
+        company: savedAddress.company ?? "", line1: savedAddress.line1 ?? "", line2: savedAddress.line2 ?? "",
+        postalCode: savedAddress.postal_code ?? "", city: savedAddress.city ?? "", countryCode: savedAddress.country_code ?? "FR", phone: savedAddress.phone ?? "",
+      } : null,
+    } : null,
+    pickupConfigured: pickupPointsConfigured(),
+    products: await getProducts({ status: "published", audience }),
+  };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(
@@ -53,7 +72,7 @@ export default function Checkout() {
   const { lines, hydrated } = useCart(); const formRef = useRef<HTMLFormElement>(null);
   const [cartId, setCartId] = useState(""); const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [selectedRate, setSelectedRate] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const [countryCode, setCountryCode] = useState("FR"); const [deliveryMethod, setDeliveryMethod] = useState<"home" | "pickup">("home");
+  const [countryCode, setCountryCode] = useState(account?.address?.countryCode ?? "FR"); const [deliveryMethod, setDeliveryMethod] = useState<"home" | "pickup">("home");
   const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([]); const [selectedPickupPointId, setSelectedPickupPointId] = useState("");
   const [pickupBusy, setPickupBusy] = useState(false); const [pickupError, setPickupError] = useState("");
   const [createAccount, setCreateAccount] = useState(false);
@@ -149,18 +168,18 @@ export default function Checkout() {
             <div className="field"><label htmlFor="firstName">{english ? "First name" : "Prénom"}</label><input id="firstName" name="firstName" defaultValue={account?.firstName} required autoComplete="given-name" /></div>
             <div className="field"><label htmlFor="lastName">{english ? "Last name" : "Nom"}</label><input id="lastName" name="lastName" defaultValue={account?.lastName} required autoComplete="family-name" /></div>
             <div className="field"><label htmlFor="email">Email</label><input id="email" name="email" type="email" defaultValue={account?.email} readOnly={Boolean(account)} required autoComplete="email" /></div>
-            <div className="field"><label htmlFor="phone">{english ? "Phone" : "Téléphone"}</label><input id="phone" name="phone" type="tel" required autoComplete="tel" /></div>
+            <div className="field"><label htmlFor="phone">{english ? "Phone" : "Téléphone"}</label><input id="phone" name="phone" type="tel" defaultValue={account?.address?.phone} required autoComplete="tel" /></div>
           </div>
           {!account ? <div className="checkout-account-option"><label><input type="checkbox" checked={createAccount} onChange={(event) => setCreateAccount(event.currentTarget.checked)} /> <span><strong>{english ? "Create my customer account" : "Créer mon compte client"}</strong><small>{english ? "Find your orders, invoices, addresses and tracking in one place." : "Retrouvez vos commandes, factures, adresses et suivis au même endroit."}</small></span></label>{createAccount ? <div className="field"><label htmlFor="accountPassword">{english ? "Choose a password" : "Choisissez un mot de passe"}</label><input id="accountPassword" name="accountPassword" type="password" minLength={10} maxLength={200} required autoComplete="new-password" /><small>{english ? "At least 10 characters. You will receive an email to confirm your address." : "10 caractères minimum. Vous recevrez un e-mail pour confirmer votre adresse."}</small></div> : null}</div> : <p className="checkout-account-connected">{english ? "This order will be added to your customer account." : "Cette commande sera ajoutée à votre compte client."}</p>}
         </section>
         <section className="checkout-section" onChange={invalidateQuote}>
           <h2>2. {english ? "Shipping address" : "Adresse de livraison"}</h2>
           <div className="form-grid">
-            <div className="field field--wide"><label htmlFor="company">{english ? "Company (optional)" : "Société (facultatif)"}</label><input id="company" name="company" autoComplete="organization" /></div>
-            <div className="field field--wide"><label htmlFor="line1">{english ? "Address" : "Adresse"}</label><input id="line1" name="line1" required autoComplete="address-line1" /></div>
-            <div className="field field--wide"><label htmlFor="line2">{english ? "Address line 2" : "Complément"}</label><input id="line2" name="line2" autoComplete="address-line2" /></div>
-            <div className="field"><label htmlFor="postalCode">{english ? "Postcode" : "Code postal"}</label><input id="postalCode" name="postalCode" required autoComplete="postal-code" /></div>
-            <div className="field"><label htmlFor="city">{english ? "City" : "Ville"}</label><input id="city" name="city" required autoComplete="address-level2" /></div>
+            <div className="field field--wide"><label htmlFor="company">{english ? "Company (optional)" : "Société (facultatif)"}</label><input id="company" name="company" defaultValue={account?.address?.company} autoComplete="organization" /></div>
+            <div className="field field--wide"><label htmlFor="line1">{english ? "Address" : "Adresse"}</label><input id="line1" name="line1" defaultValue={account?.address?.line1} required autoComplete="address-line1" /></div>
+            <div className="field field--wide"><label htmlFor="line2">{english ? "Address line 2" : "Complément"}</label><input id="line2" name="line2" defaultValue={account?.address?.line2} autoComplete="address-line2" /></div>
+            <div className="field"><label htmlFor="postalCode">{english ? "Postcode" : "Code postal"}</label><input id="postalCode" name="postalCode" defaultValue={account?.address?.postalCode} required autoComplete="postal-code" /></div>
+            <div className="field"><label htmlFor="city">{english ? "City" : "Ville"}</label><input id="city" name="city" defaultValue={account?.address?.city} required autoComplete="address-level2" /></div>
             <div className="field"><label htmlFor="countryCode">{english ? "Country" : "Pays"}</label><select id="countryCode" name="countryCode" value={countryCode} onChange={(event) => { setCountryCode(event.currentTarget.value); setDeliveryMethod("home"); resetPickup(); }}><optgroup label={english ? "European Union" : "Union européenne"}>{EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup><optgroup label={english ? "Outside the EU" : "Hors Union européenne"}>{NON_EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup></select></div>
           </div>
         </section>
