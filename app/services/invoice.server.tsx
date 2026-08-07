@@ -38,6 +38,13 @@ type OrderLineSnapshot = {
   line_total_cents: number;
 };
 
+export function invoiceReferenceLabels(input: { invoiceNumber: string; orderNumber: string; english: boolean }) {
+  return {
+    invoiceNumber: input.invoiceNumber,
+    orderNumber: `${input.english ? "Order" : "Commande"} ${input.orderNumber}`,
+  };
+}
+
 const pageWidth = 595.28;
 const pageHeight = 841.89;
 const margin = 42;
@@ -102,10 +109,13 @@ export async function renderInvoicePdf(input: { invoice: InvoiceSnapshot; order:
   page.drawText(english ? "Micro-roastery - Tours, France" : "Micro-torrefacteur - Tours, France", { x: margin, y: pageHeight - 76, size: 9, font, color: mutedColor });
   const title = english ? "INVOICE" : "FACTURE";
   page.drawText(title, { x: pageWidth - margin - boldFont.widthOfTextAtSize(title, 18), y: pageHeight - 58, size: 18, font: boldFont, color: textColor });
-  const invoiceNumber = safePdfText(font, invoice.invoice_number);
+  const references = invoiceReferenceLabels({ invoiceNumber: invoice.invoice_number, orderNumber: order.order_number, english });
+  const invoiceNumber = safePdfText(font, references.invoiceNumber);
   page.drawText(invoiceNumber, { x: pageWidth - margin - font.widthOfTextAtSize(invoiceNumber, 10), y: pageHeight - 76, size: 10, font, color: textColor });
+  const orderNumber = safePdfText(font, references.orderNumber);
+  page.drawText(orderNumber, { x: pageWidth - margin - font.widthOfTextAtSize(orderNumber, 9), y: pageHeight - 90, size: 9, font, color: mutedColor });
   const date = new Date(invoice.issued_at).toLocaleDateString(english ? "en-GB" : "fr-FR");
-  page.drawText(date, { x: pageWidth - margin - font.widthOfTextAtSize(date, 10), y: pageHeight - 91, size: 10, font, color: textColor });
+  page.drawText(date, { x: pageWidth - margin - font.widthOfTextAtSize(date, 10), y: pageHeight - 105, size: 10, font, color: textColor });
 
   const address = order.shipping_address ?? {};
   const addressLines = [

@@ -1,6 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { generateInvoicePdfSafely, renderInvoicePdf } from "~/services/invoice.server";
+import { generateInvoicePdfSafely, invoiceReferenceLabels, renderInvoicePdf } from "~/services/invoice.server";
 
 describe("invoice PDF", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -21,6 +21,13 @@ describe("invoice PDF", () => {
 
     expect(new TextDecoder().decode(bytes.slice(0, 4))).toBe("%PDF");
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+  });
+
+  it("labels the matching invoice and order references explicitly", () => {
+    expect(invoiceReferenceLabels({ invoiceNumber: "ZCL-F-202608-000001", orderNumber: "ZCL-202608-000001", english: false })).toEqual({
+      invoiceNumber: "ZCL-F-202608-000001",
+      orderNumber: "Commande ZCL-202608-000001",
+    });
   });
 
   it("does not block the payment webhook when invoice generation fails", async () => {

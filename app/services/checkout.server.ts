@@ -6,6 +6,28 @@ import { createServiceSupabase } from "~/lib/supabase.server";
 import { createStripe } from "~/lib/stripe.server";
 import { getLatestShippingQuote } from "~/services/shipping.server";
 
+export const temporaryOrderPrefix = "ZCL-TMP-";
+
+export function isTemporaryOrderNumber(value: string | null | undefined) {
+  return Boolean(value?.startsWith(temporaryOrderPrefix));
+}
+
+export async function resolveCheckoutOrderNumber(sessionId: string) {
+  const config = env();
+  if (!config.STRIPE_SECRET_KEY || !sessionId.startsWith("cs_")) return null;
+  const supabase = createServiceSupabase(); if (!supabase) return null;
+  try {
+    const session = await createStripe(config.STRIPE_SECRET_KEY).checkout.sessions.retrieve(sessionId);
+    const orderId = session.metadata?.order_id;
+    if (session.payment_status !== "paid" || !orderId) return null;
+    const { data: order } = await supabase.from("orders").select("order_number,status").eq("id", orderId).maybeSingle();
+    if (!order || order.status === "pending_payment" || isTemporaryOrderNumber(order.order_number)) return null;
+    return order.order_number;
+  } catch {
+    return null;
+  }
+}
+
 export async function createCheckout(input: { cartId: string; shippingRateId: string; audience: Audience; profileId?: string }) {
   const config = env(); const quote = await getLatestShippingQuote(input.cartId);
   if (!quote || quote.audience !== input.audience) throw new Response("Shipping quote not found.", { status: 404 });
@@ -26,10 +48,10 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
     const session = await stripe.checkout.sessions.create({
       mode: "payment", customer_email: quote.address.email, client_reference_id: order.id,
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
-      success_url: `${config.VITE_SITE_URL}${quote.locale === "en-GB" ? "/en/order/confirmation" : "/commande/confirmation"}?order=${encodeURIComponent(order.order_number)}&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${config.VITE_SITE_URL}${quote.locale === "en-GB" ? "/en/order/confirmation" : "/commande/confirmation"}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${config.VITE_SITE_URL}${quote.locale === "en-GB" ? "/en/checkout" : "/commande"}?canceled=1`,
       metadata: { order_id: order.id, quote_id: quote.id, audience: quote.audience },
-      payment_intent_data: { metadata: { order_id: order.id, order_number: order.order_number } },
+      payment_intent_data: { metadata: { order_id: order.id } },
       line_items: [...quote.lines.map((line) => ({ quantity: line.quantity, price_data: { currency: "eur" as const, unit_amount: line.unitPriceCents, product_data: { name: line.productName, description: line.variantLabel, images: line.imageUrl ? [line.imageUrl] : undefined, metadata: { variant_id: line.variantId } } } })), ...(rate.amountCents > 0 ? [{ quantity: 1, price_data: { currency: "eur" as const, unit_amount: rate.amountCents, product_data: { name: quote.locale === "en-GB" ? "Shipping" : "Livraison", description: shippingRateLabel(rate) } } }] : [])],
       locale: quote.locale === "fr-FR" ? "fr" : "en",
     });

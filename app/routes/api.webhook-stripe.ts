@@ -62,7 +62,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
       if (error) throw error;
       const paymentIntentId = String(session.payment_intent ?? "");
       if (paymentIntentId) {
-        const intent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ["latest_charge.balance_transaction"] });
+        const intent = await stripe.paymentIntents.update(paymentIntentId, { metadata: { order_id: orderId, order_number: order.order_number }, expand: ["latest_charge.balance_transaction"] });
         const charge = typeof intent.latest_charge === "object" ? intent.latest_charge : null;
         const balance = charge && typeof charge.balance_transaction === "object" ? charge.balance_transaction : null;
         if (balance) await client.from("orders").update({ stripe_fee_cents: balance.fee, updated_at: new Date().toISOString() }).eq("id", orderId);
