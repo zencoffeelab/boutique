@@ -52,11 +52,15 @@ export function env(): z.infer<typeof schema> {
     // Cloudflare build must therefore use production-safe defaults even when
     // the local shell did not explicitly provide NODE_ENV.
     const localDefault = parsed.NODE_ENV !== "production" && process.env.CLOUDFLARE_BUILD !== "1";
+    // Local development uses Sendcloud whenever its credentials are present.
+    // This keeps a fresh checkout usable with mock rates, while preventing an
+    // operator's configured workstation from creating fake label URLs.
+    const localShippingDefault = localDefault && !Boolean(parsed.SENDCLOUD_PUBLIC_KEY && parsed.SENDCLOUD_SECRET_KEY);
     cached = {
       ...parsed,
       ALLOW_DEMO_DATA: process.env.ALLOW_DEMO_DATA === undefined ? localDefault : parsed.ALLOW_DEMO_DATA,
       PAYMENTS_MOCK: process.env.PAYMENTS_MOCK === undefined ? localDefault : parsed.PAYMENTS_MOCK,
-      SHIPPING_MOCK: process.env.SHIPPING_MOCK === undefined ? localDefault : parsed.SHIPPING_MOCK,
+      SHIPPING_MOCK: process.env.SHIPPING_MOCK === undefined ? localShippingDefault : parsed.SHIPPING_MOCK,
       DEMO_ADMIN: process.env.DEMO_ADMIN === undefined ? localDefault : parsed.DEMO_ADMIN,
     };
   }
