@@ -53,7 +53,8 @@ describe("transactional email templates", () => {
 
   it("includes the quote amount, PDF notice and secure payment link", () => {
     const email = professionalQuoteEmail({ locale: "fr-FR", quoteNumber: "ZCL-D-2026-001001", totalCents: 45_000, validUntil: "2026-08-26T10:00:00.000Z", paymentUrl: "https://zencoffeelab.com/devis/quote-id/paiement" });
-    expect(email.subject).toContain("ZCL-D-2026-001001");
+    expect(email.subject).toBe("Votre devis professionnel est prêt");
+    expect(email.html).toContain("ZCL-D-2026-001001");
     expect(email.html).toContain("450,00");
     expect(email.html).toContain("PDF est joint");
     expect(email.html).toContain("https://zencoffeelab.com/devis/quote-id/paiement");

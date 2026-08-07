@@ -5,7 +5,7 @@ import { createServiceSupabase } from "~/lib/supabase.server";
 import { constructStripeEvent, createStripe } from "~/lib/stripe.server";
 import { orderConfirmationEmail, professionalQuotePaidEmail, refundEmail } from "~/services/email-templates.server";
 import { dispatchNotificationQueue, enqueueNotification } from "~/services/notifications.server";
-import { generateInvoicePdf } from "~/services/invoice.server";
+import { generateInvoicePdfSafely } from "~/services/invoice.server";
 
 export async function action({ request, context }: ActionFunctionArgs) {
   const config = env();
@@ -67,7 +67,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
         const balance = charge && typeof charge.balance_transaction === "object" ? charge.balance_transaction : null;
         if (balance) await client.from("orders").update({ stripe_fee_cents: balance.fee, updated_at: new Date().toISOString() }).eq("id", orderId);
       }
-      await generateInvoicePdf(orderId);
+      await generateInvoicePdfSafely(orderId);
       if (order?.email) {
         const { data: snapshot } = await client.from("orders").select("order_number,locale,email,shipping_address,shipping_carrier,shipping_service,subtotal_cents,shipping_charged_cents,total_cents,order_lines(product_name,variant_label,quantity,line_total_cents)").eq("id", orderId).single();
         if (!snapshot) throw new Error("Order confirmation snapshot is unavailable.");
