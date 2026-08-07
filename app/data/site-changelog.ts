@@ -11,6 +11,7 @@ export type ChangelogEntry = Readonly<{
 
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
+  { id: "2026-08-07-ci-advice-catalog-mock", date: "2026-08-07", kind: "Correction", title: "Vérification continue rétablie", description: "Le test de la page Conseil simule désormais toutes les données chargées par cette page, ce qui rétablit l’exécution complète des contrôles automatiques." },
   { id: "2026-08-07-cloudflare-build-windows", date: "2026-08-07", kind: "Maintenance", title: "Build Cloudflare compatible avec Windows", description: "La commande de build Cloudflare fonctionne désormais aussi sur les postes Windows, ce qui fiabilise les vérifications et déploiements de production." },
   { id: "2026-08-07-account-welcome-light-green-background", date: "2026-08-07", kind: "Design", title: "Bienvenue de l’espace privé en vert clair", description: "Le fond du bandeau de bienvenue adopte désormais le vert plus clair utilisé pour la citation de la page d’accueil." },
   { id: "2026-08-07-account-welcome-green-background", date: "2026-08-07", kind: "Design", title: "Bienvenue de l’espace privé sur fond vert", description: "Le bandeau de bienvenue de la page complète de l’espace privé utilise désormais le même fond vert que la carte indiquant le compte connecté." },

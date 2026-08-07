@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("~/lib/catalog.server", () => ({ getArticles: vi.fn() }));
+vi.mock("~/lib/catalog.server", () => ({ getArticles: vi.fn(), getProducts: vi.fn() }));
 
 import { demoArticles } from "~/data/demo-catalog";
-import { getArticles } from "~/lib/catalog.server";
+import { getArticles, getProducts } from "~/lib/catalog.server";
 import { loader } from "~/routes/advice-detail";
 
 describe("advice detail recommendations", () => {
@@ -19,6 +19,7 @@ describe("advice detail recommendations", () => {
       { ...demoArticles[1], slug: "temps-extraction" },
     ];
     vi.mocked(getArticles).mockResolvedValue(articles);
+    vi.mocked(getProducts).mockResolvedValue([]);
 
     const result = await loader({
       request: new Request(`http://localhost/conseils/${current.slug}`),
