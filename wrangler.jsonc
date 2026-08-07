@@ -18,7 +18,11 @@
     }
   ],
   "vars": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "ALLOW_DEMO_DATA": "false",
+    "PAYMENTS_MOCK": "false",
+    "SHIPPING_MOCK": "false",
+    "DEMO_ADMIN": "false"
   },
   "observability": {
     "enabled": true
