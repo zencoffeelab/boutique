@@ -114,5 +114,11 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
     dispatchNotificationQueue(context, "label_ready_notification_delivery_failed");
   }
   await client.from("audit_log").insert({ actor_id: admin.id === "demo-admin" ? null : admin.id, action: "order.labels_purchased", entity_type: "order", entity_id: order.id, after_data: { count: labels.length, actualShippingCostCents, provider } });
-  return Response.json({ ok: true, labels, fallbackParcels: [] });
+  const labelCount = labels.length;
+  return Response.json({
+    ok: true,
+    message: `${labelCount} étiquette${labelCount > 1 ? "s" : ""} achetée${labelCount > 1 ? "s" : ""}. ${labelCount > 1 ? "Elles sont" : "Elle est"} disponible${labelCount > 1 ? "s" : ""} dans la rubrique « Étiquettes achetées ».`,
+    labels,
+    fallbackParcels: [],
+  });
 }

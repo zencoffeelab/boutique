@@ -5,13 +5,14 @@ import {
   RotateCcw,
   Search,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { z } from "zod";
 import type {
   ActionFunctionArgs,
   LoaderFunctionArgs,
   MetaFunction,
 } from "react-router";
-import { Form, useActionData, useFetcher, useLoaderData } from "react-router";
+import { Form, useActionData, useFetcher, useLoaderData, useRevalidator } from "react-router";
 import { AdminShell } from "~/components/admin-shell";
 import { Badge } from "~/components/ui/badge";
 import { labelIsRefundable } from "~/domain/label-refunds";
@@ -154,6 +155,15 @@ function LabelPurchaseAction({ order }: { order: any }) {
     message?: string;
     labels?: Array<{ url: string }>;
   }>();
+  const revalidator = useRevalidator();
+  const handledResult = useRef<unknown>(undefined);
+
+  useEffect(() => {
+    if (!label.data?.ok || label.data === handledResult.current) return;
+    handledResult.current = label.data;
+    revalidator.revalidate();
+  }, [label.data, revalidator]);
+
   return (
     <div className="admin-order-actions admin-order-label-purchase">
       <label.Form method="post" action={`/api/admin/orders/${order.id}/label`}>
