@@ -130,12 +130,23 @@ async function storeState(client: NonNullable<ReturnType<typeof createServiceSup
 }
 
 async function applySuccessfulRefund(client: NonNullable<ReturnType<typeof createServiceSupabase>>, input: { orderId: string; shipmentId: string; adminId: string; state: LabelRefundState }) {
-  const { error: shipmentError } = await client.from("shipments").update({ actual_cost_cents: 0 }).eq("id", input.shipmentId).eq("order_id", input.orderId);
+  const { error: shipmentError } = await client.from("shipments").update({
+    actual_cost_cents: 0,
+    status: "CANCELLED",
+    label_url: null,
+    tracking_url: null,
+  }).eq("id", input.shipmentId).eq("order_id", input.orderId);
   if (shipmentError) throw new LabelRefundError(`Le coût de l’étiquette n’a pas pu être régularisé : ${shipmentError.message}`, 500);
-  const { data: costs, error: costError } = await client.from("shipments").select("actual_cost_cents").eq("order_id", input.orderId);
+  const { data: shipments, error: costError } = await client.from("shipments").select("actual_cost_cents,status").eq("order_id", input.orderId);
   if (costError) throw new LabelRefundError(`Le coût de la commande n’a pas pu être recalculé : ${costError.message}`, 500);
-  const actualShippingCostCents = (costs ?? []).reduce((sum, shipment) => sum + shipment.actual_cost_cents, 0);
-  const { error: orderError } = await client.from("orders").update({ actual_shipping_cost_cents: actualShippingCostCents, updated_at: new Date().toISOString() }).eq("id", input.orderId);
+  const actualShippingCostCents = (shipments ?? []).reduce((sum, shipment) => sum + shipment.actual_cost_cents, 0);
+  const allShipmentsCancelled = (shipments ?? []).length > 0 && (shipments ?? []).every((shipment) => normalizedTrackingStatus(shipment.status) === "CANCELLED");
+  const orderUpdate: { actual_shipping_cost_cents: number; updated_at: string; status?: "preparing" } = {
+    actual_shipping_cost_cents: actualShippingCostCents,
+    updated_at: new Date().toISOString(),
+  };
+  if (allShipmentsCancelled) orderUpdate.status = "preparing";
+  const { error: orderError } = await client.from("orders").update(orderUpdate).eq("id", input.orderId);
   if (orderError) throw new LabelRefundError(`Le coût de la commande n’a pas pu être enregistré : ${orderError.message}`, 500);
   await client.from("audit_log").insert({
     actor_id: input.adminId,
@@ -143,7 +154,7 @@ async function applySuccessfulRefund(client: NonNullable<ReturnType<typeof creat
     entity_type: "shipment",
     entity_id: input.shipmentId,
     before_data: { actualCostCents: input.state.originalCostCents },
-    after_data: { refundId: input.state.refundId, actualCostCents: 0, actualShippingCostCents },
+    after_data: { refundId: input.state.refundId, actualCostCents: 0, actualShippingCostCents, shipmentStatus: "CANCELLED", orderStatus: allShipmentsCancelled ? "preparing" : undefined },
   });
 }
 

@@ -333,7 +333,7 @@ function ShipmentActions({
               if (
                 canRequest &&
                 !window.confirm(
-                  "Demander le remboursement réel de cette étiquette ? Elle ne devra plus jamais être utilisée.",
+                  "Annuler cette étiquette et la livraison prévue ? Sendcloud sera averti et le remboursement sera demandé. Cette étiquette ne devra plus jamais être utilisée.",
                 )
               )
                 event.preventDefault();
@@ -351,7 +351,7 @@ function ShipmentActions({
               {fetcher.state !== "idle"
                 ? "Traitement…"
                 : canRequest
-                  ? "Rembourser l’étiquette"
+                  ? "Annuler l’étiquette"
                   : "Actualiser le remboursement"}
             </button>
           </fetcher.Form>
