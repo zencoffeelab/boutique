@@ -11,6 +11,7 @@ export type ChangelogEntry = Readonly<{
 
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
+  { id: "2026-08-07-admin-order-notification", date: "2026-08-07", kind: "Fonctionnalité", title: "Nouvelles commandes signalées dans le back-office", description: "Un petit compteur apparaît désormais à côté de Commandes lorsqu’une commande payée n’a pas encore été consultée. Il disparaît dès l’ouverture de la liste des commandes." },
   { id: "2026-08-07-checkout-saved-address", date: "2026-08-07", kind: "Correction", title: "Adresse enregistrée reprise à la commande", description: "Lorsqu’un client connecté passe une commande, son adresse de livraison enregistrée est désormais automatiquement reprise dans le formulaire, tout en restant modifiable." },
   { id: "2026-08-07-ci-browser-checks", date: "2026-08-07", kind: "Correction", title: "Tests navigateur et accessibilité fiabilisés", description: "Les vérifications navigateur suivent désormais les contenus actuels du site et les libellés anglais du back-office disposent d’un contraste conforme aux exigences d’accessibilité." },
   { id: "2026-08-07-ci-advice-catalog-mock", date: "2026-08-07", kind: "Correction", title: "Vérification continue rétablie", description: "Le test de la page Conseil simule désormais toutes les données chargées par cette page, ce qui rétablit l’exécution complète des contrôles automatiques." },

@@ -35,6 +35,14 @@ describe("admin navigation", () => {
     expect(html).toContain(">3</span>");
   });
 
+  it("includes the new-order notification endpoint in the shared administration menu", () => {
+    const router = createMemoryRouter([{ path: "/", element: <AdminShell active="products"><h1>Produits</h1></AdminShell> }]);
+    const html = renderToStaticMarkup(<RouterProvider router={router} />);
+
+    expect(html).toContain('href="/admin/commandes"');
+    expect(html).toContain("Commandes");
+  });
+
   it("only accepts successful mutation results as confirmations", () => {
     expect(successfulAdminMessage({ ok: true, message: "Produit enregistré." })).toBe("Produit enregistré.");
     expect(successfulAdminMessage({ ok: true })).toBe("La modification a bien été enregistrée.");

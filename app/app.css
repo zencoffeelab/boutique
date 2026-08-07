@@ -3282,6 +3282,18 @@ button:disabled {
   color: #182116;
   font: 800 0.68rem/1 var(--sans);
 }
+.admin-sidebar__order-count {
+  display: inline-grid;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.3rem;
+  place-items: center;
+  border: 1px solid #e4c6a7;
+  border-radius: 999px;
+  background: #f1d0ac;
+  color: #39220f;
+  font: 800 0.68rem/1 var(--sans);
+}
 .admin-logout {
   margin-top: auto;
   padding-top: 1.5rem;
