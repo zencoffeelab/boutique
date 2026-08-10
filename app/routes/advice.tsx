@@ -6,6 +6,7 @@ import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
 
 export async function loader({ request }: LoaderFunctionArgs) { return { locale: getLocale(request), articles: await getArticles() }; }
+export function headers() { return { "Cache-Control": "no-store" }; }
 export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(data?.locale === "en-GB" ? "Coffee brewing tips | Zen Coffee Lab" : "Conseils café | Zen Coffee Lab", data?.locale === "en-GB" ? "Recipes and practical guides for better coffee." : "Recettes et guides pratiques pour mieux préparer le café.", data?.locale === "en-GB" ? "/en/tips" : "/conseils");
 
 export default function Advice() {

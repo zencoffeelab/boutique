@@ -210,6 +210,7 @@ export type AdviceArticle = Readonly<{
   publishedAt: string;
   title: Record<Locale, string>;
   excerpt: Record<Locale, string>;
+  excerptBody?: Record<Locale, import("~/lib/rich-text").RichTextDocument>;
   body: Record<Locale, import("~/lib/rich-text").RichTextDocument | readonly string[]>;
   body2?: Record<Locale, import("~/lib/rich-text").RichTextDocument>;
   story: Record<Locale, { introImageUrl?: string; introImageAlt?: string; introImageFirst?: boolean; bodyImageUrl?: string; bodyImageAlt?: string; bodyImageFirst?: boolean; body2ImageUrl?: string; body2ImageAlt?: string }>;

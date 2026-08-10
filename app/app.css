@@ -1914,6 +1914,263 @@ button:disabled {
   border: 0;
   border-top: 1px solid var(--line);
 }
+.advice-story .product-story-block__media img {
+  height: 100%;
+  object-fit: cover;
+}
+.advice-detail__intro-image {
+  display: block;
+  width: min(100%, 42rem);
+  height: auto;
+  margin: 1.5rem auto 0;
+  object-fit: cover;
+}
+.advice-detail__intro .rich-text-content {
+  margin-top: 1.25rem;
+}
+.advice-detail__intro {
+  max-width: 42rem;
+  margin-inline: auto;
+  text-align: center;
+}
+.advice-detail__intro .rich-text-content {
+  text-align: center;
+}
+.rich-text-insert-panel__dimensions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.rich-text-editor__table-node {
+  margin: 1rem 0;
+}
+.rich-text-editor__table-node table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.rich-text-editor__table-node th,
+.rich-text-editor__table-node td {
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+}
+.rich-text-editor__table-node input {
+  width: 100%;
+  min-width: 5rem;
+  border: 0;
+  background: transparent;
+  padding: 0.4rem;
+  text-align: center;
+}
+.rich-text-editor__table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.rich-text-editor__table-actions button {
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--line);
+  background: var(--cream-dark);
+  cursor: pointer;
+}
+.rich-text-editor__table-actions .rich-text-editor__table-delete {
+  margin-left: auto;
+  color: var(--red, #9d3b2f);
+}
+.advice-story .product-story-block__copy {
+  padding: var(--advice-inner-space);
+}
+.advice-story .product-story-block {
+  --advice-inner-space: clamp(0.75rem, 1.25vw, 1.25rem);
+}
+.advice-story .product-story-block__media {
+  display: flex;
+  box-sizing: border-box;
+  align-items: stretch;
+  min-height: 0;
+  padding: var(--advice-inner-space);
+  overflow: hidden;
+}
+.advice-story .product-story-block__media img {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.advice-story .rich-text-content {
+  position: relative;
+  max-width: 100%;
+  overflow: visible;
+}
+.advice-story,
+.advice-detail-page,
+.advice-story .product-story,
+.advice-story .product-story-block,
+.advice-story .product-story-block__copy {
+  min-width: 0;
+  max-width: 100%;
+}
+.advice-story {
+  width: var(--page);
+  margin-inline: auto;
+  overflow-x: clip;
+}
+.advice-detail-page {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+html.advice-detail-overflow-hidden,
+body.advice-detail-overflow-hidden {
+  overflow-x: hidden;
+}
+.advice-story .product-story {
+  width: 100%;
+}
+.advice-story .product-story-block__copy .rich-text-content h2,
+.advice-story .product-story-block__copy .rich-text-content h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+.advice-story .product-story-block__copy .rich-text-content p {
+  max-width: none;
+  overflow-wrap: anywhere;
+}
+.advice-story .product-story-block__copy {
+  overflow: visible;
+}
+.advice-story .rich-text-table {
+  table-layout: fixed;
+  overflow-wrap: anywhere;
+}
+.advice-story .rich-text-accordion {
+  margin-block: 0.75rem;
+}
+.advice-story .product-story-block {
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.advice-story .product-story-block__copy {
+  height: auto;
+  min-height: 0;
+}
+.advice-story .product-story-block__media {
+  height: auto;
+  min-height: 0;
+  align-self: stretch;
+  box-sizing: border-box;
+  align-items: stretch;
+  justify-content: stretch;
+}
+.advice-story .product-story-block__media img {
+  display: block;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  min-width: 0;
+  min-height: 0;
+  align-self: stretch;
+  object-fit: cover;
+}
+@media (max-width: 900px) {
+  .advice-story .product-story-block {
+    height: auto;
+    min-height: 0;
+  }
+  .advice-story .product-story-block__copy {
+    height: auto;
+    min-height: 0;
+  }
+  .advice-story .product-story-block__media img {
+    height: auto;
+    aspect-ratio: 75 / 83;
+  }
+}
+.rich-text-accordion-measure {
+  position: absolute;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0 1.25rem 1.25rem;
+  visibility: hidden;
+  pointer-events: none;
+}
+.rich-text-table {
+  width: 100%;
+  margin: 2rem 0;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+.rich-text-table th,
+.rich-text-table td {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  text-align: center;
+}
+.rich-text-table th {
+  background: var(--cream-dark);
+  color: var(--green);
+  font-weight: 700;
+}
+.rich-text-accordion {
+  margin: 2rem 0;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: var(--cream-dark);
+}
+.rich-text-accordion__trigger {
+  display: block;
+  width: 100%;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  font: inherit;
+  text-align: left;
+  font-weight: 700;
+}
+.rich-text-accordion p {
+  margin: 0;
+  padding: 0 1.25rem 1.25rem;
+}
+.rich-text-insert-panel {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  background: var(--cream-dark);
+}
+.rich-text-insert-panel label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 700;
+}
+.rich-text-insert-panel small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.rich-text-insert-panel input,
+.rich-text-insert-panel textarea {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font: inherit;
+}
+.rich-text-insert-panel__action,
+.rich-text-insert-panel__cancel {
+  margin-right: 0.5rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--green);
+  cursor: pointer;
+}
+.rich-text-insert-panel__action { background: var(--green); color: var(--paper); }
+.rich-text-insert-panel__cancel { background: transparent; color: var(--green); }
 
 .faq-list {
   max-width: 920px;
@@ -4775,13 +5032,6 @@ button:disabled {
   grid-column: 1 / -1;
   grid-row: 5;
   justify-content: flex-end;
-}
-.admin-advice-editor > .admin-editor__actions .ui-button--default {
-  font-size: 0;
-}
-.admin-advice-editor > .admin-editor__actions .ui-button--default::after {
-  content: "Publier";
-  font-size: 0.82rem;
 }
 .admin-advice-editor__introduction {
   padding: 1.25rem;

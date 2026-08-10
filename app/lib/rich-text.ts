@@ -28,6 +28,8 @@ const allowedBlockTypes = new Set([
   "codeBlock",
   "horizontalRule",
   "hardBreak",
+  "contentTable",
+  "contentAccordion",
 ]);
 const allowedMarkTypes = new Set<RichTextMark["type"]>([
   "bold",
@@ -74,6 +76,8 @@ export function richTextPlainText(document: RichTextDocument): string {
   const read = (node: RichTextNode): string => {
     if (node.type === "text") return node.text ?? "";
     if (node.type === "hardBreak") return "\n";
+    if (node.type === "contentAccordion") return `${typeof node.attrs?.title === "string" ? node.attrs.title : ""} ${typeof node.attrs?.body === "string" ? node.attrs.body : ""}\n`;
+    if (node.type === "contentTable") return (Array.isArray(node.attrs?.rows) ? node.attrs.rows : []).flatMap((row) => Array.isArray(row) ? row : []).filter((cell): cell is string => typeof cell === "string").join(" ") + "\n";
     const text = (node.content ?? []).map(read).join("");
     return ["paragraph", "heading", "blockquote", "listItem", "codeBlock"].includes(node.type)
       ? `${text}\n`
@@ -110,6 +114,15 @@ function normalizeNode(value: unknown, depth: number, budget: { nodes: number })
   } else if (value.type === "orderedList") {
     const start = isRecord(value.attrs) && typeof value.attrs.start === "number" ? Math.max(1, Math.floor(value.attrs.start)) : 1;
     node.attrs = { start };
+  } else if (value.type === "contentTable") {
+    const rows = isRecord(value.attrs) && Array.isArray(value.attrs.rows) ? value.attrs.rows : [];
+    node.attrs = { rows: rows.slice(0, 30).flatMap((row) => Array.isArray(row) ? [row.slice(0, 12).map((cell) => typeof cell === "string" ? cell.slice(0, 500) : "")] : []) };
+  } else if (value.type === "contentAccordion") {
+    const attrs = isRecord(value.attrs) ? value.attrs : {};
+    node.attrs = {
+      title: typeof attrs.title === "string" ? attrs.title.slice(0, 300) : "",
+      body: typeof attrs.body === "string" ? attrs.body.slice(0, 10_000) : "",
+    };
   }
   if (Array.isArray(value.content)) {
     node.content = value.content

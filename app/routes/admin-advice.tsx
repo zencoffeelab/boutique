@@ -7,22 +7,28 @@ import { AdminShell } from "~/components/admin-shell";
 import { AdminImageEditorInput } from "~/components/admin-image-editor-input";
 import { RichTextEditor } from "~/components/rich-text-editor";
 import { requireAdmin } from "~/lib/auth.server";
-import { parseRichTextInput, storedBlocksToRichTextDocument } from "~/lib/rich-text";
+import { paragraphsToRichTextDocument, parseRichTextInput, richTextPlainText, storedBlocksToRichTextDocument } from "~/lib/rich-text";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
 type Translation = { locale: "fr-FR" | "en-GB"; title: string; excerpt: string; blocks: Array<{ type?: string; content: unknown }>; seo_title: string; seo_description: string };
 type Article = { id: string; slug: string; status: "draft" | "published" | "archived"; published_at: string; advice_translations: Translation[] };
 
+function normalizeSlug(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
 const schema = z.object({
   intent: z.literal("save_advice"),
   id: z.preprocess((value) => value === "" ? undefined : value, z.uuid().optional()),
-  slug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  slug: z.preprocess((value) => typeof value === "string" ? normalizeSlug(value) : value, z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)),
   status: z.enum(["draft", "published", "archived"]),
   publishedAt: z.string().min(10),
   titleFr: z.string().trim().min(3), titleEn: z.string().trim().min(3),
   excerptFr: z.string().trim().min(10), excerptEn: z.string().trim().min(10),
-  bodyFr: z.string().trim().min(20), bodyEn: z.string().trim().min(20),
-  body2Fr: z.string().trim().min(20), body2En: z.string().trim().min(20),
+  bodyFr: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().optional()),
+  bodyEn: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().optional()),
+  body2Fr: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().min(20).optional()),
+  body2En: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().min(20).optional()),
   seoTitleFr: z.string().trim().min(3), seoTitleEn: z.string().trim().min(3),
   seoDescriptionFr: z.string().trim().min(10), seoDescriptionEn: z.string().trim().min(10),
   introImageUrlFr: z.string().trim().max(2000).optional(), introImageUrlEn: z.string().trim().max(2000).optional(),
@@ -33,6 +39,10 @@ const schema = z.object({
   body2ImageAltFr: z.string().trim().max(300).optional(), body2ImageAltEn: z.string().trim().max(300).optional(),
 });
 const deleteSchema = z.object({ intent: z.literal("delete_advice"), id: z.uuid() });
+
+function parseIntroduction(value: string) {
+  return parseRichTextInput(value, 10) ?? paragraphsToRichTextDocument([value]);
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
@@ -62,24 +72,70 @@ export async function action({ request }: ActionFunctionArgs) {
     await client.from("audit_log").insert({ actor_id: admin.id, action: "advice.deleted", entity_type: "advice_article", entity_id: parsed.data.id, before_data: before });
     return { ok: true, message: "Conseil supprimé." };
   }
-  const parsed = schema.safeParse(form);
-  if (!parsed.success) return { ok: false, message: "Complétez les deux langues et les sections de l’article." };
-  const bodyFr = parseRichTextInput(parsed.data.bodyFr);
-  const bodyEn = parseRichTextInput(parsed.data.bodyEn);
-  const body2Fr = parseRichTextInput(parsed.data.body2Fr);
-  const body2En = parseRichTextInput(parsed.data.body2En);
-  if (!bodyFr || !bodyEn || !body2Fr || !body2En) return { ok: false, message: "Le texte des deux blocs éditoriaux est trop court." };
+  const validationForm = { ...form };
+  const requiredFields = ["slug", "status", "publishedAt", "titleFr", "titleEn", "excerptFr", "excerptEn", "bodyFr", "bodyEn", "seoTitleFr", "seoTitleEn", "seoDescriptionFr", "seoDescriptionEn"];
+  const missingFields = requiredFields.filter((field) => !(field in validationForm));
+  if (typeof form.id === "string" && form.id && missingFields.length > 0) {
+    const { data: existing, error: existingError } = await client.from("advice_articles").select("*,advice_translations(*)").eq("id", form.id).maybeSingle();
+    if (existingError) return { ok: false, message: existingError.message };
+    const storedTranslation = (existing?.advice_translations ?? []) as Translation[];
+    const storedLayout = (translation?: Translation) => layout(translation) ?? {};
+    const storedValue = (field: string, suffix: "Fr" | "En") => {
+      const translation = storedTranslation.find((item) => item.locale === (suffix === "Fr" ? "fr-FR" : "en-GB"));
+      if (!translation) return undefined;
+      if (field === "title") return translation.title;
+      if (field === "excerpt") return translation.excerpt;
+      if (field === "body") return JSON.stringify(storedBlocksToRichTextDocument(translation.blocks));
+      if (field === "seoTitle") return translation.seo_title;
+      if (field === "seoDescription") return translation.seo_description;
+      if (field === "body2") {
+        const value = storedLayout(translation).body2;
+        return value ? JSON.stringify(storedBlocksToRichTextDocument([{ type: "richText", content: value }])) : undefined;
+      }
+      if (field === "introImageUrl" || field === "introImageAlt") return storedLayout(translation)[field];
+      return undefined;
+    };
+    if ((!(("slug" in validationForm) && typeof validationForm.slug === "string" && validationForm.slug.trim())) && typeof existing?.slug === "string") validationForm.slug = existing.slug;
+    if (!("status" in validationForm) && typeof existing?.status === "string") validationForm.status = existing.status;
+    if (!("publishedAt" in validationForm) && typeof existing?.published_at === "string") validationForm.publishedAt = existing.published_at.slice(0, 16);
+    for (const suffix of ["Fr", "En"] as const) {
+      for (const field of ["title", "excerpt", "body", "seoTitle", "seoDescription", "body2", "introImageUrl", "introImageAlt"]) {
+        const name = `${field}${suffix}`;
+        if (!(name in validationForm)) {
+          const value = storedValue(field, suffix);
+          if (typeof value === "string") validationForm[name] = value;
+        }
+      }
+    }
+  }
+  const parsed = schema.safeParse(validationForm);
+  if (!parsed.success) {
+    const fields = parsed.error.issues.map((issue) => issue.path.join(".")).filter(Boolean);
+    return { ok: false, message: fields.length ? `Champs invalides ou manquants : ${fields.join(", ")}.` : "Complétez les deux langues et les sections de l’article." };
+  }
+  const bodyFr = parsed.data.bodyFr ? parseRichTextInput(parsed.data.bodyFr, 1) : null;
+  const bodyEn = parsed.data.bodyEn ? parseRichTextInput(parsed.data.bodyEn, 1) : null;
+  const excerptFr = parseIntroduction(parsed.data.excerptFr);
+  const excerptEn = parseIntroduction(parsed.data.excerptEn);
+  const resolvedBodyFr = bodyFr ?? paragraphsToRichTextDocument([richTextPlainText(excerptFr)]);
+  const resolvedBodyEn = bodyEn ?? paragraphsToRichTextDocument([richTextPlainText(excerptEn)]);
+  const body2Fr = parsed.data.body2Fr ? parseRichTextInput(parsed.data.body2Fr, 1) : null;
+  const body2En = parsed.data.body2En ? parseRichTextInput(parsed.data.body2En, 1) : null;
+  const resolvedBody2Fr = body2Fr && body2En ? body2Fr : null;
+  const resolvedBody2En = body2Fr && body2En ? body2En : null;
   const values = { slug: parsed.data.slug, status: parsed.data.status, published_at: new Date(parsed.data.publishedAt).toISOString() };
   const mutation = parsed.data.id
     ? await client.from("advice_articles").update(values).eq("id", parsed.data.id).select("id").single()
     : await client.from("advice_articles").insert(values).select("id").single();
   if (mutation.error || !mutation.data) return { ok: false, message: mutation.error?.message ?? "Article non enregistré." };
-  const uploadImage = async (name: string, position: 1 | 2, locale: "fr" | "en") => {
-    const file = formData.get(name);
-    if (!(file instanceof File) || file.size === 0) return null;
+  const uploadImage = async (name: string, position: 0 | 1 | 2, locale: "fr" | "en" | "shared") => {
+    const fileValue = formData.get(name);
+    if (!fileValue || typeof fileValue !== "object" || typeof (fileValue as File).arrayBuffer !== "function") return null;
+    const file = fileValue as File;
+    if (file.size === 0) return null;
     if (file.size > 8_000_000 || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Les images doivent être au format JPEG, PNG ou WebP et peser moins de 8 Mo.");
     const extension = file.type === "image/png" ? "png" : file.type === "image/jpeg" ? "jpg" : "webp";
-    const path = `${mutation.data.id}/block-${position}-${locale}-${crypto.randomUUID()}.${extension}`;
+    const path = `${mutation.data.id}/${position === 0 ? "intro" : `block-${position}`}-${locale}-${crypto.randomUUID()}.${extension}`;
     const { error: uploadError } = await client.storage.from("advice-media").upload(path, await file.arrayBuffer(), { contentType: file.type });
     if (uploadError) throw new Error(uploadError.message);
     return client.storage.from("advice-media").getPublicUrl(path).data.publicUrl;
@@ -87,6 +143,7 @@ export async function action({ request }: ActionFunctionArgs) {
   let uploaded: Record<string, string | null>;
   try {
     uploaded = {
+      introImageShared: await uploadImage("introImageFileShared", 0, "shared"),
       bodyImageFr: await uploadImage("bodyImageFileFr", 1, "fr"), bodyImageEn: await uploadImage("bodyImageFileEn", 1, "en"),
       body2ImageFr: await uploadImage("body2ImageFileFr", 2, "fr"), body2ImageEn: await uploadImage("body2ImageFileEn", 2, "en"),
     };
@@ -95,27 +152,27 @@ export async function action({ request }: ActionFunctionArgs) {
     article_id: mutation.data.id,
     locale,
     title: parsed.data[`title${suffix}`],
-    excerpt: parsed.data[`excerpt${suffix}`],
+    excerpt: JSON.stringify(suffix === "Fr" ? excerptFr : excerptEn),
     seo_title: parsed.data[`seoTitle${suffix}`],
     seo_description: parsed.data[`seoDescription${suffix}`],
     blocks: [
       { type: "richText", content: body },
       { type: "storyLayout", content: {
-        introImageUrl: parsed.data[`introImageUrl${suffix}`] ?? "",
+        introImageUrl: uploaded.introImageShared ?? parsed.data[`introImageUrl${suffix}`] ?? "",
         introImageAlt: parsed.data[`introImageAlt${suffix}`] ?? "",
         introImageFirst: false,
         bodyImageUrl: uploaded[`bodyImage${suffix}`] ?? parsed.data[`bodyImageUrl${suffix}`] ?? "",
         bodyImageAlt: parsed.data[`bodyImageAlt${suffix}`] ?? "",
-        bodyImageFirst: true,
-        body2,
+        bodyImageFirst: false,
+        ...(body2 ? { body2 } : {}),
         body2ImageUrl: uploaded[`body2Image${suffix}`] ?? parsed.data[`body2ImageUrl${suffix}`] ?? "",
         body2ImageAlt: parsed.data[`body2ImageAlt${suffix}`] ?? "",
       } },
     ],
   });
   const { error } = await client.from("advice_translations").upsert([
-    translation("fr-FR", "Fr", bodyFr, body2Fr),
-    translation("en-GB", "En", bodyEn, body2En),
+    translation("fr-FR", "Fr", resolvedBodyFr, resolvedBody2Fr),
+    translation("en-GB", "En", resolvedBodyEn, resolvedBody2En),
   ], { onConflict: "article_id,locale" });
   return error ? { ok: false, message: error.message } : { ok: true, message: "Conseil enregistré." };
 }
@@ -174,7 +231,7 @@ function LegacyArticleForm({ article, demo }: { article?: Article; demo: boolean
       <div className="field"><label>{english ? "Image alternative text" : "Texte alternatif de l’image"}<input name={`bodyImageAlt${locale}`} defaultValue={String(data?.bodyImageAlt ?? "")} /></label></div>
     </fieldset>;
   };
-  return <Form method="post" className="admin-advice-editor">
+  return <Form method="post" encType="multipart/form-data" className="admin-advice-editor">
     <input type="hidden" name="intent" value="save_advice" /><input type="hidden" name="id" value={article?.id ?? ""} />
     <section className="admin-advice-editor__settings"><div><p className="eyebrow">Publication</p><h2>{article ? "Éditer l’article" : "Nouvel article"}</h2></div><div className="form-grid"><label>Slug<input name="slug" defaultValue={article?.slug ?? ""} required /></label><label>Statut<select name="status" defaultValue={article?.status ?? "draft"}><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label><label>Date de publication<input name="publishedAt" type="datetime-local" defaultValue={(article?.published_at ?? new Date().toISOString()).slice(0, 16)} required /></label></div></section>
     <section className="admin-editorial-block admin-advice-editor__block admin-advice-editor__block--copy-first"><header className="admin-editorial-block__heading"><div><p className="eyebrow">En-tête et introduction</p><h3>Texte à gauche · image à droite</h3></div></header><div className="admin-editorial-block__layout"><div className="admin-editorial-block__image"><StoryImage url={String(frLayout?.introImageUrl ?? "")} alt={String(frLayout?.introImageAlt ?? "")} /></div><div className="admin-editorial-block__content"><LanguageTabs label="Langue de l’en-tête et de l’introduction" french={introductionFields("Fr", fr, frLayout)} english={introductionFields("En", en, enLayout)} /></div></div></section>
@@ -189,10 +246,11 @@ function ArticleForm({ article, demo }: { article?: Article; demo: boolean }) {
   const en = article?.advice_translations.find((item) => item.locale === "en-GB");
   const frLayout = layout(fr);
   const enLayout = layout(en);
-  const intro = (locale: "Fr" | "En", translation?: Translation) => <fieldset className="admin-editorial-block__language"><legend>{locale === "Fr" ? "Français" : "English"}</legend><div className="field"><label>{locale === "Fr" ? "Titre" : "Title"}<input name={`title${locale}`} defaultValue={translation?.title ?? ""} required /></label></div><div className="field"><label>{locale === "Fr" ? "Introduction" : "Introduction"}<textarea name={`excerpt${locale}`} defaultValue={translation?.excerpt ?? ""} required /></label></div></fieldset>;
+  const intro = (locale: "Fr" | "En", translation?: Translation) => <fieldset className="admin-editorial-block__language"><legend>{locale === "Fr" ? "Français" : "English"}</legend>{locale === "Fr" ? <AdminImageEditorInput name="introImageFileShared" label="Image commune sous le titre" help="Cette image sera utilisée dans les deux langues · JPEG, PNG ou WebP · recadrage libre" currentPreviewUrl={String(layout(translation)?.introImageUrl ?? "")} defaultAspect="original" defaultOutputWidth={1500} /> : null}<div className="field"><label>{locale === "Fr" ? "Titre" : "Title"}<input name={`title${locale}`} defaultValue={translation?.title ?? ""} required /></label></div><div className="field"><label>{locale === "Fr" ? "Texte alternatif de l’image" : "Image alternative text"}<input name={`introImageAlt${locale}`} defaultValue={String(layout(translation)?.introImageAlt ?? "")} /></label></div><RichTextEditor name={`excerpt${locale}`} label="Introduction" initialContent={parseIntroduction(translation?.excerpt ?? "")} disabled={demo} /></fieldset>;
   const block = (position: 1 | 2, locale: "Fr" | "En", translation: Translation | undefined, data: Record<string, unknown> | undefined) => <fieldset className="admin-editorial-block__language"><legend>{locale === "Fr" ? "Français" : "English"}</legend><RichTextEditor name={position === 1 ? `body${locale}` : `body2${locale}`} label={locale === "Fr" ? "Texte" : "Text"} initialContent={position === 1 ? storedBlocksToRichTextDocument(translation?.blocks) : storedBlocksToRichTextDocument([{ type: "richText", content: data?.body2 }])} disabled={demo} /><input type="hidden" name={position === 1 ? `bodyImageUrl${locale}` : `body2ImageUrl${locale}`} value={String(position === 1 ? data?.bodyImageUrl ?? "" : data?.body2ImageUrl ?? "")} /><AdminImageEditorInput name={position === 1 ? `bodyImageFile${locale}` : `body2ImageFile${locale}`} label={locale === "Fr" ? "Image du bloc" : "Block image"} help="JPEG, PNG ou WebP · recadrage au ratio 75:83" currentPreviewUrl={String(position === 1 ? data?.bodyImageUrl ?? "" : data?.body2ImageUrl ?? "")} defaultAspect="75:83" lockAspect defaultOutputWidth={1500} /><div className="field"><label>{locale === "Fr" ? "Texte alternatif" : "Alternative text"}<input name={position === 1 ? `bodyImageAlt${locale}` : `body2ImageAlt${locale}`} defaultValue={String(position === 1 ? data?.bodyImageAlt ?? "" : data?.body2ImageAlt ?? "")} /></label></div></fieldset>;
   const editorial = (position: 1 | 2, imageFirst: boolean) => <section className={`admin-editorial-block admin-advice-editor__block${imageFirst ? "" : " admin-advice-editor__block--copy-first"}`}><header className="admin-editorial-block__heading"><div><p className="eyebrow">Bloc {position}</p><h3>{imageFirst ? "Image à gauche · texte à droite" : "Texte à gauche · image à droite"}</h3></div></header><div className="admin-editorial-block__layout"><div className="admin-editorial-block__image"><StoryImage url={String(position === 1 ? frLayout?.bodyImageUrl ?? "" : frLayout?.body2ImageUrl ?? "")} alt={String(position === 1 ? frLayout?.bodyImageAlt ?? "" : frLayout?.body2ImageAlt ?? "")} /></div><div className="admin-editorial-block__content"><LanguageTabs label={`Langue du bloc ${position}`} french={block(position, "Fr", fr, frLayout)} english={block(position, "En", en, enLayout)} /></div></div></section>;
-  return <Form method="post" className="admin-advice-editor"><input type="hidden" name="intent" value="save_advice" /><input type="hidden" name="id" value={article?.id ?? ""} /><section className="admin-advice-editor__top"><div className="admin-advice-editor__settings"><p className="eyebrow">Publication</p><div className="form-grid"><label>Slug<input name="slug" defaultValue={article?.slug ?? ""} required /></label><label>Statut<select name="status" defaultValue={article?.status ?? "draft"}><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label><label>Date de publication<input name="publishedAt" type="datetime-local" defaultValue={(article?.published_at ?? new Date().toISOString()).slice(0, 16)} required /></label></div></div><section className="admin-advice-editor__introduction"><h2>Titre et introduction</h2><LanguageTabs label="Langue du titre et de l’introduction" french={intro("Fr", fr)} english={intro("En", en)} /></section></section>{editorial(1, false)}{editorial(2, true)}<section className="admin-advice-editor__seo"><h3>Référencement</h3><LanguageTabs label="Langue du référencement" french={<fieldset className="admin-editorial-block__language"><legend>Français</legend><div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? ""} required /></label></div><div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? ""} required /></label></div></fieldset>} english={<fieldset className="admin-editorial-block__language"><legend>English</legend><div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? ""} required /></label></div><div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? ""} required /></label></div></fieldset>} /></section><div className="admin-editor__actions"><button className="ui-button ui-button--default" disabled={demo}>{article ? "Enregistrer" : <><Plus /> Nouveau blog</>}</button>{article ? <Link className="ui-button ui-button--ghost" to={`/conseils/${article.slug}`}>Lire l’article</Link> : null}</div></Form>;
+  const actionLabel = article ? "Modifier" : null;
+  return <Form method="post" encType="multipart/form-data" className="admin-advice-editor"><input type="hidden" name="intent" value="save_advice" /><input type="hidden" name="id" value={article?.id ?? ""} /><section className="admin-advice-editor__top"><div className="admin-advice-editor__settings"><p className="eyebrow">Publication</p><div className="form-grid"><label>Slug<input name="slug" defaultValue={article?.slug ?? ""} required /></label><label>Statut<select name="status" defaultValue={article?.status ?? "draft"}><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label><label>Date de publication<input name="publishedAt" type="datetime-local" defaultValue={(article?.published_at ?? new Date().toISOString()).slice(0, 16)} required /></label></div></div><section className="admin-advice-editor__introduction"><h2>Titre et introduction</h2><LanguageTabs label="Langue du titre et de l’introduction" french={intro("Fr", fr)} english={intro("En", en)} /></section></section>{editorial(1, false)}{editorial(2, true)}<section className="admin-advice-editor__seo"><h3>Référencement</h3><LanguageTabs label="Langue du référencement" french={<fieldset className="admin-editorial-block__language"><legend>Français</legend><div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? ""} required /></label></div><div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? ""} required /></label></div></fieldset>} english={<fieldset className="admin-editorial-block__language"><legend>English</legend><div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? ""} required /></label></div><div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? ""} required /></label></div></fieldset>} /></section><div className="admin-editor__actions"><button className="ui-button ui-button--default" disabled={demo}>{actionLabel ?? <><Plus /> Nouveau blog</>}</button>{article ? <Link className="ui-button ui-button--ghost" to={`/conseils/${article.slug}`}>Lire l’article</Link> : null}</div></Form>;
 }
 
 export default function AdminAdvice() {

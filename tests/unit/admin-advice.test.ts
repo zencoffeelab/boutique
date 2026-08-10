@@ -83,7 +83,7 @@ describe("advice administration", () => {
     expect(upsert).toHaveBeenCalledWith(expect.arrayContaining([
       expect.objectContaining({ blocks: expect.arrayContaining([
         expect.objectContaining({ type: "richText", content: expect.objectContaining({ type: "doc" }) }),
-        expect.objectContaining({ type: "storyLayout", content: expect.objectContaining({ introImageFirst: false, bodyImageFirst: true }) }),
+        expect.objectContaining({ type: "storyLayout", content: expect.objectContaining({ introImageFirst: false, bodyImageFirst: false }) }),
       ]) }),
     ]), { onConflict: "article_id,locale" });
   });
