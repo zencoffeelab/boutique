@@ -33,6 +33,6 @@ export async function action({ request }: ActionFunctionArgs) {
     profileId = data.user.id;
     for (const [key, value] of supabase.responseHeaders) responseHeaders.append(key, value);
   }
-  try { return Response.json(await createCheckout({ cartId: parsed.data.cartId, shippingRateId: parsed.data.shippingRateId, paymentMethod: parsed.data.paymentMethod, audience, profileId }), { headers: responseHeaders }); }
+  try { return Response.json(await createCheckout({ cartId: parsed.data.cartId, shippingRateId: parsed.data.shippingRateId, lines: parsed.data.lines, paymentMethod: parsed.data.paymentMethod, audience, profileId }), { headers: responseHeaders }); }
   catch (cause) { if (cause instanceof Response) return Response.json({ ok: false, message: await cause.text() }, { status: cause.status }); console.error("checkout_creation_failed", { message: cause instanceof Error ? cause.message : String(cause) }); return Response.json({ ok: false, message: "Secure checkout is temporarily unavailable." }, { status: 503 }); }
 }

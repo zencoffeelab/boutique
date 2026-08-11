@@ -92,6 +92,14 @@ export default function Checkout() {
   }, []);
 
   const validLines = useMemo(() => lines.filter((line) => line.audience === audience), [audience, lines]);
+  const cartSignature = useMemo(() => validLines
+    .map((line) => JSON.stringify([line.productId, line.variantId, line.audience, line.quantity]))
+    .toSorted()
+    .join("|"), [validLines]);
+  useEffect(() => {
+    setQuote(null);
+    setSelectedRate("");
+  }, [cartSignature]);
   const resolved = useMemo(() => validLines.map((line) => {
     const product = products.find((item) => item.id === line.productId); const variant = product?.variants.find((item) => item.id === line.variantId);
     const offer = variant?.offers.find((item) => item.audience === line.audience);

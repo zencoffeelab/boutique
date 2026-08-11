@@ -13,6 +13,26 @@ export function isTemporaryOrderNumber(value: string | null | undefined) {
   return Boolean(value?.startsWith(temporaryOrderPrefix));
 }
 
+type CheckoutCartLine = Readonly<{
+  productId: string;
+  variantId: string;
+  audience: Audience;
+  quantity: number;
+}>;
+
+function comparableCartLines(lines: readonly CheckoutCartLine[]) {
+  return lines
+    .map((line) => JSON.stringify([line.productId, line.variantId, line.audience, line.quantity]))
+    .toSorted();
+}
+
+export function shippingQuoteMatchesCart(quoteLines: readonly CheckoutCartLine[], cartLines: readonly CheckoutCartLine[]) {
+  if (quoteLines.length !== cartLines.length) return false;
+  const quoted = comparableCartLines(quoteLines);
+  const current = comparableCartLines(cartLines);
+  return quoted.every((line, index) => line === current[index]);
+}
+
 export async function resolveCheckoutOrderNumber(sessionId: string) {
   const config = env();
   if (!config.STRIPE_SECRET_KEY || !sessionId.startsWith("cs_")) return null;
@@ -29,10 +49,13 @@ export async function resolveCheckoutOrderNumber(sessionId: string) {
   }
 }
 
-export async function createCheckout(input: { cartId: string; shippingRateId: string; paymentMethod?: "stripe" | "paypal"; audience: Audience; profileId?: string }) {
+export async function createCheckout(input: { cartId: string; shippingRateId: string; lines: readonly CheckoutCartLine[]; paymentMethod?: "stripe" | "paypal"; audience: Audience; profileId?: string }) {
   const config = env(); const quote = await getLatestShippingQuote(input.cartId);
   if (!quote || quote.audience !== input.audience) throw new Response("Shipping quote not found.", { status: 404 });
   if (new Date(quote.expiresAt).getTime() <= Date.now()) throw new Response("Shipping quote has expired.", { status: 409 });
+  if (!shippingQuoteMatchesCart(quote.lines, input.lines)) {
+    throw new Response(quote.locale === "fr-FR" ? "Le panier a changé. Recalculez la livraison avant de payer." : "The cart has changed. Recalculate shipping before paying.", { status: 409 });
+  }
   const rate = quote.rates.find((candidate) => candidate.id === input.shippingRateId);
   if (!rate) throw new Response("Shipping rate is not part of this quote.", { status: 409 });
   const shippingAddress = rate.deliveryMethod === "pickup" && rate.pickupPoint ? { ...quote.address, pickupPoint: rate.pickupPoint } : quote.address;

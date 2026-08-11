@@ -22,7 +22,7 @@ import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { constructStripeEvent, createStripe } from "~/lib/stripe.server";
 import { action as stripeWebhookAction } from "~/routes/api.webhook-stripe";
-import { createCheckout } from "~/services/checkout.server";
+import { createCheckout, shippingQuoteMatchesCart } from "~/services/checkout.server";
 import { generateInvoicePdfSafely } from "~/services/invoice.server";
 import { enqueueNotification } from "~/services/notifications.server";
 import { getLatestShippingQuote } from "~/services/shipping.server";
@@ -131,6 +131,12 @@ describe("Stripe checkout to paid back-office order", () => {
     const result = await createCheckout({
       cartId: "44444444-4444-4444-8444-444444444444",
       shippingRateId: rateId,
+      lines: [{
+        productId: "55555555-5555-4555-8555-555555555555",
+        variantId: "66666666-6666-4666-8666-666666666666",
+        audience: "retail",
+        quantity: 1,
+      }],
       audience: "retail",
     });
 
@@ -155,6 +161,38 @@ describe("Stripe checkout to paid back-office order", () => {
       status: "pending",
       amount_cents: 2_128,
     });
+  });
+
+  it("detects a changed quantity or an added product before payment", () => {
+    const quoted = [{ productId: "product-1", variantId: "variant-1", audience: "retail" as const, quantity: 1 }];
+    expect(shippingQuoteMatchesCart(quoted, [...quoted])).toBe(true);
+    expect(shippingQuoteMatchesCart(quoted, [{ ...quoted[0], quantity: 2 }])).toBe(false);
+    expect(shippingQuoteMatchesCart(quoted, [
+      ...quoted,
+      { productId: "product-2", variantId: "variant-2", audience: "retail", quantity: 1 },
+    ])).toBe(false);
+  });
+
+  it("rejects payment when the stored shipping quote has an older cart weight", async () => {
+    vi.mocked(getLatestShippingQuote).mockResolvedValue({
+      audience: "retail",
+      locale: "fr-FR",
+      lines: [{ productId: "product-1", variantId: "variant-1", audience: "retail", quantity: 1 }],
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      rates: [],
+    } as never);
+
+    const rejection = await createCheckout({
+      cartId: "44444444-4444-4444-8444-444444444444",
+      shippingRateId: rateId,
+      audience: "retail",
+      lines: [{ productId: "product-1", variantId: "variant-1", audience: "retail", quantity: 2 }],
+    }).catch((cause) => cause);
+
+    expect(rejection).toBeInstanceOf(Response);
+    expect(rejection).toMatchObject({ status: 409 });
+    await expect(rejection.text()).resolves.toContain("Recalculez la livraison");
+    expect(createStripe).not.toHaveBeenCalled();
   });
 
   it("finalizes a paid Stripe event so the order is available to the back office", async () => {

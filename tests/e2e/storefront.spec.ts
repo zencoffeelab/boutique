@@ -247,6 +247,21 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   await expect(
     page.locator(".rate-option").getByText("Colissimo — Domicile", { exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: /Panier \(1\)/ }).click();
+  await drawer.getByRole("button", { name: /Augmenter la quantité de/ }).click();
+  await expect(page.getByRole("button", { name: /Panier \(2\)/ })).toBeVisible();
+  await expect(page.locator(".rate-option")).toHaveCount(0);
+  await drawer.getByRole("button", { name: "Fermer le panier" }).click();
+  const updatedQuoteResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/shipping/quote") &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Calculer la livraison" }).click();
+  await expect((await updatedQuoteResponse).status()).toBe(200);
+  await expect(
+    page.locator(".rate-option").getByText("Colissimo — Domicile", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Payer en toute sécurité" }).click();
   await expect(page.getByRole("heading", { name: "Merci." })).toBeVisible();
   await expect(

@@ -113,6 +113,27 @@ describe("Shippo Colissimo shipping quotes", () => {
     expect(publicQuote(quote).rates[0]).not.toHaveProperty("serviceToken");
   });
 
+  it("adapts one Colissimo price to the combined weight of several products", async () => {
+    useRealShippingEnvironment();
+    const { getProducts } = await import("~/lib/catalog.server");
+    const products = await getProducts({ status: "published" });
+    const lines = products.slice(0, 2).map((product, index) => ({
+      productId: product.id,
+      variantId: product.variants[0].id,
+      audience: "retail" as const,
+      quantity: index === 0 ? 2 : 1,
+    }));
+    const { fetchMock, shipmentBodies } = shippoFetch([1_062]);
+    vi.stubGlobal("fetch", fetchMock);
+    const { createShippingQuote } = await import("~/services/shipping.server");
+    const quote = await createShippingQuote({ cartId: crypto.randomUUID(), locale: "fr-FR", audience: "retail", address, lines });
+
+    expect(quote.parcels).toHaveLength(1);
+    expect(quote.parcels[0]).toMatchObject({ netWeightGrams: 600, shippingWeightGrams: 780 });
+    expect(shipmentBodies[0].parcels[0]).toMatchObject({ weight: "0.780", mass_unit: "kg" });
+    expect(quote.rates[0].amountCents).toBe(950);
+  });
+
   it("accepts Shippo's home token as International Expert in another EU country and applies free shipping", async () => {
     useRealShippingEnvironment(0);
     const { fetchMock } = shippoFetch([1_423]);
