@@ -10,7 +10,7 @@ import { getContentPage } from "~/lib/content.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request);
-  const [products, articles, content] = await Promise.all([getProducts({ status: "published", availableOnly: true }), getArticles(), getContentPage("accueil", locale)]);
+  const [products, articles, content] = await Promise.all([getProducts({ status: "published" }), getArticles(), getContentPage("accueil", locale)]);
   return { locale, products: products.filter((product) => product.featured).slice(0, 6), articles: articles.slice(0, 2), content };
 }
 

@@ -21,7 +21,7 @@ export default [
   route("commande/confirmation", "routes/confirmation.tsx"),
   route("mon-compte", "routes/account.tsx"),
   route("devis/:id/paiement", "routes/professional-quote-payment.tsx"),
-  route("auth/confirm", "routes/auth-confirm.ts"),
+  route("auth/confirm", "routes/auth-confirm.tsx"),
   route("activation/mot-de-passe", "routes/password-setup.tsx"),
   route("admin", "routes/admin.tsx"),
   route("admin/produits", "routes/admin-products.tsx"),

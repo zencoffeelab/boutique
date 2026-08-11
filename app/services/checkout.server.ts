@@ -47,6 +47,7 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "payment", customer_email: quote.address.email, client_reference_id: order.id,
+      payment_method_types: ["card", "paypal"],
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
       success_url: `${config.VITE_SITE_URL}${quote.locale === "en-GB" ? "/en/order/confirmation" : "/commande/confirmation"}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${config.VITE_SITE_URL}${quote.locale === "en-GB" ? "/en/checkout" : "/commande"}?canceled=1`,

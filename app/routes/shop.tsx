@@ -7,7 +7,7 @@ import { pageMeta } from "~/lib/seo";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request);
-  return { locale, products: await getProducts({ status: "published", availableOnly: true }) };
+  return { locale, products: await getProducts({ status: "published" }) };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {

@@ -13,15 +13,18 @@ function ProductCardQuickAdd({ product, locale, audience }: { product: Product; 
   const menuId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const firstOptionRef = useRef<HTMLButtonElement>(null);
-  const purchasableVariants = product.variants.filter((variant) => {
+  const purchasableVariants = product.variants
+    .filter((variant) => variant.offers.some((candidate) => candidate.audience === audience && candidate.active))
+    .toSorted((left, right) => left.weightGrams - right.weightGrams);
+  const firstAvailableIndex = purchasableVariants.findIndex((variant) => {
     const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active);
-    return offer ? variant.stockOnHand - variant.stockReserved >= offer.minimumQuantity : false;
+    return Boolean(offer) && variant.stockOnHand - variant.stockReserved >= offer!.minimumQuantity;
   });
   const [menuOpen, setMenuOpen] = useState(false);
   const { addItem, hydrated, openDrawer } = useCart();
   const add = (variant: Product["variants"][number]) => {
     const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active);
-    if (!offer) return;
+    if (!offer || variant.stockOnHand - variant.stockReserved < offer.minimumQuantity) return;
     addItem(buildProductCartLine({ product, variant, offer, audience, quantity: offer.minimumQuantity }));
     setMenuOpen(false);
     openDrawer();
@@ -63,7 +66,8 @@ function ProductCardQuickAdd({ product, locale, audience }: { product: Product; 
     {menuOpen ? <div id={menuId} className="product-card__variant-menu" role="menu" aria-label={dictionary[locale].weight}>
       {purchasableVariants.map((variant, index) => {
         const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active)!;
-        return <button ref={index === 0 ? firstOptionRef : undefined} type="button" role="menuitem" onClick={() => add(variant)} key={variant.id}>
+        const available = variant.stockOnHand - variant.stockReserved >= offer.minimumQuantity;
+        return <button ref={index === (firstAvailableIndex >= 0 ? firstAvailableIndex : 0) ? firstOptionRef : undefined} type="button" role="menuitem" onClick={() => add(variant)} disabled={!available} aria-disabled={!available} key={variant.id}>
           <span>{variant.label}</span><strong>{formatMoney(offer.price.amount, locale)}</strong>
         </button>;
       })}
