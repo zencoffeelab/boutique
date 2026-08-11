@@ -44,7 +44,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
         } else {
           await client.from("professional_quotes").update({ status: "bank_transfer_pending", stripe_checkout_session_id: session.id, updated_at: new Date().toISOString() }).eq("id", quote.id).eq("status", "pending_payment");
         }
-        await client.from("webhook_events").update({ processed_at: new Date().toISOString(), processing_error: null }).eq("provider", "stripe").eq("provider_event_id", event.id);
+        await client.from("webhook_events").update({ processed_at: new Date().toISOString() }).eq("provider", "stripe").eq("provider_event_id", event.id);
         return Response.json({ received: true, professionalQuote: true, paymentPending: session.payment_status !== "paid" });
       }
     }
@@ -93,7 +93,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
         }
       }
     }
-    await client.from("webhook_events").update({ processed_at: new Date().toISOString(), processing_error: null }).eq("provider", "stripe").eq("provider_event_id", event.id);
+    await client.from("webhook_events").update({ processed_at: new Date().toISOString() }).eq("provider", "stripe").eq("provider_event_id", event.id);
   } catch (cause) { await client.from("webhook_events").update({ processing_error: cause instanceof Error ? cause.message : String(cause) }).eq("provider", "stripe").eq("provider_event_id", event.id); return new Response("Webhook processing failed.", { status: 500 }); }
   return Response.json({ received: true });
 }

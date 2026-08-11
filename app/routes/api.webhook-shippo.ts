@@ -18,11 +18,9 @@ export async function action({ request, context }: ActionFunctionArgs) {
   if (error?.code === "23505") { const { data: existing } = await client.from("webhook_events").select("processed_at").eq("provider", "shippo").eq("provider_event_id", eventId).single(); if (existing?.processed_at) return Response.json({ received: true, duplicate: true }); }
   if (error && error.code !== "23505") return new Response("Unable to persist event.", { status: 500 });
   if (trackingNumber) {
-    const { data: shipment } = await client.from("shipments").select("carrier,tracking_url,orders(email,locale,order_number)").eq("tracking_number", trackingNumber).maybeSingle();
-    const storedCarrier = shipment?.carrier || carrier || "Colissimo";
-    const { error: trackingError } = await client.rpc("apply_tracking_update", { p_carrier: storedCarrier, p_tracking_number: trackingNumber, p_status: status, p_status_date: statusDate || new Date().toISOString(), p_payload: payload }); if (trackingError) return new Response("Tracking update failed.", { status: 500 });
+    const { error: trackingError } = await client.rpc("apply_tracking_update", { p_carrier: carrier, p_tracking_number: trackingNumber, p_status: status, p_status_date: statusDate || new Date().toISOString(), p_payload: payload }); if (trackingError) return new Response("Tracking update failed.", { status: 500 });
     const normalized = status.toUpperCase(); if (["TRANSIT", "DELIVERED"].includes(normalized)) {
-      const order = Array.isArray(shipment?.orders) ? shipment.orders[0] : shipment?.orders;
+      const { data: shipment } = await client.from("shipments").select("tracking_url,orders(email,locale,order_number)").eq("tracking_number", trackingNumber).eq("carrier", carrier).maybeSingle(); const order = Array.isArray(shipment?.orders) ? shipment.orders[0] : shipment?.orders;
       if (order?.email) { const delivered = normalized === "DELIVERED"; const content = trackingEmail({ locale: order.locale, orderNumber: order.order_number, delivered, trackingUrl: shipment?.tracking_url }); await enqueueNotification({ kind: delivered ? "delivered" : "shipped", to: order.email, locale: order.locale, ...content, payload: { trackingNumber, status }, dedupeKey: `tracking/${order.order_number}/${trackingNumber}/${delivered ? "delivered" : "shipped"}` }); dispatchNotificationQueue(context, "shippo_tracking_notification_delivery_failed"); }
     }
   }

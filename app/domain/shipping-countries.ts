@@ -5,9 +5,11 @@ export const EU_SHIPPING_COUNTRY_CODES = [
   "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "SE", "CZ",
 ] as const;
 
-export const SHIPPING_COUNTRY_CODES = EU_SHIPPING_COUNTRY_CODES;
+export const NON_EU_SHIPPING_COUNTRY_CODES = ["LI", "NO", "GB", "CH"] as const;
 
-export type ShippingCountryCode = (typeof SHIPPING_COUNTRY_CODES)[number];
+export const SHIPPING_COUNTRY_CODES = [...EU_SHIPPING_COUNTRY_CODES, ...NON_EU_SHIPPING_COUNTRY_CODES] as const;
+
+type ShippingCountryCode = (typeof SHIPPING_COUNTRY_CODES)[number];
 
 const labels: Record<ShippingCountryCode, Record<Locale, string>> = {
   AT: { "fr-FR": "Autriche", "en-GB": "Austria" },
@@ -27,9 +29,11 @@ const labels: Record<ShippingCountryCode, Record<Locale, string>> = {
   IT: { "fr-FR": "Italie", "en-GB": "Italy" },
   LV: { "fr-FR": "Lettonie", "en-GB": "Latvia" },
   LT: { "fr-FR": "Lituanie", "en-GB": "Lithuania" },
+  LI: { "fr-FR": "Liechtenstein", "en-GB": "Liechtenstein" },
   LU: { "fr-FR": "Luxembourg", "en-GB": "Luxembourg" },
   MT: { "fr-FR": "Malte", "en-GB": "Malta" },
   NL: { "fr-FR": "Pays-Bas", "en-GB": "Netherlands" },
+  NO: { "fr-FR": "Norvège", "en-GB": "Norway" },
   PL: { "fr-FR": "Pologne", "en-GB": "Poland" },
   PT: { "fr-FR": "Portugal", "en-GB": "Portugal" },
   RO: { "fr-FR": "Roumanie", "en-GB": "Romania" },
@@ -37,11 +41,9 @@ const labels: Record<ShippingCountryCode, Record<Locale, string>> = {
   SI: { "fr-FR": "Slovénie", "en-GB": "Slovenia" },
   ES: { "fr-FR": "Espagne", "en-GB": "Spain" },
   SE: { "fr-FR": "Suède", "en-GB": "Sweden" },
+  GB: { "fr-FR": "Royaume-Uni", "en-GB": "United Kingdom" },
+  CH: { "fr-FR": "Suisse", "en-GB": "Switzerland" },
 };
-
-export function isShippingCountry(code: string): code is ShippingCountryCode {
-  return (SHIPPING_COUNTRY_CODES as readonly string[]).includes(code.toUpperCase());
-}
 
 export function shippingCountryLabel(code: ShippingCountryCode, locale: Locale) {
   return labels[code][locale];

@@ -27,8 +27,6 @@ type OrderSnapshot = {
     };
   };
   shipping_charged_cents: number;
-  shipping_carrier?: string;
-  shipping_service?: string;
   total_cents: number;
 };
 
@@ -125,7 +123,7 @@ export async function renderInvoicePdf(input: { invoice: InvoiceSnapshot; order:
     address.company,
     address.line1,
     `${address.postalCode ?? ""} ${address.city ?? ""} - ${address.countryCode ?? ""}`.trim(),
-    address.pickupPoint ? (english ? "Colissimo - Pickup Point" : "Colissimo - Point Retrait") : null,
+    address.pickupPoint ? (english ? "Pickup point" : "Point relais") : null,
     address.pickupPoint?.name,
     address.pickupPoint ? `${address.pickupPoint.address1 ?? ""} - ${address.pickupPoint.postalCode ?? ""} ${address.pickupPoint.city ?? ""}`.trim() : null,
     address.pickupPoint?.id ? `ID ${address.pickupPoint.id}` : null,
@@ -146,10 +144,7 @@ export async function renderInvoicePdf(input: { invoice: InvoiceSnapshot; order:
     }
     y = drawTableRow(page, font, boldFont, `${line.quantity} x ${line.product_name} - ${line.variant_label}`, euros(line.line_total_cents, order.locale), y);
   }
-  const shippingMethod = order.shipping_carrier === "Colissimo"
-    ? `Colissimo - ${address.pickupPoint ? (english ? "Pickup Point" : "Point Retrait") : (english ? "Home Delivery" : "Domicile")}`
-    : [order.shipping_carrier, order.shipping_service].filter(Boolean).join(" - ");
-  y = drawTableRow(page, font, boldFont, `${english ? "Shipping" : "Livraison"}${shippingMethod ? ` - ${shippingMethod}` : ""}`, euros(order.shipping_charged_cents, order.locale), y);
+  y = drawTableRow(page, font, boldFont, english ? "Shipping" : "Livraison", euros(order.shipping_charged_cents, order.locale), y);
   y = drawTableRow(page, font, boldFont, "Total EUR", euros(order.total_cents, order.locale), y, true);
   page.drawText(english ? "VAT not applicable under Article 293 B of the French Tax Code." : "TVA non applicable, art. 293 B du CGI.", { x: margin, y: y - 18, size: 9, font, color: mutedColor });
 

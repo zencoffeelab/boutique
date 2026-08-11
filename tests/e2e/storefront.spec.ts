@@ -84,10 +84,6 @@ test("a coffee can be added to the cart directly from the shop", async ({
   const drawer = page.getByRole("dialog", { name: "Votre panier" });
   await expect(drawer).toBeVisible();
   await expect(drawer.locator(".cart-drawer-line")).toHaveCount(1);
-  await drawer.getByRole("button", { name: /Augmenter la quantité de/ }).click();
-  await expect(drawer.locator(".cart-drawer-line .quantity-stepper output")).toHaveText("2");
-  await drawer.getByRole("button", { name: /Diminuer la quantité de/ }).click();
-  await expect(drawer.locator(".cart-drawer-line .quantity-stepper output")).toHaveText("1");
   await expect(page).toHaveURL(/\/boutique$/);
   await expect(page.getByRole("button", { name: "Panier (1)" })).toBeVisible();
 });
@@ -199,8 +195,7 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   page.on("console", (message) => {
     if (
       message.type() === "error" &&
-      !message.text().includes("net::ERR_CONNECTION_RESET") &&
-      !message.text().includes("Failed to fetch manifest patches")
+      !message.text().includes("net::ERR_CONNECTION_RESET")
     )
       consoleErrors.push(message.text());
   });
@@ -231,7 +226,6 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   await page.getByLabel("Adresse", { exact: true }).fill("1 rue du Café");
   await page.getByLabel("Code postal").fill("37000");
   await page.getByLabel("Ville").fill("Tours");
-  await expect(page.locator('select[name="countryCode"] option[value="GB"]')).toHaveCount(0);
   const accountChoice = page.getByRole("checkbox", { name: /Créer mon compte client/ });
   await expect(accountChoice).toBeVisible();
   await accountChoice.check();
@@ -245,23 +239,11 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   await page.getByRole("button", { name: "Calculer la livraison" }).click();
   await expect((await quoteResponse).status()).toBe(200);
   await expect(
-    page.locator(".rate-option").getByText("Colissimo — Domicile", { exact: true }),
+    page.locator(".rate-option").getByText("FedEx", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: /Panier \(1\)/ }).click();
-  await drawer.getByRole("button", { name: /Augmenter la quantité de/ }).click();
-  await expect(page.getByRole("button", { name: /Panier \(2\)/ })).toBeVisible();
-  await expect(page.locator(".rate-option")).toHaveCount(0);
-  await drawer.getByRole("button", { name: "Fermer le panier" }).click();
-  const updatedQuoteResponse = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/shipping/quote") &&
-      response.request().method() === "POST",
-  );
-  await page.getByRole("button", { name: "Calculer la livraison" }).click();
-  await expect((await updatedQuoteResponse).status()).toBe(200);
   await expect(
-    page.locator(".rate-option").getByText("Colissimo — Domicile", { exact: true }),
-  ).toBeVisible();
+    page.locator(".rate-option").getByText("Mondial Relay", { exact: true }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Payer en toute sécurité" }).click();
   await expect(page.getByRole("heading", { name: "Merci." })).toBeVisible();
   await expect(
@@ -307,8 +289,7 @@ test("English URLs, language switch and professional form are accessible", async
   page.on("console", (message) => {
     if (
       message.type() === "error" &&
-      !message.text().includes("net::ERR_CONNECTION_RESET") &&
-      !message.text().includes("Failed to fetch manifest patches")
+      !message.text().includes("net::ERR_CONNECTION_RESET")
     )
       consoleErrors.push(message.text());
   });
@@ -341,7 +322,7 @@ test("English URLs, language switch and professional form are accessible", async
   expect(consoleErrors).toEqual([]);
 });
 
-test("EU checkout offers Colissimo Point Retrait after pickup-point selection", async ({
+test("Zone 2 checkout offers Mondial Relay only after pickup-point selection", async ({
   page,
 }) => {
   await page.goto("/boutique");
@@ -366,13 +347,13 @@ test("EU checkout offers Colissimo Point Retrait after pickup-point selection", 
   await expect(
     page.getByRole("heading", { name: /Préférence de livraison/ }),
   ).toBeVisible();
-  await page.getByLabel(/Colissimo — Point Retrait/).check();
+  await page.getByLabel("Point relais").check();
   await page
     .getByRole("button", { name: "Rechercher les points relais" })
     .click();
   await page.locator(".pickup-option input").first().check();
   await page.getByRole("button", { name: "Calculer la livraison" }).click();
   await expect(page.locator(".rate-option__details > strong")).toHaveText(
-    "Colissimo — Point Retrait",
+    "Mondial Relay",
   );
 });

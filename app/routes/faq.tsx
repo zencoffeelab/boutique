@@ -9,7 +9,7 @@ const items = [
   { fr: ["Quand mon café est-il torréfié ?", "Nous torréfions en petits lots chaque semaine. La date de torréfaction figure sur chaque paquet."], en: ["When is my coffee roasted?", "We roast in small batches every week. The roasting date is printed on every bag."] },
   { fr: ["Comment conserver mon café ?", "Conservez le paquet fermé, à température ambiante, à l’abri de la lumière et de l’humidité. Évitez le réfrigérateur."], en: ["How should I store coffee?", "Keep the bag closed at room temperature, away from light and moisture. Avoid the refrigerator."] },
   { fr: ["Quels sont les délais d’expédition ?", "Les commandes sont généralement préparées sous deux jours ouvrés. Le délai du transporteur s’ajoute ensuite."], en: ["How long does shipping take?", "Orders are usually prepared within two business days, followed by the carrier transit time."] },
-  { fr: ["Livrez-vous hors de France ?", "Nous livrons dans les 27 pays de l’Union européenne avec Colissimo."], en: ["Do you ship outside France?", "We ship with Colissimo throughout all 27 European Union countries."] },
+  { fr: ["Livrez-vous hors de France ?", "Nous livrons dans l’Union européenne et au Royaume-Uni. Les droits éventuels au Royaume-Uni restent à la charge du destinataire."], en: ["Do you ship outside France?", "We ship within the European Union and to the United Kingdom. Any UK duties remain payable by the recipient."] },
 ];
 const faqSections = [
   { count: 3, fr: "Notre style de torréfaction", en: "Our roasting style" },

@@ -12,7 +12,7 @@ describe("integer money", () => {
   it("applies the configured free-shipping thresholds", () => {
     expect(freeShippingThresholdCents("FR")).toBe(7_500);
     expect(freeShippingThresholdCents("DE")).toBe(15_000);
-    expect(freeShippingThresholdCents("GB")).toBeNull();
+    expect(freeShippingThresholdCents("GB")).toBe(15_000);
     expect(freeShippingThresholdCents("US")).toBeNull();
   });
 });

@@ -74,7 +74,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
         ),
     ),
   ];
-  const refunds = await getLabelRefundStates(transactionIds);
+  const sendcloudShipmentIds = [
+    ...new Set(
+      orders
+        .flatMap((order) => order.shipments ?? [])
+        .flatMap((shipment: any) =>
+          shipment.sendcloud_shipment_id
+            ? [shipment.sendcloud_shipment_id]
+            : [],
+        ),
+    ),
+  ];
+  const [refunds, sendcloudRefunds] = await Promise.all([
+    getLabelRefundStates(transactionIds),
+    getLabelRefundStates(sendcloudShipmentIds, "sendcloud-label-refund"),
+  ]);
   return {
     demo: false,
     orders: orders.map((order) => ({
@@ -83,7 +97,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
         ...shipment,
         label_refund: shipment.shippo_transaction_id
           ? refunds[shipment.shippo_transaction_id]
-          : undefined,
+          : shipment.sendcloud_shipment_id
+            ? sendcloudRefunds[shipment.sendcloud_shipment_id]
+            : undefined,
       })),
     })),
     search,
@@ -153,7 +169,6 @@ function LabelPurchaseAction({ order }: { order: any }) {
     revalidator.revalidate();
   }, [label.data, revalidator]);
 
-  const hasLegacyShipment = order.shipments?.some((shipment: any) => shipment.label_provider === "sendcloud");
   return (
     <div className="admin-order-actions admin-order-label-purchase">
       <label.Form method="post" action={`/api/admin/orders/${order.id}/label`}>
@@ -163,16 +178,14 @@ function LabelPurchaseAction({ order }: { order: any }) {
           disabled={
             label.state !== "idle" ||
             !order.paid_at ||
-            hasLegacyShipment ||
             !["paid", "preparing", "ready_to_ship"].includes(order.status)
           }
         >
-          <PackageCheck aria-hidden="true" /> Générer les étiquettes Colissimo
+          <PackageCheck aria-hidden="true" /> Acheter les étiquettes
         </button>
       </label.Form>
-      {hasLegacyShipment ? <small>Ancienne expédition Sendcloud : historique en lecture seule.</small> : null}
       {label.data?.message ? <small>{label.data.message}</small> : null}
-      {label.data?.labels?.filter((item) => item.url).map((item, index) => (
+      {label.data?.labels?.map((item, index) => (
         <a key={item.url} href={item.url} target="_blank" rel="noreferrer">
           Colis {index + 1} <ExternalLink aria-hidden="true" />
         </a>
@@ -275,8 +288,7 @@ function ShipmentActions({
   const pending =
     refund && ["REQUESTING", "QUEUED", "PENDING"].includes(refund.status);
   const canRequest = Boolean(
-    shipment.label_provider !== "sendcloud" &&
-    shipment.shippo_transaction_id &&
+    (shipment.shippo_transaction_id || shipment.sendcloud_parcel_id) &&
     shipment.label_url &&
     !refund &&
     labelIsRefundable({
@@ -285,7 +297,6 @@ function ShipmentActions({
     }),
   );
   const canRefresh = Boolean(pending);
-  const legacy = shipment.label_provider === "sendcloud";
   const formAction = `/api/admin/orders/${orderId}/shipments/${shipment.id}/refund-label`;
   return (
     <article className="admin-shipment">
@@ -295,11 +306,9 @@ function ShipmentActions({
           {shipment.carrier} · {shipment.service} ·{" "}
           {formatMoney(shipment.actual_cost_cents, "fr-FR")}
         </small>
-        {shipment.tracking_number ? <small>Suivi : {shipment.tracking_number} · {shipment.status}</small> : null}
-        {legacy ? <small>Ancienne expédition Sendcloud — consultation uniquement.</small> : null}
       </div>
       <div className="admin-shipment__actions">
-        {!legacy && shipment.label_url && !refund ? (
+        {shipment.label_url && !refund ? (
           <a
             className="text-link"
             href={shipment.label_url}
@@ -324,7 +333,7 @@ function ShipmentActions({
               if (
                 canRequest &&
                 !window.confirm(
-                  "Annuler cette étiquette et la livraison prévue ? Le remboursement sera demandé à Shippo. Cette étiquette ne devra plus jamais être utilisée.",
+                  "Annuler cette étiquette et la livraison prévue ? Sendcloud sera averti et le remboursement sera demandé. Cette étiquette ne devra plus jamais être utilisée.",
                 )
               )
                 event.preventDefault();
@@ -434,7 +443,7 @@ export default function AdminOrders() {
                   </section>
                   <section className="admin-order-delivery">
                     <h2>Livraison</h2>
-                    <p><strong>{order.shipping_carrier === "Colissimo" ? `Colissimo — ${pickupPoint ? "Point Retrait" : "Domicile"}` : order.shipping_carrier}</strong>{order.shipping_carrier === "Colissimo" ? null : <> · {order.shipping_service}</>}</p>
+                    <p><strong>{order.shipping_carrier}</strong> · {order.shipping_service}</p>
                   {pickupPoint ? (
                     <p>
                       <strong>Point relais :</strong> {pickupPoint.name}

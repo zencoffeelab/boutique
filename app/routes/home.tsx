@@ -3,15 +3,15 @@ import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Link, useLoaderData } from "react-router";
 import { ProductCard } from "~/components/product-card";
 import { ContentBlocks } from "~/components/content-blocks";
-import { getArticles, getProducts, hasPurchasableVariant } from "~/lib/catalog.server";
+import { getArticles, getProducts } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { JsonLd, pageMeta } from "~/lib/seo";
 import { getContentPage } from "~/lib/content.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request);
-  const [products, articles, content] = await Promise.all([getProducts({ status: "published" }), getArticles(), getContentPage("accueil", locale)]);
-  return { locale, products: products.filter((product) => product.featured && hasPurchasableVariant(product, "retail")).slice(0, 6), articles: articles.slice(0, 2), content };
+  const [products, articles, content] = await Promise.all([getProducts({ status: "published", availableOnly: true }), getArticles(), getContentPage("accueil", locale)]);
+  return { locale, products: products.filter((product) => product.featured).slice(0, 6), articles: articles.slice(0, 2), content };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {

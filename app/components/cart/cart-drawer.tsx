@@ -1,4 +1,4 @@
-import { CheckCircle2, Minus, Plus, Trash2, X } from "lucide-react";
+import { CheckCircle2, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
@@ -31,7 +31,7 @@ const CART_DRAWER_ANIMATION_MS = 280;
 
 export function CartDrawer({ open, locale, onClose }: { open: boolean; locale: Locale; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const { lines, hydrated, removeItem, updateQuantity, addedNotification } = useCart();
+  const { lines, hydrated, removeItem, addedNotification } = useCart();
   const [preview, setPreview] = useState<PreviewResponse>({ ok: true, lines: [], unavailableKeys: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -147,7 +147,7 @@ export function CartDrawer({ open, locale, onClose }: { open: boolean; locale: L
           <div className="cart-drawer__lines" aria-live="polite">
             {displayedLines.map((line) => <article className="cart-drawer-line" key={lineKey(line)}>
               <Link to={`${paths.product}${line.productSlug}`} onClick={onClose} tabIndex={-1} aria-hidden="true"><img src={line.imageUrl} alt="" width="88" height="88" /></Link>
-              <div><Link className="cart-drawer-line__name" to={`${paths.product}${line.productSlug}`} onClick={onClose}>{line.productName} – {line.variantLabel}</Link><div className="cart-drawer-line__quantity"><span>{english ? "Quantity" : "Quantité"}</span><div className="quantity-stepper"><button type="button" onClick={() => updateQuantity(line.variantId, line.audience, line.quantity - 1)} aria-label={english ? `Decrease quantity of ${line.productName}` : `Diminuer la quantité de ${line.productName}`}><Minus aria-hidden="true" /></button><span className="quantity-stepper__value">{line.quantity}</span><button type="button" onClick={() => updateQuantity(line.variantId, line.audience, line.quantity + 1)} aria-label={english ? `Increase quantity of ${line.productName}` : `Augmenter la quantité de ${line.productName}`} disabled={line.quantity >= Math.min(100, line.availableStock)}><Plus aria-hidden="true" /></button></div></div>{line.quantity > line.availableStock ? <p className="cart-drawer-line__warning">{english ? `Only ${line.availableStock} available.` : `Seulement ${line.availableStock} disponible${line.availableStock > 1 ? "s" : ""}.`}</p> : null}<strong>{formatMoney(line.unitPriceCents * line.quantity, locale)}</strong></div>
+              <div><Link className="cart-drawer-line__name" to={`${paths.product}${line.productSlug}`} onClick={onClose}>{line.productName} – {line.variantLabel}</Link><p>{english ? "Quantity" : "Quantité"} : {line.quantity}</p>{line.quantity > line.availableStock ? <p className="cart-drawer-line__warning">{english ? `Only ${line.availableStock} available.` : `Seulement ${line.availableStock} disponible${line.availableStock > 1 ? "s" : ""}.`}</p> : null}<strong>{formatMoney(line.unitPriceCents * line.quantity, locale)}</strong></div>
               <button className="cart-drawer-line__remove" type="button" onClick={() => removeItem(line.variantId, line.audience)} aria-label={english ? `Remove ${line.productName}` : `Supprimer ${line.productName}`}><Trash2 aria-hidden="true" /></button>
             </article>)}
             {unavailableKeys.map((key) => {

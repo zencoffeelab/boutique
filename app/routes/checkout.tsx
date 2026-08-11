@@ -4,12 +4,12 @@ import { Link, useLoaderData } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
 import { formatMoney } from "~/domain/money";
 import { shippingRateLabel, shippingRatePromotionLabel } from "~/domain/shipping-rate-label";
-import { EU_SHIPPING_COUNTRY_CODES, isShippingCountry, shippingCountryLabel } from "~/domain/shipping-countries";
+import { EU_SHIPPING_COUNTRY_CODES, NON_EU_SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
+import { supportsPickupDelivery } from "~/domain/shipping-zones";
 import type { PickupPoint, ShippingRate } from "~/domain/types";
 import { getViewer } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
-import { paypalConfigured } from "~/lib/paypal.server";
 import { pageMeta } from "~/lib/seo";
 import { createRequestSupabase } from "~/lib/supabase.server";
 import { pickupPointsConfigured } from "~/services/pickup-points.server";
@@ -33,7 +33,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
       } : null,
     } : null,
     pickupConfigured: pickupPointsConfigured(),
-    paypalAvailable: paypalConfigured(),
     products: await getProducts({ status: "published", audience }),
   };
 }
@@ -62,28 +61,22 @@ function pickupAddress(point: PickupPoint) {
   return [point.address1, point.address2, point.address3].filter(Boolean).join(", ");
 }
 
+function pickupCarrierLabel(code: string) {
+  if (code === "mondial_relay") return "Mondial Relay";
+  if (code === "colissimo") return "Colissimo";
+  return code.replaceAll("_", " ");
+}
+
 export default function Checkout() {
-  const { locale, audience, account, pickupConfigured, paypalAvailable, products } = useLoaderData<typeof loader>(); const english = locale === "en-GB";
+  const { locale, audience, account, pickupConfigured, products } = useLoaderData<typeof loader>(); const english = locale === "en-GB";
   const { lines, hydrated } = useCart(); const formRef = useRef<HTMLFormElement>(null);
   const [cartId, setCartId] = useState(""); const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [selectedRate, setSelectedRate] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const [countryCode, setCountryCode] = useState(isShippingCountry(account?.address?.countryCode ?? "") ? account!.address!.countryCode : "FR"); const [deliveryMethod, setDeliveryMethod] = useState<"home" | "pickup">("home");
+  const [countryCode, setCountryCode] = useState(account?.address?.countryCode ?? "FR"); const [deliveryMethod, setDeliveryMethod] = useState<"home" | "pickup">("home");
   const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([]); const [selectedPickupPointId, setSelectedPickupPointId] = useState("");
   const [pickupBusy, setPickupBusy] = useState(false); const [pickupError, setPickupError] = useState("");
   const [createAccount, setCreateAccount] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "paypal">("stripe");
-  const paypalCaptureAttempted = useRef(false);
-  const pickupAvailable = pickupConfigured;
-
-  useEffect(() => {
-    const paypalOrderId = new URLSearchParams(window.location.search).get("token");
-    if (!paypalOrderId || paypalCaptureAttempted.current) return;
-    paypalCaptureAttempted.current = true;
-    setBusy(true);
-    fetch("/api/checkout/paypal/capture", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ paypalOrderId }) })
-      .then(async (response) => { const data = await response.json() as CheckoutResponse; if (!response.ok || !data.ok || !data.confirmationUrl) throw new Error(data.message || (english ? "PayPal payment could not be confirmed." : "Le paiement PayPal n’a pas pu être confirmé.")); window.location.assign(data.confirmationUrl); })
-      .catch((cause) => { setError(cause instanceof Error ? cause.message : String(cause)); setBusy(false); });
-  }, [english]);
+  const pickupAvailable = pickupConfigured && supportsPickupDelivery(countryCode);
 
   useEffect(() => {
     const key = "zcl:cart-id:v1"; let id = window.localStorage.getItem(key);
@@ -92,14 +85,6 @@ export default function Checkout() {
   }, []);
 
   const validLines = useMemo(() => lines.filter((line) => line.audience === audience), [audience, lines]);
-  const cartSignature = useMemo(() => validLines
-    .map((line) => JSON.stringify([line.productId, line.variantId, line.audience, line.quantity]))
-    .toSorted()
-    .join("|"), [validLines]);
-  useEffect(() => {
-    setQuote(null);
-    setSelectedRate("");
-  }, [cartSignature]);
   const resolved = useMemo(() => validLines.map((line) => {
     const product = products.find((item) => item.id === line.productId); const variant = product?.variants.find((item) => item.id === line.variantId);
     const offer = variant?.offers.find((item) => item.audience === line.audience);
@@ -119,7 +104,7 @@ export default function Checkout() {
   const searchForPickupPoints = async () => {
     const form = formRef.current; if (!form || !form.reportValidity()) return;
     const address = getAddress(form);
-    if (!isShippingCountry(address.countryCode)) return;
+    if (!supportsPickupDelivery(address.countryCode)) return;
     setPickupBusy(true); setPickupError(""); setPickupPoints([]); setSelectedPickupPointId(""); invalidateQuote();
     try {
       const response = await fetch("/api/shipping/pickup-points", {
@@ -161,7 +146,7 @@ export default function Checkout() {
     try {
       const response = await fetch("/api/checkout/payment-intent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(formRef.current), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, shippingRateId: selectedRate, paymentMethod, acceptTerms: true, createAccount: !account && createAccount, accountPassword: !account && createAccount ? String(new FormData(formRef.current).get("accountPassword") ?? "") : undefined }),
+        body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(formRef.current), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, shippingRateId: selectedRate, acceptTerms: true, createAccount: !account && createAccount, accountPassword: !account && createAccount ? String(new FormData(formRef.current).get("accountPassword") ?? "") : undefined }),
       });
       const data = await response.json() as CheckoutResponse;
       if (!response.ok || !data.ok) throw new Error(data.message || "Checkout unavailable");
@@ -195,32 +180,31 @@ export default function Checkout() {
             <div className="field field--wide"><label htmlFor="line2">{english ? "Address line 2" : "Complément"}</label><input id="line2" name="line2" defaultValue={account?.address?.line2} autoComplete="address-line2" /></div>
             <div className="field"><label htmlFor="postalCode">{english ? "Postcode" : "Code postal"}</label><input id="postalCode" name="postalCode" defaultValue={account?.address?.postalCode} required autoComplete="postal-code" /></div>
             <div className="field"><label htmlFor="city">{english ? "City" : "Ville"}</label><input id="city" name="city" defaultValue={account?.address?.city} required autoComplete="address-level2" /></div>
-            <div className="field"><label htmlFor="countryCode">{english ? "Country" : "Pays"}</label><select id="countryCode" name="countryCode" value={countryCode} onChange={(event) => { setCountryCode(event.currentTarget.value); setDeliveryMethod("home"); resetPickup(); }}><optgroup label={english ? "European Union" : "Union européenne"}>{EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup></select></div>
+            <div className="field"><label htmlFor="countryCode">{english ? "Country" : "Pays"}</label><select id="countryCode" name="countryCode" value={countryCode} onChange={(event) => { setCountryCode(event.currentTarget.value); setDeliveryMethod("home"); resetPickup(); }}><optgroup label={english ? "European Union" : "Union européenne"}>{EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup><optgroup label={english ? "Outside the EU" : "Hors Union européenne"}>{NON_EU_SHIPPING_COUNTRY_CODES.map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</optgroup></select></div>
           </div>
         </section>
 
         {pickupAvailable ? <section className="checkout-section pickup-section">
           <h2>3. {english ? "Delivery preference" : "Préférence de livraison"}</h2>
           <div className="delivery-methods" role="radiogroup" aria-label={english ? "Delivery preference" : "Préférence de livraison"}>
-            <label className={deliveryMethod === "home" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="deliveryMethod" value="home" checked={deliveryMethod === "home"} onChange={() => { setDeliveryMethod("home"); invalidateQuote(); }} /><span><strong>{english ? "Colissimo — Home Delivery" : "Colissimo — Domicile"}</strong><small>{english ? "Delivered to the address above" : "Livraison à l’adresse indiquée"}</small></span></label>
-            <label className={deliveryMethod === "pickup" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="deliveryMethod" value="pickup" checked={deliveryMethod === "pickup"} onChange={() => { setDeliveryMethod("pickup"); invalidateQuote(); }} /><span><strong>{english ? "Colissimo — Pickup Point" : "Colissimo — Point Retrait"}</strong><small>{english ? "Choose a nearby Colissimo location" : "Choisissez un Point Retrait Colissimo"}</small></span></label>
+            <label className={deliveryMethod === "home" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="deliveryMethod" value="home" checked={deliveryMethod === "home"} onChange={() => { setDeliveryMethod("home"); invalidateQuote(); }} /><span><strong>{english ? "Home delivery" : "Livraison à domicile"}</strong><small>{english ? "Delivered to the address above" : "Livraison à l’adresse indiquée"}</small></span></label>
+            <label className={deliveryMethod === "pickup" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="deliveryMethod" value="pickup" checked={deliveryMethod === "pickup"} onChange={() => { setDeliveryMethod("pickup"); invalidateQuote(); }} /><span><strong>{english ? "Pickup point" : "Point relais"}</strong><small>{english ? "Choose a nearby Mondial Relay location" : "Choisissez un relais Mondial Relay"}</small></span></label>
           </div>
           {deliveryMethod === "pickup" ? <div className="pickup-search">
             <button className="button button--light" type="button" onClick={searchForPickupPoints} disabled={pickupBusy}>{pickupBusy ? (english ? "Searching…" : "Recherche…") : (english ? "Find pickup points" : "Rechercher les points relais")}</button>
             {pickupError ? <p className="form-message form-error" role="alert">{pickupError}</p> : null}
             <p className="sr-only" aria-live="polite">{pickupPoints.length ? (english ? `${pickupPoints.length} pickup points found.` : `${pickupPoints.length} points relais trouvés.`) : ""}</p>
-            {pickupPoints.length ? <fieldset className="pickup-list"><legend>{english ? "Choose your pickup point" : "Choisissez votre Point Retrait"}</legend>{pickupPoints.map((point) => <label className={selectedPickupPointId === point.id ? "pickup-option is-selected" : "pickup-option"} key={point.id}><input type="radio" name="pickupPoint" value={point.id} checked={selectedPickupPointId === point.id} onChange={() => { setSelectedPickupPointId(point.id); invalidateQuote(); }} /><span><strong>{point.name}</strong><small>Colissimo · {point.locationHint}<br />{pickupAddress(point)}<br />{point.postalCode} {point.city}</small></span>{point.distanceMeters !== null && point.distanceMeters >= 0 ? <span className="pickup-distance">{point.distanceMeters < 1_000 ? `${Math.round(point.distanceMeters)} m` : `${(point.distanceMeters / 1_000).toFixed(1)} km`}</span> : null}</label>)}</fieldset> : null}
+            {pickupPoints.length ? <fieldset className="pickup-list"><legend>{english ? "Choose your pickup point" : "Choisissez votre point relais"}</legend>{pickupPoints.map((point) => <label className={selectedPickupPointId === point.id ? "pickup-option is-selected" : "pickup-option"} key={point.id}><input type="radio" name="pickupPoint" value={point.id} checked={selectedPickupPointId === point.id} onChange={() => { setSelectedPickupPointId(point.id); invalidateQuote(); }} /><span><strong>{point.name}</strong><small>{pickupCarrierLabel(point.network)} · {point.locationHint}<br />{pickupAddress(point)}<br />{point.postalCode} {point.city}</small></span>{point.distanceMeters !== null && point.distanceMeters >= 0 ? <span className="pickup-distance">{point.distanceMeters < 1_000 ? `${Math.round(point.distanceMeters)} m` : `${(point.distanceMeters / 1_000).toFixed(1)} km`}</span> : null}</label>)}</fieldset> : null}
           </div> : null}
         </section> : null}
 
         {hasUnavailableItems ? <p className="form-message form-error" role="alert">{english ? "The stock for an item has changed." : "Le stock d’un produit a changé."} <Link to={english ? "/en/cart" : "/panier"}>{english ? "Update cart" : "Mettre à jour le panier"}</Link></p> : null}
         <button className="button button--dark" type="submit" disabled={busy || !cartId || hasUnavailableItems}>{busy ? (english ? "Calculating…" : "Calcul…") : (english ? "Calculate shipping" : "Calculer la livraison")}</button>
         {error ? <p className="form-message form-error" role="alert">{error}</p> : null}
-        {quote?.rates?.length ? <section className="checkout-section shipping-rates"><h2>{pickupAvailable ? "4" : "3"}. {english ? "Delivery service" : "Mode de livraison"}</h2><div className="rate-list">{quote.rates.map((rate) => <label className="rate-option" key={rate.id}><input type="radio" name="shippingRate" checked={selectedRate === rate.id} onChange={() => setSelectedRate(rate.id)} /><span className="rate-option__details"><strong>{shippingRateLabel(rate, locale)}</strong><br /><small>{rate.estimatedDays ? `${rate.estimatedDays} ${english ? "business days" : "jours ouvrés"}` : ""}{rate.pickupPoint ? `${rate.estimatedDays ? " · " : ""}${rate.pickupPoint.name}` : ""}</small></span><span className="rate-option__price"><strong>{formatMoney(rate.amountCents, locale)}</strong>{shippingRatePromotionLabel(rate, locale) ? <small className="shipping-free-label">{shippingRatePromotionLabel(rate, locale)}</small> : null}</span></label>)}</div></section> : null}
-        {quote?.rates?.length ? <section className="checkout-section checkout-payment-method"><h2>{pickupAvailable ? "5" : "4"}. {english ? "Payment method" : "Mode de paiement"}</h2><div className="delivery-methods" role="radiogroup" aria-label={english ? "Payment method" : "Mode de paiement"}><label className={paymentMethod === "stripe" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="paymentMethod" value="stripe" checked={paymentMethod === "stripe"} onChange={() => setPaymentMethod("stripe")} /><span><strong>{english ? "Card" : "Carte bancaire"}</strong><small>Stripe</small></span></label>{paypalAvailable ? <label className={paymentMethod === "paypal" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="paymentMethod" value="paypal" checked={paymentMethod === "paypal"} onChange={() => setPaymentMethod("paypal")} /><span><strong>PayPal</strong><small>{english ? "Pay securely with PayPal" : "Payer avec PayPal"}</small></span></label> : null}</div></section> : null}
+        {quote?.rates?.length ? <section className="checkout-section shipping-rates"><h2>{pickupAvailable ? "4" : "3"}. {english ? "Delivery service" : "Mode de livraison"}</h2><div className="rate-list">{quote.rates.map((rate) => <label className="rate-option" key={rate.id}><input type="radio" name="shippingRate" checked={selectedRate === rate.id} onChange={() => setSelectedRate(rate.id)} /><span className="rate-option__details"><strong>{shippingRateLabel(rate)}</strong><br /><small>{rate.estimatedDays ? `${rate.estimatedDays} ${english ? "business days" : "jours ouvrés"}` : ""}{rate.pickupPoint ? `${rate.estimatedDays ? " · " : ""}${rate.pickupPoint.name}` : ""}</small></span><span className="rate-option__price"><strong>{formatMoney(rate.amountCents, locale)}</strong>{shippingRatePromotionLabel(rate, locale) ? <small className="shipping-free-label">{shippingRatePromotionLabel(rate, locale)}</small> : null}</span></label>)}</div></section> : null}
       </form>
 
-      <aside className="summary-card"><h2>{english ? "Your order" : "Votre commande"}</h2>{resolved.map(({ line, product, variant, offer }) => <div className="summary-row" key={variant.id}><span>{line.quantity} × {product.translations[locale].name} · {variant.label}</span><strong>{formatMoney(line.quantity * offer.price.amount, locale)}</strong></div>)}<div className="summary-row"><span>{english ? "Subtotal" : "Sous-total"}</span><strong>{formatMoney(subtotal, locale)}</strong></div><div className="summary-row"><span>{english ? "Shipping" : "Livraison"}</span><span className="summary-shipping-price"><strong>{selectedShippingRate ? formatMoney(selectedShippingRate.amountCents, locale) : "—"}</strong>{selectedShippingRate && shippingRatePromotionLabel(selectedShippingRate, locale) ? <small className="shipping-free-label">{shippingRatePromotionLabel(selectedShippingRate, locale)}</small> : null}</span></div><div className="summary-row summary-total"><span>Total</span><strong>{formatMoney(subtotal + (selectedShippingRate?.amountCents ?? 0), locale)}</strong></div><p><small>{english ? "By paying, you accept the terms and conditions." : "En payant, vous acceptez les conditions générales de vente."}</small></p><button className="button button--dark" type="button" onClick={pay} disabled={!selectedRate || busy}>{english ? "Pay securely" : "Payer en toute sécurité"}</button></aside>
+      <aside className="summary-card"><h2>{english ? "Your order" : "Votre commande"}</h2>{resolved.map(({ line, product, variant, offer }) => <div className="summary-row" key={variant.id}><span>{line.quantity} × {product.translations[locale].name} · {variant.label}</span><strong>{formatMoney(line.quantity * offer.price.amount, locale)}</strong></div>)}<div className="summary-row"><span>{english ? "Subtotal" : "Sous-total"}</span><strong>{formatMoney(subtotal, locale)}</strong></div><div className="summary-row"><span>{english ? "Shipping" : "Livraison"}</span><span className="summary-shipping-price"><strong>{selectedShippingRate ? formatMoney(selectedShippingRate.amountCents, locale) : "—"}</strong>{selectedShippingRate && shippingRatePromotionLabel(selectedShippingRate, locale) ? <small className="shipping-free-label">{shippingRatePromotionLabel(selectedShippingRate, locale)}</small> : null}</span></div><div className="summary-row summary-total"><span>Total</span><strong>{formatMoney(subtotal + (selectedShippingRate?.amountCents ?? 0), locale)}</strong></div><p><small>{english ? "By paying, you accept the terms and acknowledge that UK duties remain payable by the recipient." : "En payant, vous acceptez les CGV. Les éventuels droits au Royaume-Uni restent à la charge du destinataire."}</small></p><button className="button button--dark" type="button" onClick={pay} disabled={!selectedRate || busy}>{english ? "Pay securely" : "Payer en toute sécurité"}</button></aside>
     </div>
   </>;
 }

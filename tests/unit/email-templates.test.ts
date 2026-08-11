@@ -16,8 +16,8 @@ describe("transactional email templates", () => {
       order_number: "ZCL-2026-000123",
       locale: "fr-FR",
       shipping_address: { line1: "1 rue du Café <script>", postalCode: "37000", city: "Tours" },
-      shipping_carrier: "Colissimo",
-      shipping_service: "Domicile",
+      shipping_carrier: "FedEx",
+      shipping_service: "Priority",
       subtotal_cents: 1_300,
       shipping_charged_cents: 950,
       total_cents: 2_250,
@@ -27,7 +27,6 @@ describe("transactional email templates", () => {
     expect(email.subject).toContain("Commande confirmée");
     expect(email.html).toContain("Éthiopie — Aricha");
     expect(email.html).toContain("22,50");
-    expect(email.html).toContain("Colissimo — Domicile");
     expect(email.html).toContain("&lt;script&gt;");
     expect(email.html).not.toContain("<script>");
   });
