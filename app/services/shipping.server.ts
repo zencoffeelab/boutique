@@ -3,12 +3,12 @@ import { randomUUID } from "node:crypto";
 import type { Audience, Locale, PackedParcel, PickupPoint, ResolvedCartLine, ShippingRate } from "~/domain/types";
 import { packCartByWeight } from "~/domain/packing";
 import { freeShippingThresholdCents } from "~/domain/money";
-import { configuredShippingServicesForDelivery, customerShippingPriceCents, type ConfiguredShippingService } from "~/domain/shipping-zones";
+import { configuredShippingServicesForDelivery, customerShippingPriceCents, type ConfiguredShippingService, type ShippingTariffs } from "~/domain/shipping-zones";
 import { getPackagingPresets, resolveCartLines } from "~/lib/catalog.server";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { getPickupPointById } from "~/services/pickup-points.server";
-import { getFreeShippingThresholds } from "~/services/site-settings.server";
+import { getFreeShippingThresholds, getShippingTariffs } from "~/services/site-settings.server";
 
 export type QuoteAddress = {
   firstName: string; lastName: string; company?: string; email: string; phone: string;
@@ -37,7 +37,7 @@ type SendcloudOption = {
 
 const localQuotes = new Map<string, ShippingQuoteRecord>();
 
-async function mockRates(parcels: PackedParcel[], subtotalCents: number, countryCode: string, pickupPoint?: PickupPoint): Promise<StoredRate[]> {
+async function mockRates(parcels: PackedParcel[], subtotalCents: number, countryCode: string, pickupPoint: PickupPoint | undefined, tariffs: ShippingTariffs): Promise<StoredRate[]> {
   const totalWeight = parcels.reduce((sum, parcel) => sum + parcel.shippingWeightGrams, 0);
   const deliveryMethod = pickupPoint ? "pickup" : "home";
   const services = configuredShippingServicesForDelivery(countryCode, deliveryMethod);
@@ -48,7 +48,7 @@ async function mockRates(parcels: PackedParcel[], subtotalCents: number, country
     colissimo: { carrier: "Colissimo", service: "International", days: 5 },
   };
   const rates = services.flatMap((service) => {
-    const amountCents = customerShippingPriceCents(countryCode, service, totalWeight);
+    const amountCents = customerShippingPriceCents(countryCode, service, totalWeight, tariffs);
     if (amountCents === null) return [];
     const details = metadata[service];
     return [{
@@ -132,7 +132,7 @@ async function sendcloudOptionsForParcel(parcel: PackedParcel, address: QuoteAdd
   });
 }
 
-async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, pickupPoint?: PickupPoint): Promise<StoredRate[]> {
+async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, pickupPoint: PickupPoint | undefined, tariffs: ShippingTariffs): Promise<StoredRate[]> {
   const optionsByParcel = await Promise.all(parcels.map((parcel) => sendcloudOptionsForParcel(parcel, address, pickupPoint)));
   if (optionsByParcel.some((options) => options.length === 0)) throw new Error("No matching Sendcloud service is available for this parcel.");
 
@@ -173,7 +173,7 @@ async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, pi
   const selectedByService = new Map<ConfiguredShippingService, StoredRate>();
   for (const rate of rates) {
     const service = rate.configuredService;
-    if (!service || customerShippingPriceCents(address.countryCode, service, totalWeight) === null) continue;
+    if (!service || customerShippingPriceCents(address.countryCode, service, totalWeight, tariffs) === null) continue;
     const selected = selectedByService.get(service);
     const actualCost = rate.sendcloudParcelAmountsCents?.reduce((sum, amount) => sum + amount, 0) ?? Number.POSITIVE_INFINITY;
     const selectedCost = selected?.sendcloudParcelAmountsCents?.reduce((sum, amount) => sum + amount, 0) ?? Number.POSITIVE_INFINITY;
@@ -184,7 +184,7 @@ async function sendcloudRates(parcels: PackedParcel[], address: QuoteAddress, pi
   const orderedServices = configuredShippingServicesForDelivery(address.countryCode, pickupPoint ? "pickup" : "home");
   return orderedServices.flatMap((service) => {
     const rate = selectedByService.get(service);
-    const amountCents = customerShippingPriceCents(address.countryCode, service, totalWeight);
+    const amountCents = customerShippingPriceCents(address.countryCode, service, totalWeight, tariffs);
     return rate && amountCents !== null ? [{ ...rate, amountCents }] : [];
   });
 }
@@ -208,10 +208,11 @@ export async function createShippingQuote(input: { cartId: string; locale: Local
   const subtotalCents = lines.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0);
   const parcels = packCartByWeight(lines, await getPackagingPresets());
   const pickupPoint = input.pickupPointId ? await getPickupPointById({ id: input.pickupPointId, locale: input.locale, countryCode: input.address.countryCode }) : undefined;
+  const tariffs = await getShippingTariffs();
   let rates: StoredRate[];
-  if (env().SHIPPING_MOCK) rates = await mockRates(parcels, subtotalCents, input.address.countryCode, pickupPoint);
+  if (env().SHIPPING_MOCK) rates = await mockRates(parcels, subtotalCents, input.address.countryCode, pickupPoint, tariffs);
   else {
-    rates = await applyFreeShipping(await sendcloudRates(parcels, input.address, pickupPoint), input.address.countryCode, subtotalCents);
+    rates = await applyFreeShipping(await sendcloudRates(parcels, input.address, pickupPoint, tariffs), input.address.countryCode, subtotalCents);
   }
   if (rates.length === 0) throw new Error("No matching shipping service is available for all parcels.");
   const quote: ShippingQuoteRecord = { id: randomUUID(), cartId: input.cartId, locale: input.locale, audience: input.audience, address: input.address, lines, parcels, rates, subtotalCents, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() };

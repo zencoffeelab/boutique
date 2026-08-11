@@ -80,7 +80,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
   const client = createServiceSupabase();
   const [ordersResult, addressesResult, professionalQuotesResult] = await Promise.all([
-    client ? client.from("orders").select("id,order_number,status,total_cents,created_at,paid_at,shipments(carrier,tracking_number,tracking_url,status)").eq("profile_id", viewer.user.id).order("created_at", { ascending: false }).limit(50) : Promise.resolve({ data: [] }),
+    client ? client.from("orders").select("id,order_number,status,total_cents,created_at,paid_at,shipments(carrier,tracking_number,tracking_url,status)").eq("profile_id", viewer.user.id).neq("status", "pending_payment").order("created_at", { ascending: false }).limit(50) : Promise.resolve({ data: [] }),
     client ? client.from("addresses").select("*").eq("profile_id", viewer.user.id).order("created_at") : Promise.resolve({ data: [] }),
     client && viewer.profile?.professional_status === "approved" ? client.from("professional_quotes").select("id,quote_number,status,total_weight_kg,total_cents,valid_until,paid_at,created_at").eq("profile_id", viewer.user.id).order("created_at", { ascending: false }).limit(50) : Promise.resolve({ data: [] }),
   ]);

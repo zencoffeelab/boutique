@@ -38,6 +38,7 @@ export function createRequestSupabase(request: Request) {
   const responseHeaders = new Headers();
   const requestCookies = parseCookies(request.headers.get("cookie"));
   const client = createServerClient(config.VITE_SUPABASE_URL, config.VITE_SUPABASE_ANON_KEY, {
+    auth: { flowType: "implicit" },
     cookies: {
       getAll: () => requestCookies,
       setAll: (cookies) => {

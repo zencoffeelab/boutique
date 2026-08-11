@@ -6,7 +6,8 @@ import { Form, useActionData, useLoaderData } from "react-router";
 import { AdminShell } from "~/components/admin-shell";
 import { requireAdmin } from "~/lib/auth.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
-import { getFreeShippingThresholds, saveFreeShippingThresholds } from "~/services/site-settings.server";
+import { DEFAULT_SHIPPING_TARIFFS, type ConfiguredShippingService, type ShippingTariffs, type ShippingZone } from "~/domain/shipping-zones";
+import { getFreeShippingThresholds, getShippingTariffs, saveFreeShippingThresholds, saveShippingTariffs } from "~/services/site-settings.server";
 
 type PackagingPresetRow = {
   id: string;
@@ -34,18 +35,45 @@ const presetSchema = z.object({
 const deletePresetSchema = z.object({ intent: z.literal("delete_preset"), id: z.uuid() });
 const thresholdsSchema = z.object({ intent: z.literal("save_thresholds"), france: z.coerce.number().finite().nonnegative().max(100_000), europe: z.coerce.number().finite().nonnegative().max(100_000) });
 
+const shippingZoneRows: Array<{ zone: ShippingZone; countries: string; services: Array<{ id: ConfiguredShippingService; label: string }> }> = [
+  { zone: 1, countries: "France", services: [{ id: "mondial_relay", label: "Mondial Relay" }, { id: "fedex", label: "FedEx" }] },
+  { zone: 2, countries: "Allemagne, Belgique, Luxembourg, Pays-Bas", services: [{ id: "mondial_relay", label: "Mondial Relay" }, { id: "fedex", label: "FedEx" }, { id: "fedex_signature", label: "FedEx avec signature" }] },
+  { zone: 3, countries: "Autriche, Danemark, Espagne, Finlande, Irlande, Italie, Pologne, Portugal, Royaume-Uni, Suède", services: [{ id: "mondial_relay", label: "Mondial Relay" }, { id: "fedex", label: "FedEx" }, { id: "fedex_signature", label: "FedEx avec signature" }] },
+  { zone: 4, countries: "Bulgarie, Croatie, Estonie, Grèce, Hongrie, Lettonie, Lituanie, Roumanie, Slovaquie, Slovénie, Suisse, Tchéquie", services: [{ id: "fedex", label: "FedEx" }] },
+  { zone: 5, countries: "Chypre, Liechtenstein, Malte, Norvège", services: [{ id: "colissimo", label: "Colissimo" }] },
+];
+
+function parseShippingTariffs(form: Record<string, FormDataEntryValue>): ShippingTariffs | null {
+  const tariffs = {} as Record<number, Record<string, [number, number, number | null]>>;
+  for (const row of shippingZoneRows) {
+    tariffs[row.zone] = {};
+    for (const service of row.services) {
+      const prices: [number, number, number | null] = [0, 0, null];
+      for (const [index, weight] of [1000, 2000, 2001].entries()) {
+        const raw = form[`zone_${row.zone}_${service.id}_${weight}`];
+        if (raw === undefined || raw === "") { if (index < 2) return null; prices[index] = null; continue; }
+        const euros = Number(raw);
+        if (!Number.isFinite(euros) || euros < 0 || euros > 100_000) return null;
+        prices[index] = Math.round(euros * 100);
+      }
+      tariffs[row.zone][service.id] = prices;
+    }
+  }
+  return tariffs as unknown as ShippingTariffs;
+}
+
 export function canDeletePackagingPreset(presetActive: boolean, activePresetCount: number) {
   return !presetActive || activePresetCount > 1;
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
-  if (admin.demo) return { demo: true, presets: [] as PackagingPresetRow[], thresholds: await getFreeShippingThresholds() };
+  if (admin.demo) return { demo: true, presets: [] as PackagingPresetRow[], thresholds: await getFreeShippingThresholds(), tariffs: DEFAULT_SHIPPING_TARIFFS };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
   const { data, error } = await client.from("packaging_presets").select("*").order("max_net_weight_grams");
   if (error) throw new Response(error.message, { status: 500 });
-  return { demo: false, presets: (data ?? []) as PackagingPresetRow[], thresholds: await getFreeShippingThresholds() };
+  return { demo: false, presets: (data ?? []) as PackagingPresetRow[], thresholds: await getFreeShippingThresholds(), tariffs: await getShippingTariffs() };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -63,6 +91,17 @@ export async function action({ request }: ActionFunctionArgs) {
       return { ok: true, message: "Seuils de livraison gratuite enregistrés." };
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : "Seuils non enregistrés." };
+    }
+  }
+
+  if (form.intent === "save_tariffs") {
+    const tariffs = parseShippingTariffs(form);
+    if (!tariffs) return { ok: false, message: "Chaque tarif doit être un montant en euros valide." };
+    try {
+      await saveShippingTariffs(tariffs, admin.id);
+      return { ok: true, message: "Tarifs de livraison enregistrés." };
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : "Tarifs non enregistrés." };
     }
   }
 
@@ -115,6 +154,10 @@ function PresetForm({ preset, demo }: { preset?: PackagingPresetRow; demo: boole
   </Form>;
 }
 
+function ShippingTariffGrid({ tariffs, demo }: { tariffs: ShippingTariffs; demo: boolean }) {
+  return <section className="ui-card admin-editor"><h2>Coûts de livraison par zone</h2><p>Les montants sont facturés au client selon le poids total du colis. Modifiez-les directement puis enregistrez la grille.</p><Form method="post"><input type="hidden" name="intent" value="save_tariffs" />{shippingZoneRows.map((row) => <fieldset key={row.zone} className="shipping-tariff-zone"><legend>Zone {row.zone}</legend><p className="admin-form-hint">{row.countries}</p><div className="admin-help-table-wrap"><table className="admin-help-table"><thead><tr><th>Service</th><th>Jusqu’à 1 kg (€)</th><th>1 à 2 kg (€)</th><th>Au-delà de 2 kg (€)</th></tr></thead><tbody>{row.services.map((service) => <tr key={service.id}><th scope="row">{service.label}</th>{[0, 1, 2].map((index) => { const price = tariffs[row.zone][service.id]?.[index] ?? null; return <td key={index}><input aria-label={`${service.label}, zone ${row.zone}, palier ${index + 1}`} name={`zone_${row.zone}_${service.id}_${index === 0 ? 1000 : index === 1 ? 2000 : 2001}`} type="number" min="0" step="0.01" defaultValue={price === null ? "" : (price / 100).toFixed(2)} disabled={demo} /></td>; })}</tr>)}</tbody></table></div></fieldset>)}<button className="ui-button ui-button--default" type="submit" disabled={demo}>Enregistrer les coûts de livraison</button></Form></section>;
+}
+
 export function ShippingHelp({ presets, thresholds }: { presets: PackagingPresetRow[]; thresholds: { fr: number; euUk: number } }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const euros = (cents: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(cents / 100);
@@ -136,7 +179,7 @@ export function ShippingHelp({ presets, thresholds }: { presets: PackagingPreset
 }
 
 export default function AdminShipping() {
-  const { demo, presets, thresholds } = useLoaderData<typeof loader>();
+  const { demo, presets, thresholds, tariffs } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const activePresetCount = presets.filter((preset) => preset.active).length;
   return <AdminShell active="shipping">
@@ -144,6 +187,7 @@ export default function AdminShipping() {
     {demo ? <p className="admin-notice">Connectez Supabase pour modifier les emballages.</p> : null}
     {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
     <section className="ui-card admin-editor"><h2>Seuils de livraison gratuite</h2><p>Modifiez les montants à partir desquels la livraison la moins chère devient gratuite.</p><Form method="post" className="form-grid"><input type="hidden" name="intent" value="save_thresholds" /><div className="field"><label>France (€)<input name="france" type="number" min="0" max="100000" step="0.01" defaultValue={(thresholds.fr / 100).toFixed(2)} required /></label></div><div className="field"><label>Europe et Royaume-Uni (€)<input name="europe" type="number" min="0" max="100000" step="0.01" defaultValue={(thresholds.euUk / 100).toFixed(2)} required /></label></div><div><button className="ui-button ui-button--default" type="submit" disabled={demo}>Enregistrer les seuils</button></div></Form></section>
+    <ShippingTariffGrid tariffs={tariffs} demo={demo} />
     <section className="admin-content-list" aria-label="Emballages">{presets.map((preset) => {
       const canDelete = canDeletePackagingPreset(preset.active, activePresetCount);
       return <details className="ui-card admin-content-page" key={preset.id}><summary><strong>{preset.name}</strong><span className="ui-badge">{preset.active ? "actif" : "inactif"}</span></summary><PresetForm preset={preset} demo={demo} /><Form method="post" className="admin-delete-form" onSubmit={(event) => { if (!window.confirm(`Supprimer définitivement l’emballage « ${preset.name} » ?`)) event.preventDefault(); }}><input type="hidden" name="intent" value="delete_preset" /><input type="hidden" name="id" value={preset.id} /><button className="ui-button ui-button--danger ui-button--sm" type="submit" disabled={demo || !canDelete} title={!canDelete ? "Activez d’abord un autre emballage" : undefined}><Trash2 aria-hidden="true" /> Supprimer l’emballage</button></Form></details>;

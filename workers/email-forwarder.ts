@@ -73,6 +73,25 @@ function supabaseHeaders(env: EmailForwardingEnv, extra?: HeadersInit) {
   };
 }
 
+export function classifyIncomingEmail(input: { senderAddress: string; recipientAddresses: string[]; subject: string; text: string }) {
+  const searchable = `${input.subject} ${input.text}`.toLocaleLowerCase("en-US");
+  if (/(mailer-daemon|postmaster|no-?reply|no.?reply|bounce|delivery status|undeliverable|erreur|error|failed|failure)/i.test(`${input.senderAddress} ${input.subject}`) || /(exception|stack trace|http 5\d\d|delivery failed|échec de livraison|erreur système)/i.test(searchable)) return "Erreur";
+  if (/(system|système|notification|automated|automatique|cron|stripe|sendcloud|supabase|cloudflare)/i.test(`${input.senderAddress} ${searchable}`)) return "Système";
+  const professional = /(professionnel|entreprise|société|siret|tva|facture pro|devis|grossiste|revendeur|wholesale|company|business|vat|invoice)/i.test(searchable);
+  const siteMessage = input.recipientAddresses.some((address) => /@(?:www\.)?zencoffeelab\.com$/i.test(address));
+  return `${siteMessage ? "Site" : "Extérieur"} · Client ${professional ? "professionnel" : "particulier"}`;
+}
+
+async function classificationLabelId(env: EmailForwardingEnv, name: string) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/admin_mail_labels`);
+  url.searchParams.set("name", `eq.${name}`);
+  url.searchParams.set("select", "id");
+  const response = await fetch(url, { headers: supabaseHeaders(env) });
+  if (!response.ok) return null;
+  return ((await response.json()) as Array<{ id: string }>)[0]?.id ?? null;
+}
+
 async function persistAttachments(env: EmailForwardingEnv, messageId: string, attachments: Attachment[]) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || attachments.length === 0) return;
   const rows: Array<{ message_id: string; filename: string; mime_type: string; size_bytes: number; storage_path: string }> = [];
@@ -109,6 +128,8 @@ export async function persistIncomingEmail(message: ForwardableEmail, env: Email
   if (recipients.length === 0 && message.to) recipients.push({ name: "", address: message.to.toLocaleLowerCase("en-US") });
   const messageIdHeader = (parsed.messageId || message.headers?.get("message-id") || await stableMessageId(raw)).slice(0, 998);
   const receivedDate = parsed.date && !Number.isNaN(Date.parse(parsed.date)) ? new Date(parsed.date).toISOString() : new Date().toISOString();
+  const classification = classifyIncomingEmail({ senderAddress: sender.address, recipientAddresses: recipients.map((recipient) => recipient.address), subject: parsed.subject?.trim() || "", text: parsed.text?.trim() || htmlToPlainText(parsed.html) });
+  const labelId = await classificationLabelId(env, classification);
   const body = {
     direction: "inbound",
     sender_name: sender.name || null,
@@ -122,6 +143,7 @@ export async function persistIncomingEmail(message: ForwardableEmail, env: Email
     message_id_header: messageIdHeader,
     in_reply_to_header: parsed.inReplyTo?.slice(0, 998) || null,
     references_header: parsed.references?.slice(0, 4_000) || null,
+    label_id: labelId,
     is_read: false,
     raw_size: message.rawSize ?? raw.byteLength,
     received_at: receivedDate,

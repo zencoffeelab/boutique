@@ -1,9 +1,21 @@
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
+import { DEFAULT_SHIPPING_TARIFFS, type ConfiguredShippingService, type ShippingTariffs, type ShippingZone } from "~/domain/shipping-zones";
 
 export type FreeShippingThresholds = { fr: number; euUk: number };
 
 const settingKeys = ["free_shipping_fr_cents", "free_shipping_eu_uk_cents"] as const;
+const shippingTariffSettingKey = "shipping_tariffs";
+const shippingServices: ConfiguredShippingService[] = ["mondial_relay", "fedex", "fedex_signature", "colissimo"];
+
+function validTariffs(value: unknown): value is ShippingTariffs {
+  if (!value || typeof value !== "object") return false;
+  return [1, 2, 3, 4, 5].every((zone) => {
+    const zoneTariffs = (value as Record<string, unknown>)[zone];
+    if (!zoneTariffs || typeof zoneTariffs !== "object") return false;
+    return Object.entries(zoneTariffs).every(([service, prices]) => shippingServices.includes(service as ConfiguredShippingService) && Array.isArray(prices) && prices.length === 3 && prices.every((price) => price === null || (typeof price === "number" && Number.isSafeInteger(price) && price >= 0)));
+  });
+}
 
 function environmentThresholds(): FreeShippingThresholds {
   const config = env();
@@ -35,4 +47,20 @@ export async function saveFreeShippingThresholds(thresholds: FreeShippingThresho
   ], { onConflict: "key" });
   if (error) throw new Error(error.message);
   await client.from("audit_log").insert({ actor_id: actorId, action: "shipping.thresholds.updated", entity_type: "site_settings", entity_id: "free_shipping_thresholds", before_data: before, after_data: thresholds });
+}
+
+export async function getShippingTariffs(): Promise<ShippingTariffs> {
+  const client = createServiceSupabase();
+  if (!client) return DEFAULT_SHIPPING_TARIFFS;
+  const { data, error } = await client.from("site_settings").select("value").eq("key", shippingTariffSettingKey).maybeSingle();
+  return !error && validTariffs(data?.value) ? data.value : DEFAULT_SHIPPING_TARIFFS;
+}
+
+export async function saveShippingTariffs(tariffs: ShippingTariffs, actorId: string) {
+  const client = createServiceSupabase();
+  if (!client) throw new Error("Base indisponible.");
+  const before = await getShippingTariffs();
+  const { error } = await client.from("site_settings").upsert({ key: shippingTariffSettingKey, value: tariffs }, { onConflict: "key" });
+  if (error) throw new Error(error.message);
+  await client.from("audit_log").insert({ actor_id: actorId, action: "shipping.tariffs.updated", entity_type: "site_settings", entity_id: shippingTariffSettingKey, before_data: before, after_data: tariffs });
 }

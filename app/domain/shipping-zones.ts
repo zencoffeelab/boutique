@@ -2,6 +2,17 @@ export type ShippingZone = 1 | 2 | 3 | 4 | 5;
 export type ConfiguredShippingService = "mondial_relay" | "fedex" | "fedex_signature" | "colissimo";
 export type ShippingDeliveryMethod = "home" | "pickup";
 
+export type ShippingTariff = readonly [number, number, number | null];
+export type ShippingTariffs = Readonly<Record<ShippingZone, Partial<Record<ConfiguredShippingService, ShippingTariff>>>>;
+
+export const DEFAULT_SHIPPING_TARIFFS: ShippingTariffs = {
+  1: { mondial_relay: [390, 490, null], fedex: [950, 950, 950] },
+  2: { mondial_relay: [450, 550, 750], fedex: [850, 850, 850], fedex_signature: [1150, 1150, 1150] },
+  3: { mondial_relay: [650, 750, 950], fedex: [990, 990, 990], fedex_signature: [1290, 1290, 1290] },
+  4: { fedex: [1190, 1190, 1190] },
+  5: { colissimo: [1650, 1850, 2050] },
+};
+
 export const PICKUP_SHIPPING_COUNTRY_CODES = ["FR", "DE", "BE", "LU", "NL"] as const;
 
 const countryZones: Readonly<Record<string, ShippingZone>> = {
@@ -46,17 +57,9 @@ export function configuredShippingServicesForDelivery(countryCode: string, deliv
   return zone === 1 || zone === 2 ? services.filter((service) => service !== "mondial_relay") : services;
 }
 
-export function customerShippingPriceCents(countryCode: string, service: ConfiguredShippingService, weightGrams: number): number | null {
+export function customerShippingPriceCents(countryCode: string, service: ConfiguredShippingService, weightGrams: number, tariffs: ShippingTariffs = DEFAULT_SHIPPING_TARIFFS): number | null {
   const zone = shippingZoneForCountry(countryCode);
   if (zone === null || !zoneServices[zone].includes(service)) return null;
-  if (service === "mondial_relay") {
-    if (zone === 1) return tierPrice(weightGrams, [390, 490, null]);
-    if (zone === 2) return tierPrice(weightGrams, [450, 550, 750]);
-    if (zone === 3) return tierPrice(weightGrams, [650, 750, 950]);
-    return null;
-  }
-  if (service === "fedex") return zone === 1 ? 950 : zone === 2 ? 850 : zone === 3 ? 990 : zone === 4 ? 1_190 : null;
-  if (service === "fedex_signature") return zone === 2 ? 1_150 : zone === 3 ? 1_290 : null;
-  if (service === "colissimo" && zone === 5) return tierPrice(weightGrams, [1_650, 1_850, 2_050]);
-  return null;
+  const prices = tariffs[zone][service];
+  return prices ? tierPrice(weightGrams, prices) : null;
 }

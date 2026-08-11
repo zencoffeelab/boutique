@@ -16,7 +16,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
   const client = admin.demo ? null : createServiceSupabase();
   const dashboardData = client ? Promise.all([
-    client.from("orders").select("id,order_number,email,subtotal_cents,shipping_charged_cents,total_cents,cost_of_goods_cents,actual_shipping_cost_cents,stripe_fee_cents,status,created_at").order("created_at", { ascending: false }).limit(50),
+    client.from("orders").select("id,order_number,email,subtotal_cents,shipping_charged_cents,total_cents,cost_of_goods_cents,actual_shipping_cost_cents,stripe_fee_cents,status,created_at").neq("status", "pending_payment").order("created_at", { ascending: false }).limit(50),
     client.from("professional_applications").select("id").eq("status", "pending"),
     client.rpc("commerce_dashboard_stats"),
     client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound").eq("is_read", false),

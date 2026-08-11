@@ -7120,9 +7120,66 @@ body.advice-detail-overflow-hidden {
   max-height: 50rem;
   overflow-y: auto;
 }
+.admin-order-cart-indicator {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0.7rem 0 0;
+  color: #66705f;
+}
+.admin-order-cart-indicator strong {
+  color: var(--green-deep);
+  font: 800 1.35rem/1 var(--sans);
+}
+.admin-order-cart-indicator span {
+  font-size: 0.78rem;
+}
+
+.admin-mail-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: flex-end;
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid #d5dbd1;
+}
+
+.admin-mail-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-right: auto;
+  color: #4e594a;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.admin-mail-select-all input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--green-deep);
+}
+
+.admin-mail-list__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: stretch;
+  border-bottom: 1px solid #dfe2dc;
+}
+
+.admin-mail-list__checkbox {
+  width: 1rem;
+  height: 1rem;
+  margin: 1.1rem 0.15rem 0 0.8rem;
+  accent-color: var(--green-deep);
+}
 
 .admin-mail-open-form {
   margin: 0;
+}
+
+.admin-mail-list__row .admin-mail-open-form {
+  min-width: 0;
 }
 
 .admin-mail-item {

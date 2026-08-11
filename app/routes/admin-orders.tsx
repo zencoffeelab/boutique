@@ -34,12 +34,14 @@ const updateSchema = z.object({
   notes: z.string().max(5_000).default(""),
 });
 
+const validatedOrderStatuses = ["paid", "preparing", "ready_to_ship", "shipped", "delivered", "partially_refunded", "refunded"] as const;
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
   const url = new URL(request.url);
   const search = url.searchParams.get("q")?.trim() ?? "";
   const status = url.searchParams.get("status") ?? "";
-  if (admin.demo) return { demo: true, orders: [], search, status };
+  if (admin.demo) return { demo: true, orders: [], search, status, cartStats: { unvalidated: 0, total: 0 } };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
   const { error: viewedUpdateError } = await client.from("orders").update({ admin_viewed_at: new Date().toISOString() }).not("paid_at", "is", null).is("admin_viewed_at", null);
@@ -51,6 +53,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let query = client
     .from("orders")
     .select("*,order_lines(*),shipments(*),payments(*)")
+    .neq("status", "pending_payment")
     .order("created_at", { ascending: false })
     .limit(100);
   const safeSearch = search.replace(/[^\p{L}\p{N}@._+\- ]/gu, "").slice(0, 120);
@@ -62,6 +65,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
     );
   const { data, error } = await query;
   if (error) throw new Response(error.message, { status: 500 });
+  const [unvalidatedResult, validatedResult] = await Promise.all([
+    client.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending_payment"),
+    client.from("orders").select("id", { count: "exact", head: true }).in("status", [...validatedOrderStatuses]),
+  ]);
+  const countError = unvalidatedResult.error ?? validatedResult.error;
+  if (countError) throw new Response(countError.message, { status: 500 });
+  const unvalidated = unvalidatedResult.count ?? 0;
+  const validated = validatedResult.count ?? 0;
   const orders = data ?? [];
   const transactionIds = [
     ...new Set(
@@ -104,6 +115,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     })),
     search,
     status,
+    cartStats: { unvalidated, total: unvalidated + validated },
   };
 }
 
@@ -373,14 +385,20 @@ function ShipmentActions({
 }
 
 export default function AdminOrders() {
-  const { demo, orders, search, status } = useLoaderData<typeof loader>();
+  const { demo, orders, search, status, cartStats } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
+  const revalidator = useRevalidator();
+  useEffect(() => {
+    const interval = window.setInterval(() => { if (revalidator.state === "idle") revalidator.revalidate(); }, 15_000);
+    return () => window.clearInterval(interval);
+  }, [revalidator]);
   return (
     <AdminShell active="orders">
       <header className="admin-heading">
         <div>
           <p className="eyebrow">Commerce</p>
           <h1>Commandes</h1>
+          <p className="admin-order-cart-indicator" aria-live="polite"><strong>{cartStats.unvalidated}/{cartStats.total}</strong><span>paniers non validés / commandes validées + paniers non validés</span></p>
         </div>
         <a className="ui-button ui-button--outline" href="/admin/commandes.csv">
           <Download aria-hidden="true" /> Export CSV
@@ -405,7 +423,7 @@ export default function AdminOrders() {
           <span className="sr-only">Statut</span>
           <select name="status" defaultValue={status}>
             <option value="">Tous les statuts</option>
-            {orderStatuses.map((item) => (
+            {orderStatuses.filter((item) => item !== "pending_payment").map((item) => (
               <option key={item}>{item}</option>
             ))}
           </select>

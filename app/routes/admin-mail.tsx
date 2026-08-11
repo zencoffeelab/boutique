@@ -48,6 +48,7 @@ const mailboxContextSchema = z.object({
 const messageActionSchema = mailboxContextSchema.extend({
   messageId: z.uuid(),
 });
+const bulkMessageActionSchema = mailboxContextSchema.extend({ messageIds: z.array(z.uuid()).min(1).max(250) });
 const assignLabelSchema = messageActionSchema.extend({ labelId: z.preprocess((value) => value === "" ? null : value, z.uuid().nullable()) });
 const createLabelSchema = mailboxContextSchema.extend({
   messageId: z.preprocess((value) => value === "" ? undefined : value, z.uuid().optional()),
@@ -227,6 +228,22 @@ export async function action({ request }: ActionFunctionArgs) {
     if (error) return data<MailActionResult>({ ok: false, message: error.message }, { status: 500 });
     await client.from("audit_log").insert({ actor_id: admin.id, action: "admin_mail.deleted", entity_type: "admin_mail_message", entity_id: parsed.data.messageId, before_data: { ...before.data, attachmentCount: storagePaths.length } });
     throw redirect(`${mailboxUrl(parsed.data.view, parsed.data.q, undefined, parsed.data.label)}&confirmation=mail-deleted`);
+  }
+
+  if (intent === "delete_messages") {
+    const parsed = bulkMessageActionSchema.safeParse({ ...Object.fromEntries(form), messageIds: form.getAll("messageIds") });
+    if (!parsed.success) return data<MailActionResult>({ ok: false, message: "Sélectionnez au moins un message à supprimer." }, { status: 422 });
+    const before = await client.from("admin_mail_messages").select("id,direction,sender_address,subject,admin_mail_attachments(storage_path)").in("id", parsed.data.messageIds);
+    if (before.error) return data<MailActionResult>({ ok: false, message: before.error.message }, { status: 500 });
+    const storagePaths = (before.data ?? []).flatMap((message) => Array.isArray(message.admin_mail_attachments) ? message.admin_mail_attachments.flatMap((attachment) => attachment && typeof attachment === "object" && "storage_path" in attachment && typeof attachment.storage_path === "string" ? [attachment.storage_path] : []) : []);
+    if (storagePaths.length > 0) {
+      const removed = await client.storage.from("admin-mail-attachments").remove(storagePaths);
+      if (removed.error) return data<MailActionResult>({ ok: false, message: `Les pièces jointes n’ont pas pu être supprimées : ${removed.error.message}` }, { status: 500 });
+    }
+    const { error } = await client.from("admin_mail_messages").delete().in("id", parsed.data.messageIds);
+    if (error) return data<MailActionResult>({ ok: false, message: error.message }, { status: 500 });
+    await client.from("audit_log").insert({ actor_id: admin.id, action: "admin_mail.bulk_deleted", entity_type: "admin_mail_message", entity_id: "bulk", before_data: { messageIds: parsed.data.messageIds, attachmentCount: storagePaths.length } });
+    throw redirect(`${mailboxUrl(parsed.data.view, parsed.data.q, undefined, parsed.data.label)}&confirmation=mail-bulk-deleted`);
   }
 
   if (intent !== "send_mail") return data<MailActionResult>({ ok: false, message: "Action invalide." }, { status: 400 });
@@ -455,21 +472,32 @@ export default function AdminMail() {
           <label className="admin-mail-search__label-filter"><span className="sr-only">Filtrer par label</span><Tag aria-hidden="true" /><select name="label" defaultValue={labelFilter}><option value="">Tous les labels</option><option value="none">Sans label</option>{labels.map((label) => <option key={label.id} value={label.id}>{label.name}</option>)}</select></label>
           <button className="ui-button ui-button--outline ui-button--sm" type="submit">Rechercher</button>
         </Form>
+        <Form id="mail-bulk-actions" method="post" className="admin-mail-bulk-actions" onSubmit={(event) => { if (!window.confirm("Supprimer définitivement les messages sélectionnés et leurs pièces jointes ?")) event.preventDefault(); }}>
+          <input type="hidden" name="intent" value="delete_messages" />
+          <input type="hidden" name="view" value={view} />
+          <input type="hidden" name="q" value={query} />
+          <input type="hidden" name="label" value={labelFilter} />
+          <label className="admin-mail-select-all"><input type="checkbox" aria-label="Tout sélectionner" onChange={(event) => { document.querySelectorAll<HTMLInputElement>('input[name="messageIds"][form="mail-bulk-actions"]').forEach((checkbox) => { checkbox.checked = event.currentTarget.checked; }); }} /> Tout sélectionner</label>
+          <button className="ui-button ui-button--danger ui-button--sm" type="submit"><Trash2 aria-hidden="true" /> Supprimer la sélection</button>
+        </Form>
         <div className="admin-mail-list__items">
-          {messages.map((message) => <Form method="post" key={message.id} className="admin-mail-open-form">
-            <input type="hidden" name="intent" value="open" />
-            <input type="hidden" name="messageId" value={message.id} />
-            <input type="hidden" name="view" value={view} />
-            <input type="hidden" name="q" value={query} />
-            <input type="hidden" name="label" value={labelFilter} />
-            <button className={`admin-mail-item${selected?.id === message.id && !compose ? " is-active" : ""}${!message.is_read && message.direction === "inbound" ? " is-unread" : ""}`} type="submit">
+          {messages.map((message) => <div className="admin-mail-list__row" key={message.id}>
+            <input className="admin-mail-list__checkbox" type="checkbox" name="messageIds" value={message.id} form="mail-bulk-actions" aria-label={`Sélectionner ${message.subject}`} />
+            <Form method="post" className="admin-mail-open-form">
+              <input type="hidden" name="intent" value="open" />
+              <input type="hidden" name="messageId" value={message.id} />
+              <input type="hidden" name="view" value={view} />
+              <input type="hidden" name="q" value={query} />
+              <input type="hidden" name="label" value={labelFilter} />
+              <button className={`admin-mail-item${selected?.id === message.id && !compose ? " is-active" : ""}${!message.is_read && message.direction === "inbound" ? " is-unread" : ""}`} type="submit">
               <span className="admin-mail-item__top"><strong>{participantLabel(message)}</strong><time dateTime={messageDate(message)}>{dateFormatter.format(new Date(messageDate(message)))}</time></span>
               <span className="admin-mail-item__subject">{message.subject}</span>
               {message.admin_mail_labels ? <MailLabelBadge label={message.admin_mail_labels} /> : null}
               <span className="admin-mail-item__preview">{message.text_body?.slice(0, 120) || "Aucun aperçu disponible"}</span>
               {message.admin_mail_attachments.length > 0 ? <span className="admin-mail-item__attachment"><Paperclip aria-hidden="true" /> {message.admin_mail_attachments.length}</span> : null}
-            </button>
-          </Form>)}
+              </button>
+            </Form>
+          </div>)}
           {messages.length === 0 ? <p className="admin-empty-state">{query || labelFilter ? "Aucun message ne correspond à ces filtres." : view === "inbox" ? "Aucun e-mail reçu pour le moment." : "Aucun e-mail envoyé pour le moment."}</p> : null}
         </div>
       </aside>
