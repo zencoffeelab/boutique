@@ -106,7 +106,7 @@ describe("Shippo Colissimo shipping quotes", () => {
       carrier: "Colissimo",
       service: "Domicile",
       serviceToken: "colissimo_home",
-      amountCents: 887,
+      amountCents: 750,
       shippoRateIds: ["rate-1"],
     });
     expect(shipmentBodies[0]).toMatchObject({ carrier_accounts: ["colissimo-account"], address_to: { country: "FR" }, async: false });
@@ -137,7 +137,7 @@ describe("Shippo Colissimo shipping quotes", () => {
     });
   });
 
-  it("creates one Shippo shipment per parcel and aggregates the real amounts", async () => {
+  it("creates one Shippo shipment per parcel, aggregates the real amounts and applies the commercial rule", async () => {
     useRealShippingEnvironment();
     const { fetchMock } = shippoFetch([650, 725]);
     vi.stubGlobal("fetch", fetchMock);
@@ -145,7 +145,7 @@ describe("Shippo Colissimo shipping quotes", () => {
     const quote = await createShippingQuote({ cartId: crypto.randomUUID(), locale: "fr-FR", audience: "retail", address, lines: [await cartLine(6)] });
 
     expect(quote.parcels).toHaveLength(2);
-    expect(quote.rates[0]).toMatchObject({ amountCents: 1_375, shippoRateIds: ["rate-1", "rate-2"] });
+    expect(quote.rates[0]).toMatchObject({ amountCents: 1_200, shippoRateIds: ["rate-1", "rate-2"] });
     expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/carrier_accounts"))).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/shipments/"))).toHaveLength(2);
   });

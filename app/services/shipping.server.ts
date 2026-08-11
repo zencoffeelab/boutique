@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { Audience, Locale, PackedParcel, PickupPoint, ResolvedCartLine, ShippingRate } from "~/domain/types";
 import { packCartByWeight } from "~/domain/packing";
 import { freeShippingThresholdCents } from "~/domain/money";
+import { adjustShippingPrice } from "~/domain/shipping-pricing";
 import { getPackagingPresets, resolveCartLines } from "~/lib/catalog.server";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { getPickupPointById } from "~/services/pickup-points.server";
-import { getFreeShippingThresholds } from "~/services/site-settings.server";
+import { getFreeShippingThresholds, getShippingPriceRule } from "~/services/site-settings.server";
 import {
   colissimoServiceFor,
   createColissimoRates,
@@ -139,10 +140,24 @@ export async function createShippingQuote(input: {
       weightGrams: maxParcelWeightGrams,
     })
     : undefined;
-  const calculated = env().SHIPPING_MOCK
-    ? mockRate(parcels, input.address.countryCode, pickupPoint)
-    : await shippoRate(parcels, input.address, pickupPoint);
-  const rate = await applyFreeShipping(calculated, input.address.countryCode, subtotalCents);
+  const [calculated, pricingRule] = await Promise.all([
+    env().SHIPPING_MOCK
+      ? Promise.resolve(mockRate(parcels, input.address.countryCode, pickupPoint))
+      : shippoRate(parcels, input.address, pickupPoint),
+    getShippingPriceRule(),
+  ]);
+  const totalWeightGrams = parcels.reduce((sum, parcel) => sum + parcel.shippingWeightGrams, 0);
+  const commercialPrice = adjustShippingPrice({
+    amountCents: calculated.amountCents,
+    countryCode: input.address.countryCode,
+    totalWeightGrams,
+    rule: pricingRule,
+  });
+  const rate = await applyFreeShipping(
+    { ...calculated, amountCents: commercialPrice.amountCents },
+    input.address.countryCode,
+    subtotalCents,
+  );
   const createdAt = new Date().toISOString();
   const quote: ShippingQuoteRecord = {
     id: randomUUID(),
