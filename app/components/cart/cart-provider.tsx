@@ -4,6 +4,21 @@ import type { Audience, CartLine, Locale } from "~/domain/types";
 import { safeJson } from "~/lib/utils";
 
 const storageKey = "zcl:cart:v1";
+export const CART_RETENTION_MS = 30 * 60 * 1000;
+
+type StoredCart = Readonly<{
+  lines: CartLine[];
+  expiresAt: number;
+}>;
+
+function readStoredCart(raw: string | null, now = Date.now()): StoredCart | null {
+  const parsed = safeJson<StoredCart | CartLine[]>(raw, []);
+  const legacyLines = Array.isArray(parsed) ? parsed : parsed.lines;
+  const expiresAt = Array.isArray(parsed) ? now + CART_RETENTION_MS : parsed.expiresAt;
+  if (!Array.isArray(legacyLines) || !Number.isFinite(expiresAt) || expiresAt <= now) return null;
+  const lines = legacyLines.filter((line) => Number.isSafeInteger(line.quantity) && line.quantity > 0);
+  return lines.length > 0 ? { lines, expiresAt } : null;
+}
 
 type CartAddedNotification = Readonly<{
   id: number;
@@ -39,18 +54,43 @@ function CartAddedToast({ notification, locale, onClose }: { notification: CartA
 
 export function CartProvider({ children, locale = "fr-FR" }: { children: ReactNode; locale?: Locale }) {
   const [lines, setLines] = useState<CartLine[]>([]);
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addedNotification, setAddedNotification] = useState<CartAddedNotification | null>(null);
   const notificationId = useRef(0);
   useEffect(() => {
-    const stored = safeJson<CartLine[]>(window.localStorage.getItem(storageKey), []);
-    setLines((current) => current.length > 0 ? current : stored.filter((line) => Number.isSafeInteger(line.quantity) && line.quantity > 0));
+    const stored = readStoredCart(window.localStorage.getItem(storageKey));
+    if (stored) {
+      setLines((current) => current.length > 0 ? current : stored.lines);
+      setExpiresAt(stored.expiresAt);
+    } else {
+      window.localStorage.removeItem(storageKey);
+    }
     setHydrated(true);
   }, []);
   useEffect(() => {
-    if (hydrated) window.localStorage.setItem(storageKey, JSON.stringify(lines));
-  }, [hydrated, lines]);
+    if (!hydrated) return;
+    if (!lines.length || !expiresAt || expiresAt <= Date.now()) {
+      window.localStorage.removeItem(storageKey);
+      return;
+    }
+    window.localStorage.setItem(storageKey, JSON.stringify({ lines, expiresAt } satisfies StoredCart));
+  }, [expiresAt, hydrated, lines]);
+  useEffect(() => {
+    if (!expiresAt) return;
+    const remaining = expiresAt - Date.now();
+    if (remaining <= 0) {
+      setLines([]);
+      setExpiresAt(null);
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setLines([]);
+      setExpiresAt(null);
+    }, remaining);
+    return () => window.clearTimeout(timeout);
+  }, [expiresAt]);
   useEffect(() => {
     if (!addedNotification) return;
     const timeout = window.setTimeout(() => setAddedNotification(null), 3_500);
@@ -59,6 +99,7 @@ export function CartProvider({ children, locale = "fr-FR" }: { children: ReactNo
 
   const addItem = useCallback<CartContextValue["addItem"]>((item) => {
     const quantity = item.quantity ?? 1;
+    if (lines.length === 0) setExpiresAt(Date.now() + CART_RETENTION_MS);
     setLines((current) => {
       const index = current.findIndex((line) => line.variantId === item.variantId && line.audience === item.audience);
       if (index < 0) return [...current, { ...item, quantity }];
@@ -70,7 +111,7 @@ export function CartProvider({ children, locale = "fr-FR" }: { children: ReactNo
       productName: item.preview?.productNames[locale] ?? (locale === "en-GB" ? "Coffee" : "Café"),
       variantLabel: item.preview?.variantLabel ?? "",
     });
-  }, [locale]);
+  }, [lines.length, locale]);
   const updateQuantity = useCallback((variantId: string, audience: Audience, quantity: number) => {
     setLines((current) => current
       .map((line) => line.variantId === variantId && line.audience === audience ? { ...line, quantity: Math.max(0, Math.min(100, quantity)) } : line)
@@ -79,7 +120,7 @@ export function CartProvider({ children, locale = "fr-FR" }: { children: ReactNo
   const removeItem = useCallback((variantId: string, audience: Audience) => {
     setLines((current) => current.filter((line) => line.variantId !== variantId || line.audience !== audience));
   }, []);
-  const clear = useCallback(() => setLines([]), []);
+  const clear = useCallback(() => { setLines([]); setExpiresAt(null); }, []);
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
   const dismissAddedNotification = useCallback(() => setAddedNotification(null), []);
