@@ -178,9 +178,14 @@ function recipientAddress(address: ShippoAddress) {
 
 function rateFromShipment(shipment: ShippoShipment, serviceToken: ColissimoServiceToken): ShippoParcelRate {
   const rates = Array.isArray(shipment.rates) ? shipment.rates as ShippoRate[] : [];
-  const matching = rates.filter((rate) =>
-    text(rate.servicelevel?.token) === serviceToken && text(rate.currency).toUpperCase() === "EUR",
-  ).map((rate) => ({ rate, amountCents: Math.round(Number(rate.amount) * 100) }))
+  const euroRates = rates.filter((rate) => text(rate.currency).toUpperCase() === "EUR");
+  const exactRates = euroRates.filter((rate) => text(rate.servicelevel?.token) === serviceToken);
+  const serviceRates = exactRates.length > 0
+    ? exactRates
+    : serviceToken === "colissimo_international_expert"
+      ? euroRates.filter((rate) => text(rate.servicelevel?.token) === "colissimo_home")
+      : [];
+  const matching = serviceRates.map((rate) => ({ rate, amountCents: Math.round(Number(rate.amount) * 100) }))
     .filter(({ amountCents }) => Number.isSafeInteger(amountCents) && amountCents >= 0)
     .toSorted((left, right) => left.amountCents - right.amountCents)[0];
   const rateId = text(matching?.rate.object_id);

@@ -67,9 +67,7 @@ function shippoFetch(amounts: number[]) {
       shipmentBodies.push(body);
       const token = body.extra.location_external_id
         ? "colissimo_pick_up_point"
-        : body.address_to.country === "FR"
-          ? "colissimo_home"
-          : "colissimo_international_expert";
+        : "colissimo_home";
       const amount = amounts[shipmentIndex] ?? amounts.at(-1) ?? 0;
       shipmentIndex += 1;
       return new Response(JSON.stringify({
@@ -115,7 +113,7 @@ describe("Shippo Colissimo shipping quotes", () => {
     expect(publicQuote(quote).rates[0]).not.toHaveProperty("serviceToken");
   });
 
-  it("uses International Expert in another EU country and applies free shipping", async () => {
+  it("accepts Shippo's home token as International Expert in another EU country and applies free shipping", async () => {
     useRealShippingEnvironment(0);
     const { fetchMock } = shippoFetch([1_423]);
     vi.stubGlobal("fetch", fetchMock);
