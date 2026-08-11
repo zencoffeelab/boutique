@@ -9,6 +9,7 @@ import type { PickupPoint, ShippingRate } from "~/domain/types";
 import { getViewer } from "~/lib/auth.server";
 import { getProducts } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
+import { paypalConfigured } from "~/lib/paypal.server";
 import { pageMeta } from "~/lib/seo";
 import { createRequestSupabase } from "~/lib/supabase.server";
 import { pickupPointsConfigured } from "~/services/pickup-points.server";
@@ -32,6 +33,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       } : null,
     } : null,
     pickupConfigured: pickupPointsConfigured(),
+    paypalAvailable: paypalConfigured(),
     products: await getProducts({ status: "published", audience }),
   };
 }
@@ -61,7 +63,7 @@ function pickupAddress(point: PickupPoint) {
 }
 
 export default function Checkout() {
-  const { locale, audience, account, pickupConfigured, products } = useLoaderData<typeof loader>(); const english = locale === "en-GB";
+  const { locale, audience, account, pickupConfigured, paypalAvailable, products } = useLoaderData<typeof loader>(); const english = locale === "en-GB";
   const { lines, hydrated } = useCart(); const formRef = useRef<HTMLFormElement>(null);
   const [cartId, setCartId] = useState(""); const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [selectedRate, setSelectedRate] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
@@ -69,7 +71,19 @@ export default function Checkout() {
   const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([]); const [selectedPickupPointId, setSelectedPickupPointId] = useState("");
   const [pickupBusy, setPickupBusy] = useState(false); const [pickupError, setPickupError] = useState("");
   const [createAccount, setCreateAccount] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "paypal">("stripe");
+  const paypalCaptureAttempted = useRef(false);
   const pickupAvailable = pickupConfigured;
+
+  useEffect(() => {
+    const paypalOrderId = new URLSearchParams(window.location.search).get("token");
+    if (!paypalOrderId || paypalCaptureAttempted.current) return;
+    paypalCaptureAttempted.current = true;
+    setBusy(true);
+    fetch("/api/checkout/paypal/capture", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ paypalOrderId }) })
+      .then(async (response) => { const data = await response.json() as CheckoutResponse; if (!response.ok || !data.ok || !data.confirmationUrl) throw new Error(data.message || (english ? "PayPal payment could not be confirmed." : "Le paiement PayPal n’a pas pu être confirmé.")); window.location.assign(data.confirmationUrl); })
+      .catch((cause) => { setError(cause instanceof Error ? cause.message : String(cause)); setBusy(false); });
+  }, [english]);
 
   useEffect(() => {
     const key = "zcl:cart-id:v1"; let id = window.localStorage.getItem(key);
@@ -139,7 +153,7 @@ export default function Checkout() {
     try {
       const response = await fetch("/api/checkout/payment-intent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(formRef.current), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, shippingRateId: selectedRate, acceptTerms: true, createAccount: !account && createAccount, accountPassword: !account && createAccount ? String(new FormData(formRef.current).get("accountPassword") ?? "") : undefined }),
+        body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(formRef.current), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, shippingRateId: selectedRate, paymentMethod, acceptTerms: true, createAccount: !account && createAccount, accountPassword: !account && createAccount ? String(new FormData(formRef.current).get("accountPassword") ?? "") : undefined }),
       });
       const data = await response.json() as CheckoutResponse;
       if (!response.ok || !data.ok) throw new Error(data.message || "Checkout unavailable");
@@ -195,6 +209,7 @@ export default function Checkout() {
         <button className="button button--dark" type="submit" disabled={busy || !cartId || hasUnavailableItems}>{busy ? (english ? "Calculating…" : "Calcul…") : (english ? "Calculate shipping" : "Calculer la livraison")}</button>
         {error ? <p className="form-message form-error" role="alert">{error}</p> : null}
         {quote?.rates?.length ? <section className="checkout-section shipping-rates"><h2>{pickupAvailable ? "4" : "3"}. {english ? "Delivery service" : "Mode de livraison"}</h2><div className="rate-list">{quote.rates.map((rate) => <label className="rate-option" key={rate.id}><input type="radio" name="shippingRate" checked={selectedRate === rate.id} onChange={() => setSelectedRate(rate.id)} /><span className="rate-option__details"><strong>{shippingRateLabel(rate, locale)}</strong><br /><small>{rate.estimatedDays ? `${rate.estimatedDays} ${english ? "business days" : "jours ouvrés"}` : ""}{rate.pickupPoint ? `${rate.estimatedDays ? " · " : ""}${rate.pickupPoint.name}` : ""}</small></span><span className="rate-option__price"><strong>{formatMoney(rate.amountCents, locale)}</strong>{shippingRatePromotionLabel(rate, locale) ? <small className="shipping-free-label">{shippingRatePromotionLabel(rate, locale)}</small> : null}</span></label>)}</div></section> : null}
+        {quote?.rates?.length ? <section className="checkout-section checkout-payment-method"><h2>{pickupAvailable ? "5" : "4"}. {english ? "Payment method" : "Mode de paiement"}</h2><div className="delivery-methods" role="radiogroup" aria-label={english ? "Payment method" : "Mode de paiement"}><label className={paymentMethod === "stripe" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="paymentMethod" value="stripe" checked={paymentMethod === "stripe"} onChange={() => setPaymentMethod("stripe")} /><span><strong>{english ? "Card" : "Carte bancaire"}</strong><small>Stripe</small></span></label>{paypalAvailable ? <label className={paymentMethod === "paypal" ? "delivery-method is-selected" : "delivery-method"}><input type="radio" name="paymentMethod" value="paypal" checked={paymentMethod === "paypal"} onChange={() => setPaymentMethod("paypal")} /><span><strong>PayPal</strong><small>{english ? "Pay securely with PayPal" : "Payer avec PayPal"}</small></span></label> : null}</div></section> : null}
       </form>
 
       <aside className="summary-card"><h2>{english ? "Your order" : "Votre commande"}</h2>{resolved.map(({ line, product, variant, offer }) => <div className="summary-row" key={variant.id}><span>{line.quantity} × {product.translations[locale].name} · {variant.label}</span><strong>{formatMoney(line.quantity * offer.price.amount, locale)}</strong></div>)}<div className="summary-row"><span>{english ? "Subtotal" : "Sous-total"}</span><strong>{formatMoney(subtotal, locale)}</strong></div><div className="summary-row"><span>{english ? "Shipping" : "Livraison"}</span><span className="summary-shipping-price"><strong>{selectedShippingRate ? formatMoney(selectedShippingRate.amountCents, locale) : "—"}</strong>{selectedShippingRate && shippingRatePromotionLabel(selectedShippingRate, locale) ? <small className="shipping-free-label">{shippingRatePromotionLabel(selectedShippingRate, locale)}</small> : null}</span></div><div className="summary-row summary-total"><span>Total</span><strong>{formatMoney(subtotal + (selectedShippingRate?.amountCents ?? 0), locale)}</strong></div><p><small>{english ? "By paying, you accept the terms and conditions." : "En payant, vous acceptez les conditions générales de vente."}</small></p><button className="button button--dark" type="button" onClick={pay} disabled={!selectedRate || busy}>{english ? "Pay securely" : "Payer en toute sécurité"}</button></aside>

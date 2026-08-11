@@ -1,13 +1,14 @@
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { useLoaderData } from "react-router";
 import { ProductCard } from "~/components/product-card";
-import { getProducts } from "~/lib/catalog.server";
+import { getProducts, hasPurchasableVariant } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request);
-  return { locale, products: await getProducts({ status: "published", availableOnly: true }) };
+  const products = await getProducts({ status: "published" });
+  return { locale, products: products.filter((product) => hasPurchasableVariant(product, "retail")) };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {

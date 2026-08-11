@@ -9,19 +9,26 @@ import type { Audience, Locale, Product } from "~/domain/types";
 import { formatMoney } from "~/domain/money";
 import { dictionary } from "~/lib/i18n";
 
+function getPurchasableVariants(product: Product, audience: Audience) {
+  return product.variants
+    .map((variant) => ({
+      variant,
+      offer: variant.offers.find((candidate) => candidate.audience === audience && candidate.active),
+    }))
+    .filter(({ offer }) => Boolean(offer))
+    .sort((left, right) => left.variant.weightGrams - right.variant.weightGrams);
+}
+
 function ProductCardQuickAdd({ product, locale, audience }: { product: Product; locale: Locale; audience: Audience }) {
   const menuId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const firstOptionRef = useRef<HTMLButtonElement>(null);
-  const purchasableVariants = product.variants.filter((variant) => {
-    const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active);
-    return offer ? variant.stockOnHand - variant.stockReserved >= offer.minimumQuantity : false;
-  });
+  const purchasableVariants = getPurchasableVariants(product, audience);
+  const availableVariants = purchasableVariants.filter(({ variant, offer }) => variant.stockOnHand - variant.stockReserved >= offer!.minimumQuantity);
   const [menuOpen, setMenuOpen] = useState(false);
   const { addItem, hydrated, openDrawer } = useCart();
-  const add = (variant: Product["variants"][number]) => {
-    const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active);
-    if (!offer) return;
+  const add = (variant: Product["variants"][number], offer: NonNullable<ReturnType<typeof getPurchasableVariants>[number]["offer"]>) => {
+    if (variant.stockOnHand - variant.stockReserved < offer.minimumQuantity) return;
     addItem(buildProductCartLine({ product, variant, offer, audience, quantity: offer.minimumQuantity }));
     setMenuOpen(false);
     openDrawer();
@@ -54,17 +61,17 @@ function ProductCardQuickAdd({ product, locale, audience }: { product: Product; 
       aria-expanded={menuOpen}
       aria-controls={menuId}
       onClick={toggleMenu}
-      disabled={!hydrated || purchasableVariants.length === 0}
+      disabled={!hydrated || availableVariants.length === 0}
     >
       <ShoppingBag aria-hidden="true" />
       {purchasableVariants.length === 0 ? dictionary[locale].soldOut : dictionary[locale].addToCart}
       {purchasableVariants.length > 0 ? <ChevronDown className={menuOpen ? "is-open" : ""} aria-hidden="true" /> : null}
     </button>
     {menuOpen ? <div id={menuId} className="product-card__variant-menu" role="menu" aria-label={dictionary[locale].weight}>
-      {purchasableVariants.map((variant, index) => {
-        const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active)!;
-        return <button ref={index === 0 ? firstOptionRef : undefined} type="button" role="menuitem" onClick={() => add(variant)} key={variant.id}>
-          <span>{variant.label}</span><strong>{formatMoney(offer.price.amount, locale)}</strong>
+      {purchasableVariants.map(({ variant, offer }, index) => {
+        const available = variant.stockOnHand - variant.stockReserved >= offer!.minimumQuantity;
+        return <button ref={index === 0 ? firstOptionRef : undefined} type="button" role="menuitem" onClick={() => add(variant, offer!)} disabled={!available} key={variant.id}>
+          <span>{variant.label}</span><strong>{available ? formatMoney(offer!.price.amount, locale) : (locale === "fr-FR" ? "Épuisé" : "Sold out")}</strong>
         </button>;
       })}
     </div> : null}

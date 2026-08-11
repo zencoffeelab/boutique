@@ -41,6 +41,7 @@ export const shippingQuoteSchema = z.object({
 
 export const checkoutSchema = shippingQuoteSchema.extend({
   shippingRateId: z.string().min(1),
+  paymentMethod: z.enum(["stripe", "paypal"]).default("stripe"),
   acceptTerms: z.literal(true),
   createAccount: z.boolean().optional().default(false),
   accountPassword: z.string().max(200).optional(),

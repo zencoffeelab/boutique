@@ -84,6 +84,10 @@ test("a coffee can be added to the cart directly from the shop", async ({
   const drawer = page.getByRole("dialog", { name: "Votre panier" });
   await expect(drawer).toBeVisible();
   await expect(drawer.locator(".cart-drawer-line")).toHaveCount(1);
+  await drawer.getByRole("button", { name: /Augmenter la quantité de/ }).click();
+  await expect(drawer.locator(".cart-drawer-line .quantity-stepper output")).toHaveText("2");
+  await drawer.getByRole("button", { name: /Diminuer la quantité de/ }).click();
+  await expect(drawer.locator(".cart-drawer-line .quantity-stepper output")).toHaveText("1");
   await expect(page).toHaveURL(/\/boutique$/);
   await expect(page.getByRole("button", { name: "Panier (1)" })).toBeVisible();
 });
