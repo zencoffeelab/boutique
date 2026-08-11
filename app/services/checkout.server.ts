@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type Stripe from "stripe";
 import { shippingRateLabel } from "~/domain/shipping-rate-label";
 import type { Audience } from "~/domain/types";
 import { env } from "~/lib/env.server";
@@ -7,6 +8,11 @@ import { createStripe } from "~/lib/stripe.server";
 import { getLatestShippingQuote } from "~/services/shipping.server";
 
 export const temporaryOrderPrefix = "ZCL-TMP-";
+
+function isPaypalAvailabilityError(cause: unknown) {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  return /paypal/i.test(message) && /(not available|not activated|unsupported|invalid|disabled|unavailable)/i.test(message);
+}
 
 export function isTemporaryOrderNumber(value: string | null | undefined) {
   return Boolean(value?.startsWith(temporaryOrderPrefix));
@@ -45,9 +51,8 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
   if (error || !order) throw new Response(error?.message ?? "Unable to reserve stock.", { status: 409 });
   const stripe = createStripe(config.STRIPE_SECRET_KEY);
   try {
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "payment", customer_email: quote.address.email, client_reference_id: order.id,
-      payment_method_types: ["card", "paypal"],
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
       success_url: `${config.VITE_SITE_URL}${quote.locale === "en-GB" ? "/en/order/confirmation" : "/commande/confirmation"}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${config.VITE_SITE_URL}${quote.locale === "en-GB" ? "/en/checkout" : "/commande"}?canceled=1`,
@@ -55,7 +60,15 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
       payment_intent_data: { metadata: { order_id: order.id } },
       line_items: [...quote.lines.map((line) => ({ quantity: line.quantity, price_data: { currency: "eur" as const, unit_amount: line.unitPriceCents, product_data: { name: line.productName, description: line.variantLabel, images: line.imageUrl ? [line.imageUrl] : undefined, metadata: { variant_id: line.variantId } } } })), ...(rate.amountCents > 0 ? [{ quantity: 1, price_data: { currency: "eur" as const, unit_amount: rate.amountCents, product_data: { name: quote.locale === "en-GB" ? "Shipping" : "Livraison", description: shippingRateLabel(rate) } } }] : [])],
       locale: quote.locale === "fr-FR" ? "fr" : "en",
-    });
+    };
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({ ...sessionParams, payment_method_types: ["card", "paypal"] });
+    } catch (cause) {
+      if (!isPaypalAvailabilityError(cause)) throw cause;
+      console.error("stripe_paypal_unavailable_fallback_to_card", { message: cause instanceof Error ? cause.message : String(cause) });
+      session = await stripe.checkout.sessions.create({ ...sessionParams, payment_method_types: ["card"] });
+    }
     const { error: paymentError } = await supabase.from("payments").insert({ order_id: order.id, provider: "stripe", provider_checkout_id: session.id, status: "pending", amount_cents: quote.subtotalCents + rate.amountCents });
     if (paymentError) { await stripe.checkout.sessions.expire(session.id); throw paymentError; }
     if (!session.url) throw new Error("Stripe did not return a checkout URL.");
