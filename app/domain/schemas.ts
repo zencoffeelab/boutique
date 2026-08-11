@@ -23,7 +23,7 @@ export const shippingAddressSchema = z.object({
   countryCode: z.enum(SHIPPING_COUNTRY_CODES),
 });
 
-export const pickupPointIdSchema = z.string().trim().min(1).max(38).regex(/^[A-Za-z0-9]+$/);
+export const pickupPointIdSchema = z.string().trim().regex(/^\d{6}$/);
 
 export const pickupPointSearchSchema = z.object({
   locale: z.enum(["fr-FR", "en-GB"]),

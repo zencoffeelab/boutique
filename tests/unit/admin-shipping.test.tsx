@@ -27,8 +27,12 @@ describe("shipping administration", () => {
     expect(html).toContain("Carton S");
     expect(html).toContain("75");
     expect(html).toContain("150");
-    expect(html).toContain("Acheter les étiquettes");
-    expect(html).toContain("grille commerciale");
-    expect(html).toContain("Royaume-Uni");
+    expect(html).toContain("Générer les étiquettes Colissimo");
+    expect(html).toContain("webhook signé");
+    expect(html).toContain("numéro définitif");
+    expect(html).toContain("montants réels");
+    expect(html).toContain("Shippo");
+    expect(html).toContain("Point Retrait");
+    expect(html).not.toContain("Royaume-Uni");
   });
 });

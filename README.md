@@ -1,6 +1,6 @@
 # Zen Coffee Lab — e-commerce React/Vite
 
-Refonte SSR bilingue du site Zen Coffee Lab, sans dépendance à WordPress au runtime. Le projet utilise React Router en Framework Mode avec Vite, Cloudflare Workers, Supabase (PostgreSQL/Auth/Storage), Stripe Checkout, Sendcloud et Resend.
+Refonte SSR bilingue du site Zen Coffee Lab, sans dépendance à WordPress au runtime. Le projet utilise React Router en Framework Mode avec Vite, Cloudflare Workers, Supabase (PostgreSQL/Auth/Storage), Stripe Checkout, Shippo/Colissimo et Resend.
 
 ## Démarrage local
 
@@ -28,7 +28,7 @@ npm run check
 
 - `app/routes` : pages SSR françaises, équivalents `/en`, ressources SEO et actions serveur.
 - `app/domain` : montants entiers en centimes, poids en grammes, colisage déterministe et schémas Zod.
-- `app/services` : checkout Stripe, Sendcloud, factures PDF privées et file Resend.
+- `app/services` : checkout Stripe, Shippo/Colissimo, factures PDF privées et file Resend.
 - `supabase/migrations` : schéma, RLS, séquences immuables et fonctions atomiques de stock.
 - `scripts/import-wordpress.ts` : import WooCommerce/WPML reproductible, simulation par défaut.
 - `tests` : tests unitaires, intégration des frontières d’accès et parcours Playwright.
@@ -50,11 +50,11 @@ La finalisation d’une vente intervient uniquement dans `finalize_paid_order`, 
 
 ## Configuration externe
 
-- Stripe : webhook `/api/webhooks/stripe`, événements `checkout.session.completed`, `checkout.session.expired` et `charge.refunded`.
-- Sendcloud : prestataire unique pour les nouveaux devis et achats d’étiquettes via l’API v3. Renseigner `SENDCLOUD_PUBLIC_KEY` et `SENDCLOUD_SECRET_KEY`. Tous les transporteurs activés et compatibles avec le colis sont proposés, triés par prix. Configurer le webhook sur `https://<domaine-production>/api/webhooks/sendcloud?secret=<SENDCLOUD_WEBHOOK_SECRET>`. Une erreur Sendcloud bloque l’achat ; aucun repli Shippo n’est effectué. L’annulation utilise également l’API v3.
-- Shippo : désactivé pour les nouveaux devis et les nouvelles étiquettes. Les clés et le webhook restent temporairement disponibles uniquement pour suivre ou rembourser les étiquettes historiques déjà achetées.
-- Points relais : la recherche utilise l’API Sendcloud Service Points et affiche les réseaux activés, notamment Mondial Relay et Colissimo. Le point choisi est revalidé avant le devis puis transmis à l’achat de l’étiquette Sendcloud v3.
-- Franco : `FREE_SHIPPING_FR_CENTS=7500` et `FREE_SHIPPING_EU_UK_CENTS=15000`, distincts par environnement.
+- Stripe : le checkout réserve la commande avant la redirection vers Stripe. Le webhook signé `/api/webhooks/stripe` traite `checkout.session.completed`, `checkout.session.expired` et `charge.refunded` ; après confirmation, la commande reçoit son numéro définitif et apparaît dans le back-office, où les étiquettes Colissimo peuvent être générées explicitement.
+- Shippo : prestataire exclusif des nouveaux devis, étiquettes, suivis et remboursements. Renseigner `SHIPPO_API_TOKEN`, activer le compte Colissimo intégré et configurer le webhook signé sur `/api/webhooks/shippo`. Le site découvre puis met en cache ce compte et ne retient que `colissimo_home`, `colissimo_international_expert` et `colissimo_pick_up_point`.
+- Point Retrait : `COLISSIMO_PICKUP_API_KEY` active automatiquement la recherche officielle Colissimo dans les pays UE compatibles ; `COLISSIMO_PICKUP_PARTNER_CLIENT_CODE` est optionnel. Sans clé, le checkout reste disponible en Colissimo à domicile.
+- Franco : `FREE_SHIPPING_FR_CENTS=7500` et `FREE_SHIPPING_EU_UK_CENTS=15000` (nom conservé pour compatibilité) règlent les seuils France et reste de l’Union européenne.
+- Historique : les colonnes et anciennes expéditions Sendcloud restent en base et sont affichées en lecture seule. Aucun secret, webhook, téléchargement ou appel Sendcloud n’est utilisé par l’application active.
 - Resend : domaine d’envoi validé et `RESEND_FROM_EMAIL` ; toute communication passe par l’outbox.
 - GA4 : uniquement `VITE_GA_MEASUREMENT_ID`, chargé après consentement. Aucun événement ne doit contenir d’e-mail, téléphone, adresse ou nom.
 
@@ -63,10 +63,10 @@ Voir [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) et [docs/MIGRATION.md](docs/MIGRAT
 ## Points à valider avant production
 
 - coûts internes et tarifs/minimums professionnels ;
-- adresse expéditeur, emballages, options Sendcloud et données douanières ;
+- compte Colissimo intégré actif dans Shippo, adresse expéditeur complète et emballages ;
 - mentions légales, régime de TVA, médiateur, codes tarifaires/origines ;
 - contenus et traductions manuelles complètes ;
 - licences Migra/Decalotype et médias définitifs ;
 - matrice des anciennes URL issue du rapport d’import.
 
-Le rapport de simulation courant est `migration-report-dry-run.json`. Il ne remplace pas la validation Staging avec accès WooCommerce authentifié, Stripe/Sendcloud de test et les contenus légaux définitifs.
+Le rapport de simulation courant est `migration-report-dry-run.json`. Il ne remplace pas la validation Staging avec accès WooCommerce authentifié, Stripe/Shippo de test et les contenus légaux définitifs.

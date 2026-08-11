@@ -16,11 +16,8 @@ const schema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   SHIPPO_API_TOKEN: z.string().optional(),
   SHIPPO_WEBHOOK_SECRET: z.string().optional(),
-  SENDCLOUD_PUBLIC_KEY: z.string().optional(),
-  SENDCLOUD_SECRET_KEY: z.string().optional(),
-  SENDCLOUD_WEBHOOK_SECRET: z.string().optional(),
-  SENDCLOUD_SHIPPING_METHOD_ID: z.coerce.number().int().positive().optional(),
-  SENDCLOUD_SHIPPING_METHODS: z.string().optional().default("{}"),
+  COLISSIMO_PICKUP_API_KEY: z.string().optional(),
+  COLISSIMO_PICKUP_PARTNER_CLIENT_CODE: z.string().regex(/^\d{6}$/).optional(),
   FREE_SHIPPING_FR_CENTS: z.coerce.number().int().nonnegative().default(7_500),
   FREE_SHIPPING_EU_UK_CENTS: z.coerce.number().int().nonnegative().default(15_000),
   SHIP_FROM_NAME: z.string().default("Zen Coffee Lab"),
@@ -52,10 +49,10 @@ export function env(): z.infer<typeof schema> {
     // Cloudflare build must therefore use production-safe defaults even when
     // the local shell did not explicitly provide NODE_ENV.
     const localDefault = parsed.NODE_ENV !== "production" && process.env.CLOUDFLARE_BUILD !== "1";
-    // Local development uses Sendcloud whenever its credentials are present.
+    // Local development uses Shippo whenever its token is present.
     // This keeps a fresh checkout usable with mock rates, while preventing an
     // operator's configured workstation from creating fake label URLs.
-    const localShippingDefault = localDefault && !Boolean(parsed.SENDCLOUD_PUBLIC_KEY && parsed.SENDCLOUD_SECRET_KEY);
+    const localShippingDefault = localDefault && !Boolean(parsed.SHIPPO_API_TOKEN);
     cached = {
       ...parsed,
       ALLOW_DEMO_DATA: process.env.ALLOW_DEMO_DATA === undefined ? localDefault : parsed.ALLOW_DEMO_DATA,

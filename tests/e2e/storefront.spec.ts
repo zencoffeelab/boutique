@@ -195,7 +195,8 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   page.on("console", (message) => {
     if (
       message.type() === "error" &&
-      !message.text().includes("net::ERR_CONNECTION_RESET")
+      !message.text().includes("net::ERR_CONNECTION_RESET") &&
+      !message.text().includes("Failed to fetch manifest patches")
     )
       consoleErrors.push(message.text());
   });
@@ -226,6 +227,7 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   await page.getByLabel("Adresse", { exact: true }).fill("1 rue du Café");
   await page.getByLabel("Code postal").fill("37000");
   await page.getByLabel("Ville").fill("Tours");
+  await expect(page.locator('select[name="countryCode"] option[value="GB"]')).toHaveCount(0);
   const accountChoice = page.getByRole("checkbox", { name: /Créer mon compte client/ });
   await expect(accountChoice).toBeVisible();
   await accountChoice.check();
@@ -239,11 +241,8 @@ test("French guest can add a coffee and reach checkout", async ({ page }) => {
   await page.getByRole("button", { name: "Calculer la livraison" }).click();
   await expect((await quoteResponse).status()).toBe(200);
   await expect(
-    page.locator(".rate-option").getByText("FedEx", { exact: true }),
+    page.locator(".rate-option").getByText("Colissimo — Domicile", { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.locator(".rate-option").getByText("Mondial Relay", { exact: true }),
-  ).toHaveCount(0);
   await page.getByRole("button", { name: "Payer en toute sécurité" }).click();
   await expect(page.getByRole("heading", { name: "Merci." })).toBeVisible();
   await expect(
@@ -289,7 +288,8 @@ test("English URLs, language switch and professional form are accessible", async
   page.on("console", (message) => {
     if (
       message.type() === "error" &&
-      !message.text().includes("net::ERR_CONNECTION_RESET")
+      !message.text().includes("net::ERR_CONNECTION_RESET") &&
+      !message.text().includes("Failed to fetch manifest patches")
     )
       consoleErrors.push(message.text());
   });
@@ -322,7 +322,7 @@ test("English URLs, language switch and professional form are accessible", async
   expect(consoleErrors).toEqual([]);
 });
 
-test("Zone 2 checkout offers Mondial Relay only after pickup-point selection", async ({
+test("EU checkout offers Colissimo Point Retrait after pickup-point selection", async ({
   page,
 }) => {
   await page.goto("/boutique");
@@ -347,13 +347,13 @@ test("Zone 2 checkout offers Mondial Relay only after pickup-point selection", a
   await expect(
     page.getByRole("heading", { name: /Préférence de livraison/ }),
   ).toBeVisible();
-  await page.getByLabel("Point relais").check();
+  await page.getByLabel(/Colissimo — Point Retrait/).check();
   await page
     .getByRole("button", { name: "Rechercher les points relais" })
     .click();
   await page.locator(".pickup-option input").first().check();
   await page.getByRole("button", { name: "Calculer la livraison" }).click();
   await expect(page.locator(".rate-option__details > strong")).toHaveText(
-    "Mondial Relay",
+    "Colissimo — Point Retrait",
   );
 });

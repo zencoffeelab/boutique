@@ -193,7 +193,7 @@ export type PickupPoint = Readonly<{
 
 export type ShippingRate = Readonly<{
   id: string;
-  provider: "sendcloud" | "shippo" | "mock";
+  provider: "shippo" | "mock";
   carrier: string;
   service: string;
   deliveryMethod: "home" | "pickup";

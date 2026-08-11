@@ -1,24 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { checkoutSchema, contactFormSchema, pickupPointIdSchema, professionalApplicationSchema, shippingAddressSchema, shippingQuoteSchema } from "~/domain/schemas";
-import { EU_SHIPPING_COUNTRY_CODES, NON_EU_SHIPPING_COUNTRY_CODES, SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
+import { EU_SHIPPING_COUNTRY_CODES, SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
 
 describe("shipping countries", () => {
   it("accepts every EU destination and rejects unsupported countries", () => {
     const address = { firstName: "Ada", lastName: "Lovelace", email: "ada@example.com", phone: "0600000000", line1: "1 Main Street", postalCode: "1000", city: "Capital" };
     expect(EU_SHIPPING_COUNTRY_CODES).toHaveLength(27);
-    expect(SHIPPING_COUNTRY_CODES).toHaveLength(31);
+    expect(SHIPPING_COUNTRY_CODES).toHaveLength(27);
     for (const countryCode of EU_SHIPPING_COUNTRY_CODES) expect(shippingAddressSchema.safeParse({ ...address, countryCode }).success).toBe(true);
-    expect(NON_EU_SHIPPING_COUNTRY_CODES).toEqual(["LI", "NO", "GB", "CH"]);
-    for (const countryCode of NON_EU_SHIPPING_COUNTRY_CODES) expect(shippingAddressSchema.safeParse({ ...address, countryCode }).success).toBe(true);
-    expect(shippingAddressSchema.safeParse({ ...address, countryCode: "US" }).success).toBe(false);
+    for (const countryCode of ["GB", "CH", "NO", "LI", "US"]) expect(shippingAddressSchema.safeParse({ ...address, countryCode }).success).toBe(false);
   });
 
   it("lists EU destinations alphabetically by their French names", () => {
     const names = EU_SHIPPING_COUNTRY_CODES.map((countryCode) => shippingCountryLabel(countryCode, "fr-FR"));
     expect(names).toEqual([...names].sort((left, right) => left.localeCompare(right, "fr-FR")));
     expect(names[0]).toBe("Allemagne");
-    const outsideEuNames = NON_EU_SHIPPING_COUNTRY_CODES.map((countryCode) => shippingCountryLabel(countryCode, "fr-FR"));
-    expect(outsideEuNames).toEqual(["Liechtenstein", "Norvège", "Royaume-Uni", "Suisse"]);
   });
 });
 
@@ -35,7 +31,7 @@ describe("customer account at checkout", () => {
     locale: "fr-FR" as const,
     lines: [{ productId: "product", variantId: "variant", audience: "retail" as const, quantity: 1 }],
     address: { firstName: "Ada", lastName: "Lovelace", company: "", email: "ada@example.com", phone: "0600000000", line1: "1 rue du Café", line2: "", postalCode: "37000", city: "Tours", countryCode: "FR" as const },
-    shippingRateId: "sendcloud:rate",
+    shippingRateId: "shippo:rate",
     acceptTerms: true as const,
   };
 
@@ -63,9 +59,10 @@ describe("contact form", () => {
 });
 
 describe("pickup-point checkout input", () => {
-  it("accepts an official alphanumeric Colissimo point identifier", () => expect(pickupPointIdSchema.safeParse("850010").success).toBe(true));
+  it("accepts an official six-digit Colissimo point identifier", () => expect(pickupPointIdSchema.safeParse("850010").success).toBe(true));
   it("rejects identifiers containing separators or markup", () => {
     expect(pickupPointIdSchema.safeParse("FR-850010").success).toBe(false);
+    expect(pickupPointIdSchema.safeParse("85001").success).toBe(false);
     expect(pickupPointIdSchema.safeParse("<script>").success).toBe(false);
   });
   it("keeps pickup selection optional for home delivery", () => {
