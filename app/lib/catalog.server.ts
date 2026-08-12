@@ -316,7 +316,7 @@ export async function getArticles(): Promise<AdviceArticle[]> {
     };
     const story = (translation: any) => {
       const layout = translation.blocks?.find((block: any) => block.type === "storyLayout")?.content ?? {};
-      return { ...layout, introImageUrl: layout.introImageUrl ?? layout.imageUrl, introImageAlt: layout.introImageAlt ?? layout.imageAlt, bodyImageUrl: layout.bodyImageUrl ?? layout.imageUrl, bodyImageAlt: layout.bodyImageAlt ?? layout.imageAlt, bodyImageFirst: layout.bodyImageFirst ?? layout.imageFirst };
+      return { ...layout, layoutConfig: layout.layoutConfig, introImageUrl: layout.introImageUrl ?? layout.imageUrl, introImageAlt: layout.introImageAlt ?? layout.imageAlt, bodyImageUrl: layout.bodyImageUrl ?? layout.imageUrl, bodyImageAlt: layout.bodyImageAlt ?? layout.imageAlt, bodyImageFirst: layout.bodyImageFirst ?? layout.imageFirst };
     };
     return [
       {

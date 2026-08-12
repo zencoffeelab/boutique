@@ -1959,6 +1959,18 @@ button:disabled {
   margin-inline: auto;
   text-align: center;
 }
+.advice-detail__top h1 {
+  width: min(100% - 2rem, 72rem);
+  margin-inline: auto;
+  text-align: center;
+}
+.advice-detail__top .advice-detail__intro {
+  max-width: 44rem;
+  margin: 1rem auto 0;
+  font-family: var(--serif);
+  font-size: clamp(1.2rem, 2vw, 1.7rem);
+  line-height: 1.35;
+}
 .advice-detail__intro .rich-text-content {
   text-align: center;
 }
@@ -2042,6 +2054,7 @@ button:disabled {
   width: var(--page);
   margin-inline: auto;
   overflow-x: clip;
+  display: block;
 }
 .advice-detail-page {
   width: 100%;
@@ -2073,6 +2086,40 @@ body.advice-detail-overflow-hidden {
 }
 .advice-story .rich-text-accordion {
   margin-block: 0.75rem;
+}
+.advice-story__text,
+.advice-story__image {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--advice-inner-space, clamp(0.75rem, 1.25vw, 1.25rem));
+  min-height: 0;
+  margin-block: 1.5rem;
+}
+.advice-story__text {
+  max-width: 46rem;
+  margin-inline: auto;
+}
+.advice-story__image {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  margin: 0;
+}
+.advice-story__image img {
+  display: block;
+  width: min(100%, 750px);
+  height: auto;
+  max-height: 830px;
+  object-fit: contain;
+}
+.advice-story__title {
+  width: min(100% - 2rem, 72rem);
+  margin: 0 auto 2rem;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .advice-story .product-story-block {
   height: auto;
@@ -5064,24 +5111,62 @@ body.advice-detail-overflow-hidden {
 }
 .admin-advice-editor__settings {
   grid-column: 1;
-  grid-row: 1;
+  grid-row: 2;
 }
 .admin-advice-editor__introduction {
   grid-column: 1 / -1;
-  grid-row: 2;
+  grid-row: 3;
 }
+.admin-advice-editor__introduction .rich-text-field { display: grid; gap: .45rem; }
+.admin-advice-editor__introduction .rich-text-editor__toolbar { display: none; }
+.admin-advice-editor__introduction .rich-text-editor__content { min-height: 5.5rem; max-height: 7rem; overflow-y: auto; font: inherit; line-height: 1.5; }
 .admin-advice-editor__seo {
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 2;
 }
 .admin-advice-editor__block {
   grid-column: 1 / -1;
 }
-.admin-advice-editor__block:nth-of-type(2) { grid-row: 3; }
-.admin-advice-editor__block:nth-of-type(3) { grid-row: 4; }
+.admin-advice-editor__block:nth-of-type(2) { grid-row: 4; }
+.admin-advice-editor__block:nth-of-type(3) { grid-row: 5; }
+.admin-advice-layout-organizer { display: grid; grid-row: 1; gap: .65rem; grid-column: 1 / -1; margin-block: 1.5rem; padding: 1.25rem; border: 1px solid #dfe2db; border-radius: 0.35rem; background: #fafbf8; }
+.admin-advice-layout-organizer h2 { margin: 0; }
+.admin-advice-layout__slots { display: grid; grid-template-columns: 1fr; gap: .4rem; }
+.admin-advice-layout__short-intro { display: grid; gap: .75rem; padding: 1rem; border: 1px solid #dfe2db; background: #fff; }
+.admin-advice-layout__short-intro strong { font: 700 1rem/1.3 var(--sans); }
+.admin-advice-layout__short-intro textarea { min-height: 0; resize: vertical; font: inherit; line-height: 1.5; }
+.admin-advice-layout__slot { display: grid; gap: .65rem; padding: 1rem; border: 1px dashed #dfe2db; }
+.admin-advice-layout__dropzone { display: grid; gap: .5rem; min-height: 0; }
+.admin-advice-layout__item { display: flex; align-items: center; gap: .6rem; padding: .7rem .8rem; border: 1px solid #dfe2db; background: #fff; cursor: grab; }
+.admin-advice-layout__item:active { cursor: grabbing; }
+.admin-advice-layout__handle { letter-spacing: -.2em; color: #768074; }
+.admin-advice-layout__label { flex: 1 1 auto; min-width: 0; width: 100%; border: 1px solid transparent; background: transparent; color: inherit; font: inherit; }
+.admin-advice-layout__label:focus { border-color: #aab4a4; outline: 2px solid rgba(91, 112, 87, .18); background: #fff; }
+.admin-advice-layout__remove { flex: 0 0 auto; }
+.admin-advice-layout__custom { display: grid; gap: .75rem; margin-top: -.15rem; }
+.admin-advice-layout__custom-heading { display: grid; gap: .45rem; }
+.admin-advice-layout__custom-heading > span { color: #687066; font-size: .9rem; }
+.admin-advice-layout__custom-heading > div { display: flex; flex-direction: column; align-items: flex-start; gap: .6rem; }
+.admin-advice-layout__custom-item { display: grid; gap: .75rem; min-width: 0; padding: 1rem; border: 1px solid #dfe2db; background: #fff; }
+.admin-advice-layout__custom-title { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.admin-advice-layout__custom-actions { display: flex; align-items: center; gap: .5rem; }
+.admin-advice-layout__add { border-color: var(--green-deep); }
+.admin-advice-layout__confirmed { color: var(--green-deep); font-size: .78rem; font-weight: 650; }
+.admin-advice-layout__custom-item.is-pending { border-color: var(--green-deep); box-shadow: 0 0 0 2px rgba(68, 81, 63, .08); }
+.admin-advice-delete-modal__actions { display: flex; width: 100%; gap: .75rem; }
+.admin-advice-delete-modal__actions .ui-button { flex: 1 1 0; }
+.admin-advice-layout__custom-item textarea { min-height: 7rem; }
+.admin-advice-layout__custom-item .form-grid:has(input[name^="customImageAlt"]) { grid-template-columns: minmax(0, 1.2fr) minmax(12rem, .8fr); align-items: start; }
+.admin-advice-layout__custom-item .form-grid:has(input[name^="customImageAlt"]) > :first-child { grid-row: 1 / span 2; }
+.admin-advice-layout__custom-item .form-grid:has(input[name^="customImageAlt"]) > label { min-width: 0; }
+.admin-advice-layout__custom-item .form-grid:has(input[name^="customImageAlt"]) > label input { width: 100%; box-sizing: border-box; }
+.advice-custom-image { margin: 1.5rem auto; max-width: min(100%, 900px); }
+.advice-custom-image img { display: block; width: 100%; height: auto; }
+@media (max-width: 800px) { .admin-advice-layout__slots { grid-template-columns: 1fr; } }
 .admin-advice-editor > .admin-editor__actions {
   grid-column: 1 / -1;
-  grid-row: 5;
+  grid-row: auto;
+  order: 999;
   justify-content: flex-end;
 }
 .admin-advice-editor__introduction {
@@ -7119,6 +7204,13 @@ body.advice-detail-overflow-hidden {
 .admin-mail-list__items {
   max-height: 50rem;
   overflow-y: auto;
+}
+.admin-image-input__processed {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 .admin-order-cart-indicator {
   display: inline-flex;

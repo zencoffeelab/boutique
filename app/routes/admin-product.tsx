@@ -131,6 +131,15 @@ const productImageExtensions: Record<string, string> = {
   "image/webp": "webp",
 };
 
+function isUploadFile(value: FormDataEntryValue | null): value is File {
+  return Boolean(value && typeof value === "object" && typeof (value as File).size === "number" && typeof (value as File).type === "string" && typeof (value as File).arrayBuffer === "function");
+}
+
+function uploadedFile(form: FormData, name: string) {
+  const processed = form.get(`${name}Processed`);
+  return isUploadFile(processed) && processed.size > 0 ? processed : form.get(`${name}Source`) ?? form.get(name);
+}
+
 const emptyTranslation = (locale: "fr-FR" | "en-GB") => ({
   locale,
   name: "",
@@ -210,7 +219,7 @@ async function saveEditorialBlock({
     .maybeSingle();
   if (readError) return { ok: false as const, message: readError.message };
 
-  const hasNewImage = file instanceof File && file.size > 0;
+  const hasNewImage = isUploadFile(file) && file.size > 0;
   if (!hasNewImage && !existing)
     return {
       ok: false as const,
@@ -338,7 +347,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "upload_thumbnail_label") {
     const productId = String(form.get("productId"));
     const backgroundColor = String(form.get("thumbnailBackgroundColor") ?? "").trim();
-    const file = form.get("file");
+    const file = uploadedFile(form, "file");
     if (!z.string().uuid().safeParse(productId).success || !/^#[0-9a-fA-F]{6}$/.test(backgroundColor))
       return { ok: false, message: "Produit ou couleur de miniature invalide." };
     const { data: existing, error: readError } = await client
@@ -349,7 +358,7 @@ export async function action({ request }: ActionFunctionArgs) {
     if (readError) return { ok: false, message: readError.message };
     if (!existing) return { ok: false, message: "Produit introuvable." };
 
-    const hasNewFile = file instanceof File && file.size > 0;
+    const hasNewFile = isUploadFile(file) && file.size > 0;
     if (!hasNewFile && !existing.thumbnail_label_public_url)
       return { ok: false, message: "Ajoutez un fichier d’étiquette." };
     if (hasNewFile && (file.size > 8_000_000 || !productImageExtensions[file.type]))
@@ -392,10 +401,10 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   if (intent === "upload_hover_image") {
     const productId = String(form.get("productId"));
-    const file = form.get("file");
+    const file = uploadedFile(form, "file");
     if (!z.string().uuid().safeParse(productId).success)
       return { ok: false, message: "Produit invalide." };
-    if (!(file instanceof File) || file.size === 0 || file.size > 8_000_000 || !productImageExtensions[file.type])
+    if (!(isUploadFile(file)) || file.size === 0 || file.size > 8_000_000 || !productImageExtensions[file.type])
       return { ok: false, message: "L’image de survol doit être au format JPEG, PNG ou WebP et peser au maximum 8 Mo." };
 
     const { data: existing, error: readError } = await client
@@ -530,13 +539,13 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   if (intent === "upload_media") {
     const productId = String(form.get("productId"));
-    const file = form.get("file");
+    const file = uploadedFile(form, "file");
     const altFr = String(form.get("altFr") ?? "").trim();
     const altEn = String(form.get("altEn") ?? "").trim();
     const imageWidth = z.coerce.number().int().min(1).max(3200).safeParse(form.get("imageWidth"));
     const imageHeight = z.coerce.number().int().min(1).max(3200).safeParse(form.get("imageHeight"));
     if (
-      !(file instanceof File) ||
+      !(isUploadFile(file)) ||
       file.size === 0 ||
       file.size > 8_000_000 ||
       !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
@@ -594,7 +603,7 @@ export async function action({ request }: ActionFunctionArgs) {
       productId: parsed.data.productId,
       position: parsed.data.position as 1 | 2,
       fields: parsed.data,
-      file: form.get("file"),
+      file: uploadedFile(form, "file"),
     });
   }
   if (intent === "update_variant") {
@@ -892,8 +901,8 @@ export async function action({ request }: ActionFunctionArgs) {
         altFr: String(form.get(`${prefix}AltFr`) ?? ""),
         altEn: String(form.get(`${prefix}AltEn`) ?? ""),
       };
-      const file = form.get(`${prefix}File`);
-      const hasNewImage = file instanceof File && file.size > 0;
+      const file = uploadedFile(form, `${prefix}File`);
+      const hasNewImage = isUploadFile(file) && file.size > 0;
       const hasText = Object.values(rawFields).some((value) => value.trim().length > 0);
       const existingBlock = existingEditorialBlocks.some(
         (block: { position?: number }) => Number(block.position) === position,

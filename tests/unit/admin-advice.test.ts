@@ -87,4 +87,24 @@ describe("advice administration", () => {
       ]) }),
     ]), { onConflict: "article_id,locale" });
   });
+
+  it("persists a confirmed custom text emplacement with its submitted content", async () => {
+    const upsert = vi.fn(async () => ({ error: null }));
+    const client = {
+      from: vi.fn((table: string) => {
+        if (table === "advice_articles") return { insert: () => ({ select: () => ({ single: async () => ({ data: { id: articleId }, error: null }) }) }) };
+        if (table === "advice_translations") return { upsert };
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+    vi.mocked(createServiceSupabase).mockReturnValue(client as never);
+    const customId = "custom-text-test";
+    const form = new FormData();
+    Object.entries({ intent: "save_advice", id: "", slug: "guide-custom", status: "published", publishedAt: "2026-07-26T12:00", titleFr: "Guide complet", titleEn: "Complete guide", excerptFr: "Un extrait suffisamment détaillé.", excerptEn: "A sufficiently detailed excerpt.", bodyFr: "Texte de corps suffisamment long pour être enregistré.", bodyEn: "Body text sufficiently long to be saved.", seoTitleFr: "Guide complet du café", seoTitleEn: "Complete coffee guide", seoDescriptionFr: "Une description SEO suffisamment complète.", seoDescriptionEn: "A sufficiently complete SEO description.", layoutConfig: JSON.stringify({ slots: [{ text: "intro", image: "intro" }, { text: "body", image: "body" }, { text: "body2", image: "body2" }], customItems: [{ id: customId, type: "text" }] }) }).forEach(([key, value]) => form.set(key, value));
+    form.set(`customTextFr-${customId}`, "Nouveau texte français publié.");
+    form.set(`customTextEn-${customId}`, "New English text published.");
+
+    await action({ request: new Request("http://localhost/admin/conseils", { method: "POST", body: form }), params: {}, context: {} } as never);
+    expect(upsert).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ blocks: expect.arrayContaining([expect.objectContaining({ type: "storyLayout", content: expect.objectContaining({ layoutConfig: expect.objectContaining({ customItems: expect.arrayContaining([expect.objectContaining({ id: customId, textFr: "Nouveau texte français publié." })]) }) }) })]) })]), { onConflict: "article_id,locale" });
+  });
 });

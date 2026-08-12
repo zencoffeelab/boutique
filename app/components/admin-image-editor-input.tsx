@@ -20,6 +20,7 @@ import {
 const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const maximumSourceBytes = 40_000_000;
 const maximumOutputBytes = 8_000_000;
+const maximumOutputDimension = 10_000;
 
 export type AdminProcessedImage = Readonly<{
   file: File;
@@ -93,6 +94,11 @@ function assignInputFile(input: HTMLInputElement | null, file: File | null) {
   input.files = transfer.files;
 }
 
+function defaultWidthForImage(sourceWidth: number, sourceHeight: number, aspect: ImageCropAspect, requestedWidth: number) {
+  const crop = calculateImageCrop({ sourceWidth, sourceHeight, aspect, zoom: 1, positionX: 0, positionY: 0 });
+  return Math.max(160, Math.min(requestedWidth, Math.floor(crop.width)));
+}
+
 export function AdminImageEditorInput({
   name = "file",
   label,
@@ -120,6 +126,7 @@ export function AdminImageEditorInput({
   const titleId = useId();
   const descriptionId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const processedInputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const sourceObjectUrlRef = useRef<string | null>(null);
@@ -147,7 +154,8 @@ export function AdminImageEditorInput({
   const sourceWidth = sourceImage?.naturalWidth ?? 1;
   const sourceHeight = sourceImage?.naturalHeight ?? 1;
   const ratio = imageAspectRatio(aspect, sourceWidth, sourceHeight);
-  const output = resizedImageDimensions({ requestedWidth: outputWidth, ratio });
+  const output = resizedImageDimensions({ requestedWidth: outputWidth, ratio, maximumDimension: maximumOutputDimension });
+  const currentCrop = sourceImage ? calculateImageCrop({ sourceWidth, sourceHeight, aspect, zoom, positionX, positionY }) : null;
   const displayPreviewUrl = processedPreviewUrl ?? currentPreviewUrl ?? null;
 
   useEffect(() => {
@@ -185,7 +193,7 @@ export function AdminImageEditorInput({
   }, [aspect, positionX, positionY, sourceHeight, sourceImage, sourceWidth, zoom]);
 
   const restoreProcessedSelection = () => {
-    assignInputFile(inputRef.current, processedImage?.file ?? null);
+    assignInputFile(processedInputRef.current, processedImage?.file ?? null);
   };
 
   const cancelEditing = () => {
@@ -199,7 +207,7 @@ export function AdminImageEditorInput({
     setZoom(1);
     setPositionX(0);
     setPositionY(0);
-    setOutputWidth(Math.min(defaultOutputWidth, sourceImage?.naturalWidth ?? defaultOutputWidth));
+    setOutputWidth(sourceImage ? defaultWidthForImage(sourceImage.naturalWidth, sourceImage.naturalHeight, defaultAspect, defaultOutputWidth) : defaultOutputWidth);
     setError(null);
   };
 
@@ -213,6 +221,9 @@ export function AdminImageEditorInput({
     const file = event.currentTarget.files?.[0];
     if (!file) return;
     setError(null);
+    assignInputFile(processedInputRef.current, null);
+    setProcessedImage(null);
+    setProcessedPreviewUrl(null);
     if (!acceptedImageTypes.has(file.type)) {
       setError("Choisissez une image JPEG, PNG ou WebP.");
       assignInputFile(inputRef.current, processedImage?.file ?? null);
@@ -234,7 +245,7 @@ export function AdminImageEditorInput({
       setZoom(1);
       setPositionX(0);
       setPositionY(0);
-      setOutputWidth(Math.max(160, Math.min(defaultOutputWidth, image.naturalWidth)));
+      setOutputWidth(defaultWidthForImage(image.naturalWidth, image.naturalHeight, defaultAspect, defaultOutputWidth));
       if (!dialogRef.current?.open) dialogRef.current?.showModal();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Cette image ne peut pas être lue.");
@@ -245,7 +256,7 @@ export function AdminImageEditorInput({
   const handleAspect = (event: ChangeEvent<HTMLSelectElement>) => {
     const nextAspect = event.currentTarget.value as ImageCropAspect;
     const nextRatio = imageAspectRatio(nextAspect, sourceWidth, sourceHeight);
-    const nextOutput = resizedImageDimensions({ requestedWidth: outputWidth, ratio: nextRatio });
+    const nextOutput = resizedImageDimensions({ requestedWidth: outputWidth, ratio: nextRatio, maximumDimension: maximumOutputDimension });
     setAspect(nextAspect);
     setOutputWidth(nextOutput.width);
     setPositionX(0);
@@ -257,6 +268,9 @@ export function AdminImageEditorInput({
     setProcessing(true);
     setError(null);
     try {
+      const widthField = dialogRef.current?.querySelector<HTMLInputElement>('input[type="number"]');
+      const requestedWidth = Number(widthField?.value ?? outputWidth);
+      const finalOutput = resizedImageDimensions({ requestedWidth, ratio, maximumDimension: maximumOutputDimension });
       const crop = calculateImageCrop({
         sourceWidth,
         sourceHeight,
@@ -266,7 +280,7 @@ export function AdminImageEditorInput({
         positionY,
       });
       const canvas = document.createElement("canvas");
-      drawCrop(canvas, sourceImage, crop, output.width, output.height);
+      drawCrop(canvas, sourceImage, crop, finalOutput.width, finalOutput.height);
       const outputType = sourceFile.type === "image/png" ? "image/png" : "image/webp";
       const blob = await canvasBlob(canvas, outputType);
       if (blob.size > maximumOutputBytes) {
@@ -276,8 +290,18 @@ export function AdminImageEditorInput({
         type: outputType,
         lastModified: Date.now(),
       });
-      const nextProcessedImage = { file, width: output.width, height: output.height };
+      const verificationUrl = URL.createObjectURL(file);
+      try {
+        const generatedImage = await loadImage(verificationUrl);
+        if (generatedImage.naturalWidth !== finalOutput.width || generatedImage.naturalHeight !== finalOutput.height)
+          throw new Error("Les dimensions générées ne correspondent pas à la largeur finale choisie.");
+      } finally {
+        URL.revokeObjectURL(verificationUrl);
+      }
+      const nextProcessedImage = { file, width: finalOutput.width, height: finalOutput.height };
       assignInputFile(inputRef.current, file);
+      if (processedInputRef.current) processedInputRef.current.disabled = false;
+      assignInputFile(processedInputRef.current, file);
       if (processedObjectUrlRef.current) URL.revokeObjectURL(processedObjectUrlRef.current);
       const previewUrl = URL.createObjectURL(file);
       processedObjectUrlRef.current = previewUrl;
@@ -330,12 +354,22 @@ export function AdminImageEditorInput({
       ref={inputRef}
       id={inputId}
       className="admin-image-input__native"
-      name={name}
+      name={`${name}Source`}
       type="file"
       accept="image/jpeg,image/png,image/webp"
       required={required && !processedImage}
       disabled={!hydrated}
       onChange={handleFile}
+    />
+    <input
+      ref={processedInputRef}
+      className="admin-image-input__processed"
+      name={`${name}Processed`}
+      type="file"
+      accept="image/jpeg,image/png,image/webp"
+      tabIndex={-1}
+      aria-hidden="true"
+      disabled={!processedImage}
     />
     {dimensionFieldNames ? <>
       <input type="hidden" name={dimensionFieldNames.width} value={processedImage?.width ?? ""} />
@@ -435,11 +469,16 @@ export function AdminImageEditorInput({
                   min="160"
                   max={output.maximumWidth}
                   step="10"
-                  value={outputWidth}
-                  onChange={(event) => setOutputWidth(Number(event.currentTarget.value))}
+                  value={Number.isFinite(outputWidth) ? outputWidth : output.width}
+                  onChange={(event) => {
+                    const value = Number(event.currentTarget.value);
+                    if (Number.isFinite(value)) setOutputWidth(value);
+                  }}
+                  onBlur={() => setOutputWidth(output.width)}
                 />
               </label>
-              <small>Sortie : {output.width} × {output.height} px</small>
+              <small>Sortie exacte après validation : {output.width} × {output.height} px</small>
+              {currentCrop && output.width > currentCrop.width ? <small className="admin-image-input__warning">Cette largeur agrandit la zone recadrée ({Math.round(currentCrop.width)} px) et peut pixeliser l’image.</small> : null}
             </div>
             <button className="ui-button ui-button--ghost" type="button" onClick={resetCrop}>
               <RotateCcw aria-hidden="true" /> Réinitialiser

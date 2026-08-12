@@ -15,7 +15,7 @@ export const dictionary = {
     shop: "Boutique",
     professional: "Professionnels",
     about: "À propos",
-    advice: "Conseils",
+    advice: "Blog",
     cart: "Panier",
     account: "Compte",
     addToCart: "Ajouter au panier",

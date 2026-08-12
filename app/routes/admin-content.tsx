@@ -4,6 +4,7 @@ import { Form, Link, useActionData, useLoaderData, useLocation } from "react-rou
 import { AdminComingSoonEditor } from "~/components/admin-coming-soon-editor";
 import { AdminNavigationOrganizer } from "~/components/admin-navigation-organizer";
 import { AdminShell } from "~/components/admin-shell";
+import { AdminImageEditorInput } from "~/components/admin-image-editor-input";
 import { RichTextEditor } from "~/components/rich-text-editor";
 import { requireAdmin } from "~/lib/auth.server";
 import { defaultComingSoonSettings } from "~/lib/coming-soon";
@@ -44,8 +45,8 @@ const pageSchema = z.object({
   seoTitleEn: z.string().trim().min(2),
   seoDescriptionFr: z.string().trim().min(10),
   seoDescriptionEn: z.string().trim().min(10),
-  contentFr: z.string().trim().min(10),
-  contentEn: z.string().trim().min(10),
+  contentFr: z.string().trim().optional(),
+  contentEn: z.string().trim().optional(),
   homeStatementFr: z.string().trim().max(500).optional(),
   homeStatementEn: z.string().trim().max(500).optional(),
   homeValue1TitleFr: z.string().trim().max(120).optional(), homeValue1TextFr: z.string().trim().max(500).optional(),
@@ -54,6 +55,15 @@ const pageSchema = z.object({
   homeValue1TitleEn: z.string().trim().max(120).optional(), homeValue1TextEn: z.string().trim().max(500).optional(),
   homeValue2TitleEn: z.string().trim().max(120).optional(), homeValue2TextEn: z.string().trim().max(500).optional(),
   homeValue3TitleEn: z.string().trim().max(120).optional(), homeValue3TextEn: z.string().trim().max(500).optional(),
+  aboutLedeFr: z.string().trim().max(600).optional(), aboutLedeEn: z.string().trim().max(600).optional(),
+  aboutParagraph1Fr: z.string().trim().min(10).optional(), aboutParagraph1En: z.string().trim().min(10).optional(),
+  aboutParagraph2Fr: z.string().trim().min(10).optional(), aboutParagraph2En: z.string().trim().min(10).optional(),
+  ...Object.fromEntries([1, 2].flatMap((index) => [
+    [`aboutStoryImageUrl${index}`, z.string().url().or(z.literal("")).optional()],
+    [`aboutStoryImagePath${index}`, z.string().max(500).optional()],
+    [`aboutStoryAlt${index}Fr`, z.string().trim().max(240).optional()],
+    [`aboutStoryAlt${index}En`, z.string().trim().max(240).optional()],
+  ])),
 });
 const navigationSchema = z.object({
   intent: z.literal("save_navigation"),
@@ -71,6 +81,30 @@ const comingSoonSchema = z.object({
 const defaults = ["accueil", "a-propos", "professionnel", "conseils", "faq", "contact", "cgv", "mentions-legales", "politique-de-confidentialite"];
 const placeholderFr = "Contenu à compléter avant publication.";
 const placeholderEn = "Content to complete before publication.";
+const aboutImageExtensions: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+function isUploadFile(value: FormDataEntryValue | null): value is File {
+  return Boolean(value && typeof value === "object" && typeof (value as File).size === "number" && typeof (value as File).type === "string" && typeof (value as File).arrayBuffer === "function");
+}
+
+async function uploadAboutImage(client: any, file: FormDataEntryValue | null, locale: string, slot: string, previousPath = "") {
+  if (!isUploadFile(file) || file.size === 0) return { path: previousPath, url: "" };
+  if (file.size > 8_000_000 || !aboutImageExtensions[file.type]) throw new Error("Les images doivent être au format JPEG, PNG ou WebP et peser au maximum 8 Mo.");
+  const path = `pages/a-propos/${locale}/${slot}-${crypto.randomUUID()}.${aboutImageExtensions[file.type]}`;
+  const { error } = await client.storage.from("product-media").upload(path, await file.arrayBuffer(), { contentType: file.type });
+  if (error) throw new Error(error.message);
+  if (previousPath) await client.storage.from("product-media").remove([previousPath]);
+  return { path, url: client.storage.from("product-media").getPublicUrl(path).data.publicUrl };
+}
+
+function uploadedFile(form: FormData, name: string) {
+  const processed = form.get(`${name}Processed`);
+  return isUploadFile(processed) && processed.size > 0 ? processed : form.get(`${name}Source`) ?? form.get(name);
+}
+
+function aboutBlock(translation: ContentTranslation | undefined, type: string) {
+  return translation?.blocks.find((block) => block.type === type)?.content as Record<string, unknown> | undefined;
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
@@ -189,8 +223,10 @@ export async function action({ request }: ActionFunctionArgs) {
   if (homeContent && homeContent.some((content) => !content.statement || content.cards.some((card) => !card.title || !card.text)))
     return { ok: false, message: "Complétez la phrase et les trois engagements de l’accueil dans les deux langues." };
 
-  const contentFr = parseRichTextInput(parsed.data.contentFr, 10);
-  const contentEn = parseRichTextInput(parsed.data.contentEn, 10);
+  const rawContentFr = parsed.data.pageKey === "a-propos" ? (fields.aboutParagraph1Fr ?? parsed.data.contentFr) : parsed.data.contentFr;
+  const rawContentEn = parsed.data.pageKey === "a-propos" ? (fields.aboutParagraph1En ?? parsed.data.contentEn) : parsed.data.contentEn;
+  const contentFr = parseRichTextInput(String(rawContentFr ?? ""), 10);
+  const contentEn = parseRichTextInput(String(rawContentEn ?? ""), 10);
   if (!contentFr || !contentEn)
     return { ok: false, message: "Le contenu de chaque langue doit comporter au moins 10 caractères." };
 
@@ -209,6 +245,25 @@ export async function action({ request }: ActionFunctionArgs) {
     .single();
   if (error || !page) return { ok: false, message: error?.message ?? "Page non créée." };
 
+  const aboutConfigured = parsed.data.pageKey === "a-propos" && Object.keys(fields).some((key) => key.startsWith("about"));
+  const sharedStoryImages = aboutConfigured
+    ? await Promise.all([1, 2].map(async (index) => {
+        const previousUrl = String(fields[`aboutStoryImageUrl${index}`] ?? "");
+        const previousPath = String(fields[`aboutStoryImagePath${index}`] ?? "");
+        return uploadAboutImage(client, uploadedFile(formData, `aboutStoryImage${index}`), "shared", `story-${index}`, previousPath).then((uploaded) => ({ url: uploaded.url || previousUrl, path: uploaded.path, previousUrl }));
+      }))
+    : null;
+  const aboutTranslations = aboutConfigured
+    ? await Promise.all(([ ["fr-FR", "Fr"], ["en-GB", "En"] ] as const).map(async ([locale, suffix]) => {
+        return {
+          locale,
+          storyImages: sharedStoryImages?.map((image, index) => ({ ...image, alt: String(fields[`aboutStoryAlt${index + 1}${suffix}`] ?? "") })),
+          lede: String(fields[`aboutLede${suffix}`] ?? ""),
+          paragraph2: parseRichTextInput(String(fields[`aboutParagraph2${suffix}`] ?? ""), 10),
+        };
+      }))
+    : null;
+
   const translations = [
     {
       locale: "fr-FR",
@@ -217,6 +272,7 @@ export async function action({ request }: ActionFunctionArgs) {
       seo_description: parsed.data.seoDescriptionFr,
       blocks: [
         { type: "richText", content: contentFr },
+        ...(aboutTranslations ? [{ type: "aboutHero", content: { lede: aboutTranslations[0].lede } }, { type: "aboutStoryImages", content: { images: aboutTranslations[0].storyImages } }, { type: "aboutParagraph2", content: aboutTranslations[0].paragraph2 }] : []),
         ...(homeContent ? [{ type: "homeStatement", content: { text: homeContent[0].statement } }, { type: "homeValues", content: { cards: homeContent[0].cards } }] : []),
       ],
     },
@@ -227,6 +283,7 @@ export async function action({ request }: ActionFunctionArgs) {
       seo_description: parsed.data.seoDescriptionEn,
       blocks: [
         { type: "richText", content: contentEn },
+        ...(aboutTranslations ? [{ type: "aboutHero", content: { lede: aboutTranslations[1].lede } }, { type: "aboutStoryImages", content: { images: aboutTranslations[1].storyImages } }, { type: "aboutParagraph2", content: aboutTranslations[1].paragraph2 }] : []),
         ...(homeContent ? [{ type: "homeStatement", content: { text: homeContent[1].statement } }, { type: "homeValues", content: { cards: homeContent[1].cards } }] : []),
       ],
     },
@@ -254,6 +311,35 @@ export const meta: MetaFunction = () => [
 function initialContent(translation: ContentTranslation | undefined, placeholder: string) {
   const document = storedBlocksToRichTextDocument(translation?.blocks);
   return document.content.length ? document : paragraphsToRichTextDocument([placeholder]);
+}
+
+const aboutDefaults = {
+  "fr-FR": { lede: "Zen Coffee Lab est une micro-torréfaction indépendante à Tours, née de l’envie de rendre les cafés d’exception aussi précis qu’accessibles.", eyebrow: "Petits lots", title: "La précision à chaque cuisson", body: "Chaque profil est développé pour préserver l’identité du terroir : sucrosité, acidité vivante et finale longue et nette.", cta: "Goûter la sélection", alt: "Torréfacteur Zen Coffee Lab" },
+  "en-GB": { lede: "Zen Coffee Lab is a small independent roastery in Tours, born from a desire to make exceptional coffee both precise and approachable.", eyebrow: "Small batches", title: "Precision in every roast", body: "Each profile is developed to preserve the identity of the terroir: sweetness, lively acidity and a long, clean finish.", cta: "Taste the selection", alt: "Zen Coffee Lab roaster" },
+} as const;
+
+function AboutPageFields({ translation, language, shared }: { translation: ContentTranslation | undefined; language: "fr-FR" | "en-GB"; shared: boolean }) {
+  const suffix = language === "fr-FR" ? "Fr" : "En";
+  const defaults = aboutDefaults[language];
+  const hero = aboutBlock(translation, "aboutHero");
+  const images = ((aboutBlock(translation, "aboutStoryImages")?.images ?? []) as Array<{ url?: string; path?: string; alt?: string }>);
+  const paragraph2 = aboutBlock(translation, "aboutParagraph2");
+  return <fieldset className="admin-about-fields">
+    <legend>{language === "fr-FR" ? "Structure de la page À propos" : "About page structure"}</legend>
+    <div className="field"><label>{language === "fr-FR" ? "Texte d’introduction sous le titre" : "Introductory text below the title"}<textarea name={`aboutLede${suffix}`} defaultValue={String(hero?.lede ?? defaults.lede)} maxLength={600} required /></label></div>
+    <p className="admin-muted">Les blocs éditoriaux ci-dessous conservent l’alternance exacte texte-image de la page publique.</p>
+    {shared ? <>
+      {[1, 2].map((index) => {
+        const image = images[index - 1] ?? {};
+        return <div className="admin-about-image-row" key={index}>
+          <div><strong>Image du bloc éditorial {index}</strong><AdminImageEditorInput name={`aboutStoryImage${index}`} label={image.url ? "Remplacer l’image" : "Importer l’image"} help="JPEG, PNG ou WebP · recadrage au ratio 75:83" currentPreviewUrl={image.url} defaultAspect="75:83" lockAspect defaultOutputWidth={1500} /><input type="hidden" name={`aboutStoryImageUrl${index}`} value={String(image.url ?? "")} /><input type="hidden" name={`aboutStoryImagePath${index}`} value={String(image.path ?? "")} /></div>
+          <div className="field"><label>Texte alternatif<input name={`aboutStoryAlt${index}${suffix}`} defaultValue={String(image.alt ?? "")} maxLength={240} /></label></div>
+        </div>;
+      })}
+    </> : null}
+    <RichTextEditor name={`aboutParagraph1${suffix}`} label="Bloc texte 1 · image à droite" initialContent={initialContent(translation, defaults.body)} disabled={false} />
+    <RichTextEditor name={`aboutParagraph2${suffix}`} label="Bloc texte 2 · image à gauche" initialContent={paragraph2 && typeof paragraph2 === "object" ? paragraph2 as never : paragraphsToRichTextDocument([defaults.body])} disabled={false} />
+  </fieldset>;
 }
 
 const homeDefaults = {
@@ -298,7 +384,7 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
   const homeFr = homeSettings(fr, "fr-FR");
   const homeEn = homeSettings(en, "en-GB");
 
-  return <Form method="post">
+  return <Form method="post" encType="multipart/form-data">
     <input type="hidden" name="intent" value="save_page" />
     <input type="hidden" name="pageKey" value={pageKey} />
     <div className="field">
@@ -316,7 +402,8 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
         <div className="field"><label>Titre<input name="titleFr" defaultValue={fr?.title ?? pageKey} required /></label></div>
         <div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? pageKey} required /></label></div>
         <div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? "Description à compléter avant publication."} required /></label></div>
-        <RichTextEditor name="contentFr" label="Paragraphes" initialContent={initialContent(fr, placeholderFr)} disabled={demo} />
+        {pageKey === "a-propos" ? null : <RichTextEditor name="contentFr" label="Paragraphes" initialContent={initialContent(fr, placeholderFr)} disabled={demo} />}
+        {pageKey === "a-propos" ? <AboutPageFields translation={fr} language="fr-FR" shared /> : null}
         {pageKey === "accueil" ? <HomeFields language="Français" statement={homeFr.statement} values={homeFr.values} /> : null}
       </fieldset>
       <fieldset>
@@ -324,7 +411,8 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
         <div className="field"><label>Title<input name="titleEn" defaultValue={en?.title ?? pageKey} required /></label></div>
         <div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? pageKey} required /></label></div>
         <div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? "Description to complete before publication."} required /></label></div>
-        <RichTextEditor name="contentEn" label="Paragraphs" initialContent={initialContent(en, placeholderEn)} disabled={demo} />
+        {pageKey === "a-propos" ? null : <RichTextEditor name="contentEn" label="Paragraphs" initialContent={initialContent(en, placeholderEn)} disabled={demo} />}
+        {pageKey === "a-propos" ? <AboutPageFields translation={en} language="en-GB" shared={false} /> : null}
         {pageKey === "accueil" ? <HomeFields language="English" statement={homeEn.statement} values={homeEn.values} /> : null}
       </fieldset>
     </div>
@@ -377,9 +465,9 @@ export default function AdminContent() {
         {keys.map((key) => {
           const page = byKey.get(key);
           if (key === "conseils") return <details className="ui-card admin-content-page" key={key}>
-            <summary><strong>conseils</strong><span className="ui-badge">Journal</span></summary>
+            <summary><strong>Blog</strong><span className="ui-badge">Blog</span></summary>
             <div className="admin-content-page__journal">
-              <p>Gérez la page Journal et les conseils déjà publiés.</p>
+              <p>Gérez la page Blog et les articles déjà publiés.</p>
               <div className="admin-content-page__actions"><Link className="ui-button ui-button--ghost" to="/conseils">Voir le journal</Link><Link className="ui-button ui-button--default" to="/admin/conseils?new=1">Nouveau blog</Link></div>
               {publishedAdvice.length ? <ul>{publishedAdvice.map((article) => <li key={article.id}><Link to={`/admin/conseils?article=${article.id}`}>{article.advice_translations.find((translation) => translation.locale === "fr-FR")?.title ?? article.slug}</Link><span>{new Date(article.published_at).toLocaleDateString("fr-FR")}</span></li>)}</ul> : <p className="admin-muted">Aucune publication n’est encore publiée.</p>}
             </div>

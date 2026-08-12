@@ -16,7 +16,7 @@ const navigation = [
   { section: "content", label: "Pages", href: "/admin/contenus", icon: FileText },
   { section: "announcement", label: "Bandeau", href: "/admin/bandeau", icon: Megaphone },
   { section: "faq", label: "FAQ", href: "/admin/faq", icon: CircleHelp },
-  { section: "advice", label: "Conseils", href: "/admin/conseils", icon: BookOpen },
+  { section: "advice", label: "Blog", href: "/admin/conseils", icon: BookOpen },
   { section: "changelog", label: "Modifications", href: "/admin/modifications", icon: History },
 ] as const;
 

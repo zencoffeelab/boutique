@@ -97,10 +97,7 @@ export function resizedImageDimensions({
   maximumDimension?: number;
 }) {
   const safeRatio = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
-  const maximumWidth = Math.max(
-    160,
-    Math.floor(Math.min(maximumDimension, maximumDimension * safeRatio)),
-  );
+  const maximumWidth = Math.max(160, Math.floor(Math.min(maximumDimension, maximumDimension * safeRatio)));
   const width = Math.round(clamp(requestedWidth, 160, maximumWidth));
   const height = Math.max(1, Math.round(width / safeRatio));
   return { width, height, maximumWidth };
