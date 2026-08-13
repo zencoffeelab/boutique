@@ -41,7 +41,7 @@ function AdviceStory({ article, locale, storyImages }: { article: Awaited<Return
     body2Image: story.body2ImageUrl ? { src: story.body2ImageUrl, alt: story.body2ImageAlt ?? "Coffee" } : (storyImages[1] ?? storyImages[0] ?? { src: "/media/home-hero-coffee-cherries.jpg", alt: "Coffee cherries" }),
   };
   const renderItem = (item: AdviceLayoutItem) => {
-    if (item.compartment === "title" || item.element === "introText") return null;
+    if (item.compartment === "title") return null;
     const customItem = item.customId ? layout.customItems.find((custom) => custom.id === item.customId) : undefined;
     if (item.compartment === "text" && item.customId && customItem) return <div className="advice-story__text" key={item.id}><RichTextContent content={[layout.customText?.[customItem.id] ?? (locale === "fr-FR" ? customItem.textFr : customItem.textEn) ?? ""]} /></div>;
     if (item.compartment === "image" && item.customId && customItem?.imageUrl) return <figure className="advice-story__image" key={item.id}><img src={customItem.imageUrl} alt={locale === "fr-FR" ? customItem.imageAltFr ?? "" : customItem.imageAltEn ?? ""} /></figure>;

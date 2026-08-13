@@ -6,12 +6,22 @@ vi.mock("~/lib/auth.server", () => ({
 vi.mock("~/lib/supabase.server", () => ({ createServiceSupabase: vi.fn() }));
 
 import { createServiceSupabase } from "~/lib/supabase.server";
-import { action } from "~/routes/admin-advice";
+import { action, removeAdviceLayoutItem } from "~/routes/admin-advice";
 
 const articleId = "11111111-1111-4111-8111-111111111111";
 
 describe("advice administration", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("removes only the selected publication slot", () => {
+    const items = [
+      { id: "title", compartment: "title" as const },
+      { id: "intro-image", compartment: "image" as const, element: "introImage" as const },
+      { id: "body", compartment: "textImage" as const, element: "bodyText" as const },
+    ];
+
+    expect(removeAdviceLayoutItem(items, items[1])).toEqual([items[0], items[2]]);
+  });
 
   it("deletes an article and records its previous content in the audit log", async () => {
     const before = { id: articleId, slug: "guide-v60", advice_translations: [{ locale: "fr-FR", title: "Guide V60" }] };

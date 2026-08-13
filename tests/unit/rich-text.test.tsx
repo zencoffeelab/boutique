@@ -6,9 +6,65 @@ import { TermsConditionsDocument } from "~/routes/legal";
 import {
   parseRichTextInput,
   storedBlocksToRichTextDocument,
+  synchronizeRichTextLayout,
 } from "~/lib/rich-text";
 
 describe("rich advice content", () => {
+  it("synchronizes table and accordion layouts between translations", () => {
+    const french = parseRichTextInput(JSON.stringify({ type: "doc", content: [
+      { type: "contentTable", attrs: { rows: [["FR 1", "FR 2"], ["FR 3", "FR 4"]] } },
+      { type: "contentAccordion", attrs: { title: "En savoir plus", body: "Texte français" } },
+    ] }), 1)!;
+    const english = parseRichTextInput(JSON.stringify({ type: "doc", content: [
+      { type: "paragraph", content: [{ type: "text", text: "EN 1" }] },
+      { type: "contentAccordion", attrs: { title: "Read more", body: "EN details" } },
+    ] }), 1)!;
+
+    const synchronized = synchronizeRichTextLayout(french, english);
+    expect(synchronized.content[0]).toEqual({ type: "contentTable", attrs: { rows: [["EN 1", ""], ["", ""]] } });
+    expect(synchronized.content[1]).toEqual({ type: "contentAccordion", attrs: { title: "Read more", body: "EN details" } });
+  });
+
+  it("matches translated accordion content by special-node order", () => {
+    const french = parseRichTextInput(JSON.stringify({ type: "doc", content: [
+      { type: "paragraph", content: [{ type: "text", text: "Introduction française" }] },
+      { type: "contentAccordion", attrs: { title: "Titre français", body: "Corps français" } },
+    ] }), 1)!;
+    const english = parseRichTextInput(JSON.stringify({ type: "doc", content: [
+      { type: "contentAccordion", attrs: { title: "English title", body: "English body" } },
+      { type: "paragraph", content: [{ type: "text", text: "English introduction" }] },
+    ] }), 1)!;
+
+    const synchronized = synchronizeRichTextLayout(french, english);
+    expect(synchronized.content[1]).toEqual({ type: "contentAccordion", attrs: { title: "English title", body: "English body" } });
+  });
+
+  it("reads double-encoded introductions and fills every translated table cell", () => {
+    const french = parseRichTextInput(JSON.stringify({ type: "doc", content: [
+      { type: "contentTable", attrs: { rows: [["Méthode", "Durée"], ["Filtre", "4 minutes"]] } },
+    ] }), 1)!;
+    const english = parseRichTextInput(JSON.stringify(JSON.stringify({ type: "doc", content: [
+      { type: "paragraph", content: [{ type: "text", text: "Method" }] },
+      { type: "paragraph", content: [{ type: "text", text: "Duration" }] },
+      { type: "paragraph", content: [{ type: "text", text: "Filter" }] },
+      { type: "paragraph", content: [{ type: "text", text: "4 minutes" }] },
+    ] })), 1)!;
+
+    expect(english.content[0]).toEqual({ type: "paragraph", content: [{ type: "text", text: "Method" }] });
+    expect(synchronizeRichTextLayout(french, english).content[0]).toEqual({
+      type: "contentTable",
+      attrs: { rows: [["Method", "Duration"], ["Filter", "4 minutes"]] },
+    });
+  });
+
+  it("unwraps an introduction accidentally stored as visible JSON text", () => {
+    const document = parseRichTextInput(JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "A real translated introduction with enough text." }] }] }) }] }],
+    }), 1);
+    expect(document?.content[0]?.content?.[0]?.text).toBe("A real translated introduction with enough text.");
+  });
+
   it("converts the former paragraph blocks without losing their content", () => {
     const document = storedBlocksToRichTextDocument([
       { type: "paragraph", content: "Premier paragraphe" },

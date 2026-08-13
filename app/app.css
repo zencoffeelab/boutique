@@ -2063,7 +2063,7 @@ button:disabled {
 }
 html.advice-detail-overflow-hidden,
 body.advice-detail-overflow-hidden {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 .advice-story .product-story {
   width: 100%;
@@ -3776,10 +3776,21 @@ body.advice-detail-overflow-hidden {
   color: #667062;
 }
 .admin-heading__actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  justify-items: end;
   justify-content: flex-end;
   gap: 0.65rem;
+}
+.admin-heading__actions .admin-editor__translation-action {
+  display: grid;
+  justify-items: end;
+  gap: 0.3rem;
+  text-align: right;
+}
+.admin-heading__actions .admin-editor__translation-action small {
+  max-width: 22rem;
+  color: #667062;
+  font-size: 0.72rem;
 }
 .admin-product-save-control {
   position: fixed;
@@ -5119,7 +5130,7 @@ body.advice-detail-overflow-hidden {
 }
 .admin-advice-editor__introduction .rich-text-field { display: grid; gap: .45rem; }
 .admin-advice-editor__introduction .rich-text-editor__toolbar { display: none; }
-.admin-advice-editor__introduction .rich-text-editor__content { min-height: 5.5rem; max-height: 7rem; overflow-y: auto; font: inherit; line-height: 1.5; }
+.admin-advice-editor__introduction .rich-text-editor__content { min-height: 16rem; max-height: 32rem; overflow-y: auto; font: inherit; line-height: 1.5; }
 .admin-advice-editor__seo {
   grid-column: 2;
   grid-row: 2;
@@ -5167,7 +5178,28 @@ body.advice-detail-overflow-hidden {
   grid-column: 1 / -1;
   grid-row: auto;
   order: 999;
-  justify-content: flex-end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.55rem;
+}
+.admin-advice-editor > .admin-editor__actions .admin-editor__translation-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  text-align: right;
+}
+.admin-advice-editor > .admin-editor__actions .admin-editor__translation-action small {
+  max-width: 24rem;
+  color: #667062;
+  font-size: 0.72rem;
+}
+.admin-content-page > .admin-delete-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.55rem;
 }
 .admin-advice-editor__introduction {
   padding: 1.25rem;

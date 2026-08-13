@@ -64,7 +64,16 @@ export function storedBlocksToRichTextDocument(blocks?: readonly StoredBlock[] |
 
 export function parseRichTextInput(value: string, minimumTextLength = 20): RichTextDocument | null {
   try {
-    const document = normalizeRichTextDocument(JSON.parse(value));
+    let parsed: unknown = JSON.parse(value);
+    for (let depth = 0; depth < 4 && typeof parsed === "string"; depth += 1) parsed = JSON.parse(parsed);
+    let document = normalizeRichTextDocument(parsed);
+    for (let depth = 0; document && depth < 2; depth += 1) {
+      const embeddedJson = document.content.length === 1 && document.content[0]?.type === "paragraph" && document.content[0].content?.length === 1 && document.content[0].content[0]?.type === "text" ? document.content[0].content[0].text : null;
+      if (!embeddedJson?.trim().startsWith("{")) break;
+      const embedded = normalizeRichTextDocument(JSON.parse(embeddedJson));
+      if (!embedded) break;
+      document = embedded;
+    }
     if (!document || richTextPlainText(document).trim().length < minimumTextLength) return null;
     return document;
   } catch {
@@ -84,6 +93,60 @@ export function richTextPlainText(document: RichTextDocument): string {
       : text;
   };
   return read(document);
+}
+
+export function synchronizeRichTextLayout(source: RichTextDocument, target: RichTextDocument): RichTextDocument {
+  const targetText = target.content.flatMap((node) => collectRichTextText(node));
+  const targetSpecial = target.content.flatMap((node) => collectRichTextSpecialNodes(node));
+  let textIndex = 0;
+  let specialIndex = 0;
+  const nextText = (fallback: string) => targetText[textIndex++] ?? fallback;
+  const clone = (sourceNode: RichTextNode, targetNode?: RichTextNode): RichTextNode => {
+    if (sourceNode.type === "text") {
+      return { ...sourceNode, text: nextText(sourceNode.text ?? ""), marks: targetNode?.type === "text" ? targetNode.marks : sourceNode.marks };
+    }
+    if (sourceNode.type === "contentTable") {
+      const matchingTarget = targetSpecial[specialIndex++];
+      const sourceRows = Array.isArray(sourceNode.attrs?.rows) ? sourceNode.attrs.rows : [];
+      const targetRows = matchingTarget?.type === "contentTable" && Array.isArray(matchingTarget.attrs?.rows) ? matchingTarget.attrs.rows : targetNode?.type === "contentTable" && Array.isArray(targetNode.attrs?.rows) ? targetNode.attrs.rows : [];
+      const targetTableText = targetRows.flatMap((row) => Array.isArray(row) ? row.filter((cell): cell is string => typeof cell === "string" && cell.trim().length > 0) : []);
+      let tableTextIndex = 0;
+      const rows = sourceRows.map((sourceRow, rowIndex) => (Array.isArray(sourceRow) ? sourceRow : []).map((_, columnIndex) => {
+        const targetRow = Array.isArray(targetRows[rowIndex]) ? targetRows[rowIndex] : [];
+        const fallbackTableText = targetTableText[tableTextIndex++];
+        if (typeof targetRow[columnIndex] === "string" && targetRow[columnIndex].trim()) return targetRow[columnIndex];
+        if (fallbackTableText) return fallbackTableText;
+        return nextText("");
+      }));
+      return { type: "contentTable", attrs: { rows } } satisfies RichTextNode;
+    }
+    if (sourceNode.type === "contentAccordion") {
+      const matchingTarget = targetSpecial[specialIndex++];
+      const targetAttrs = matchingTarget?.type === "contentAccordion" ? matchingTarget.attrs : targetNode?.type === "contentAccordion" ? targetNode.attrs : undefined;
+      return {
+        type: "contentAccordion",
+        attrs: {
+          title: typeof targetAttrs?.title === "string" ? targetAttrs.title : "Read more",
+          body: typeof targetAttrs?.body === "string" ? targetAttrs.body : targetNode ? richTextPlainText({ type: "doc", content: [targetNode] }).trim() : nextText(""),
+        },
+      } satisfies RichTextNode;
+    }
+    const content = sourceNode.content?.map((child, index) => clone(child, targetNode?.content?.[index]))
+      ?? (sourceNode.type === "text" ? undefined : sourceNode.content);
+    return { ...sourceNode, ...(content ? { content } : {}) };
+  };
+  return { ...source, content: source.content.map((node, index) => clone(node, target.content[index])) };
+}
+
+function collectRichTextText(node: RichTextNode): string[] {
+  if (node.type === "text") return [node.text ?? ""];
+  if (node.type === "contentTable" || node.type === "contentAccordion") return [];
+  return node.content?.flatMap(collectRichTextText) ?? [];
+}
+
+function collectRichTextSpecialNodes(node: RichTextNode): RichTextNode[] {
+  if (node.type === "contentTable" || node.type === "contentAccordion") return [node];
+  return node.content?.flatMap(collectRichTextSpecialNodes) ?? [];
 }
 
 function normalizeRichTextDocument(value: unknown): RichTextDocument | null {

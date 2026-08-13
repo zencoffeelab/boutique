@@ -24,7 +24,7 @@ import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor, useEd
 import StarterKit from "@tiptap/starter-kit";
 import type { ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
-import type { RichTextDocument } from "~/lib/rich-text";
+import { parseRichTextInput, synchronizeRichTextLayout, type RichTextDocument } from "~/lib/rich-text";
 
 type RichTextEditorProps = {
   name: string;
@@ -93,7 +93,10 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
       },
     },
     onUpdate: ({ editor: currentEditor }) => {
-      if (hiddenInput.current) hiddenInput.current.value = JSON.stringify(currentEditor.getJSON());
+      if (hiddenInput.current) {
+        hiddenInput.current.value = JSON.stringify(currentEditor.getJSON());
+        hiddenInput.current.dispatchEvent(new Event("input", { bubbles: true }));
+      }
     },
   });
   useEffect(() => {
@@ -107,6 +110,32 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
     form.addEventListener("submit", syncBeforeSubmit);
     return () => form.removeEventListener("submit", syncBeforeSubmit);
   }, [editor]);
+  useEffect(() => {
+    if (!editor || disabled || !["excerptEn", "bodyEn", "body2En"].includes(name)) return;
+    const sourceName = name.replace(/En$/, "Fr");
+    const form = hiddenInput.current?.form;
+    const sourceInput = form?.querySelector<HTMLInputElement>(`input[name="${sourceName}"]`);
+    const targetInput = hiddenInput.current;
+    if (!sourceInput) return;
+    const synchronize = () => {
+      const source = parseRichTextInput(sourceInput.value, 1);
+      if (!source) return;
+      const target = parseRichTextInput(JSON.stringify(editor.getJSON()), name === "excerptEn" ? 0 : 1) ?? initialContent;
+      editor.commands.setContent(synchronizeRichTextLayout(source, target));
+    };
+    const applyTranslatedContent = () => {
+      if (!targetInput) return;
+      const translated = parseRichTextInput(targetInput.value, name === "excerptEn" ? 0 : 1);
+      if (translated) editor.commands.setContent(translated, { emitUpdate: false });
+    };
+    synchronize();
+    sourceInput.addEventListener("input", synchronize);
+    targetInput?.addEventListener("rich-text-translation", applyTranslatedContent);
+    return () => {
+      sourceInput.removeEventListener("input", synchronize);
+      targetInput?.removeEventListener("rich-text-translation", applyTranslatedContent);
+    };
+  }, [editor, disabled, initialContent, name]);
   const state = useEditorState({
     editor,
     selector: ({ editor: currentEditor }) => ({

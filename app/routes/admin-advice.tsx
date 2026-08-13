@@ -1,13 +1,13 @@
 import { Plus, Trash2, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
-import { Form, Link, useActionData, useLoaderData, useLocation } from "react-router";
+import { Form, Link, useActionData, useFetcher, useLoaderData, useLocation } from "react-router";
 import { z } from "zod";
 import { AdminShell } from "~/components/admin-shell";
 import { AdminImageEditorInput } from "~/components/admin-image-editor-input";
 import { RichTextEditor } from "~/components/rich-text-editor";
 import { requireAdmin } from "~/lib/auth.server";
-import { paragraphsToRichTextDocument, parseRichTextInput, richTextPlainText, storedBlocksToRichTextDocument } from "~/lib/rich-text";
+import { paragraphsToRichTextDocument, parseRichTextInput, richTextPlainText, storedBlocksToRichTextDocument, synchronizeRichTextLayout } from "~/lib/rich-text";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
 type Translation = { locale: "fr-FR" | "en-GB"; title: string; excerpt: string; blocks: Array<{ type?: string; content: unknown }>; seo_title: string; seo_description: string };
@@ -72,6 +72,63 @@ const schema = z.object({
   shortIntroFr: z.string().trim().max(280).optional(), shortIntroEn: z.string().trim().max(280).optional(),
 });
 const deleteSchema = z.object({ intent: z.literal("delete_advice"), id: z.uuid() });
+const translateAdviceSchema = z.object({
+  intent: z.literal("translate_advice"),
+  titleFr: z.string().trim().min(1), excerptFr: z.string().trim().min(1), bodyFr: z.string().trim().min(1),
+  body2Fr: z.string().optional(), seoTitleFr: z.string().trim().min(1), seoDescriptionFr: z.string().trim().min(1), shortIntroFr: z.string().optional(),
+  introImageAltFr: z.string().optional(), bodyImageAltFr: z.string().optional(), body2ImageAltFr: z.string().optional(),
+  customTextFr: z.string().optional(), customImageAltFr: z.string().optional(),
+});
+
+type AdviceTranslation = { titleEn: string; excerptEn: string; bodyEn: string; body2En: string; seoTitleEn: string; seoDescriptionEn: string; shortIntroEn: string; introImageAltEn: string; bodyImageAltEn: string; body2ImageAltEn: string; customTextEn: string; customImageAltEn: string };
+type AdviceTranslationResponse = { ok: boolean; message: string; translation?: AdviceTranslation };
+
+async function translateAdviceToEnglish(fields: z.infer<typeof translateAdviceSchema>) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return { ok: false as const, message: "La traduction automatique n’est pas configurée. Ajoutez OPENAI_API_KEY aux variables d’environnement du serveur." };
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: process.env.OPENAI_TRANSLATION_MODEL ?? "gpt-5-mini",
+      input: [{ role: "user", content: [{ type: "input_text", text: `Translate this French coffee blog article into natural British English. Return only JSON. Preserve the exact JSON structure, node order, node types, table dimensions, accordion positions, and formatting. Translate every human-readable string, including title, paragraphs, headings, every non-empty table cell, accordion titles and bodies, SEO fields, image alternative text, custom text and the short introduction. Every non-empty French table cell must have a translated English value in the corresponding row and column; never leave that English cell blank and never turn a table into paragraphs. Do not add, remove, merge or reorder any node. Keep URLs, proper names, technical values and custom item IDs unchanged. The JSON document fields excerptEn, bodyEn and body2En must remain valid rich-text documents with the exact same structure as their French counterparts. customTextEn and customImageAltEn are JSON objects: preserve their keys exactly and translate only their string values.\n\n${JSON.stringify(fields)}` }] }],
+      text: { format: { type: "json_schema", name: "blog_translation", strict: true, schema: { type: "object", additionalProperties: false, properties: { titleEn: { type: "string" }, excerptEn: { type: "string" }, bodyEn: { type: "string" }, body2En: { type: "string" }, seoTitleEn: { type: "string" }, seoDescriptionEn: { type: "string" }, shortIntroEn: { type: "string" }, introImageAltEn: { type: "string" }, bodyImageAltEn: { type: "string" }, body2ImageAltEn: { type: "string" }, customTextEn: { type: "string" }, customImageAltEn: { type: "string" } }, required: ["titleEn", "excerptEn", "bodyEn", "body2En", "seoTitleEn", "seoDescriptionEn", "shortIntroEn", "introImageAltEn", "bodyImageAltEn", "body2ImageAltEn", "customTextEn", "customImageAltEn"] } } },
+    }),
+  });
+  if (!response.ok) return { ok: false as const, message: "La traduction automatique est temporairement indisponible." };
+  const payload = await response.json() as { output_text?: unknown; output?: Array<{ type?: unknown; content?: Array<{ type?: unknown; text?: unknown }> }> };
+  const outputText = typeof payload.output_text === "string" ? payload.output_text : payload.output?.filter((item) => item.type === "message").flatMap((item) => item.content ?? []).filter((part) => part.type === "output_text" && typeof part.text === "string").map((part) => part.text as string).join("");
+  if (!outputText) return { ok: false as const, message: "La traduction automatique n’a pas renvoyé de texte exploitable." };
+  try {
+    const translation = JSON.parse(outputText) as AdviceTranslationResponse["translation"];
+    if (!translation || ["titleEn", "excerptEn", "bodyEn", "body2En", "seoTitleEn", "seoDescriptionEn", "shortIntroEn", "introImageAltEn", "bodyImageAltEn", "body2ImageAltEn", "customTextEn", "customImageAltEn"].some((key) => typeof translation[key as keyof NonNullable<typeof translation>] !== "string")) {
+      return { ok: false as const, message: "La traduction automatique est incomplète." };
+    }
+    const toDocument = (value: string) => parseRichTextInput(value, 0) ?? (value.trim().startsWith("{") ? { type: "doc" as const, content: [] } : paragraphsToRichTextDocument([value]));
+    const excerptEn = synchronizeRichTextLayout(parseIntroduction(fields.excerptFr), toDocument(translation.excerptEn));
+    const bodyEn = synchronizeRichTextLayout(toDocument(fields.bodyFr), toDocument(translation.bodyEn));
+    const body2En = fields.body2Fr?.trim() ? synchronizeRichTextLayout(toDocument(fields.body2Fr), toDocument(translation.body2En)) : null;
+    const hasMissingTableText = (source: ReturnType<typeof toDocument>, target: ReturnType<typeof toDocument>) => {
+      const tables = (document: ReturnType<typeof toDocument>) => document.content.flatMap(function find(node): Array<{ rows: string[][] }> {
+        if (node.type === "contentTable") return [{ rows: Array.isArray(node.attrs?.rows) ? node.attrs.rows.map((row) => Array.isArray(row) ? row.map((cell) => String(cell ?? "")) : []) : [] }];
+        return node.content?.flatMap(find) ?? [];
+      });
+      const sourceTables = tables(source);
+      const targetTables = tables(target);
+      return sourceTables.some((table, tableIndex) => table.rows.some((row, rowIndex) => row.some((cell, columnIndex) => cell.trim() && !(targetTables[tableIndex]?.rows[rowIndex]?.[columnIndex] ?? "").trim())));
+    };
+    if (hasMissingTableText(parseIntroduction(fields.excerptFr), excerptEn) || hasMissingTableText(toDocument(fields.bodyFr), bodyEn) || (fields.body2Fr?.trim() && body2En && hasMissingTableText(toDocument(fields.body2Fr), body2En))) {
+      return { ok: false as const, message: "La traduction du tableau est incomplète. Aucun contenu n’a été appliqué ; réessayez." };
+    }
+    return {
+      ok: true as const,
+      message: "Tous les contenus anglais ont été traduits en conservant la mise en page française.",
+      translation: { ...translation, excerptEn: JSON.stringify(excerptEn), bodyEn: JSON.stringify(bodyEn), body2En: body2En ? JSON.stringify(body2En) : "" },
+    };
+  } catch {
+    return { ok: false as const, message: "La traduction automatique a renvoyé un format invalide. Réessayez." };
+  }
+}
 
 function isUploadFile(value: FormDataEntryValue | null): value is File {
   return Boolean(value && typeof value === "object" && typeof (value as File).size === "number" && typeof (value as File).type === "string" && typeof (value as File).arrayBuffer === "function");
@@ -83,7 +140,7 @@ function uploadedFile(form: FormData, name: string) {
 }
 
 function parseIntroduction(value: string) {
-  return parseRichTextInput(value, 10) ?? paragraphsToRichTextDocument([value]);
+  return parseRichTextInput(value, 0) ?? (value.trim().startsWith("{") ? { type: "doc" as const, content: [] } : paragraphsToRichTextDocument([value]));
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -102,6 +159,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const form = Object.fromEntries(formData);
   const client = createServiceSupabase();
+  if (form.intent === "translate_advice") {
+    const parsed = translateAdviceSchema.safeParse(form);
+    if (!parsed.success) return { ok: false, message: "Complétez d’abord les contenus français de l’article." };
+    return translateAdviceToEnglish(parsed.data);
+  }
   if (!client) return { ok: false, message: "Base indisponible." };
   if (form.intent === "delete_advice") {
     const parsed = deleteSchema.safeParse(form);
@@ -157,13 +219,15 @@ export async function action({ request }: ActionFunctionArgs) {
     return { ok: false, message: fields.length ? `Champs invalides ou manquants : ${fields.join(", ")}.` : "Complétez les deux langues et les sections de l’article." };
   }
   const bodyFr = parsed.data.bodyFr ? parseRichTextInput(parsed.data.bodyFr, 1) : null;
-  const bodyEn = parsed.data.bodyEn ? parseRichTextInput(parsed.data.bodyEn, 1) : null;
+  const bodyEnInput = parsed.data.bodyEn ? parseRichTextInput(parsed.data.bodyEn, 1) : null;
+  const bodyEn = bodyFr && bodyEnInput ? synchronizeRichTextLayout(bodyFr, bodyEnInput) : bodyEnInput;
   const excerptFr = parseIntroduction(parsed.data.excerptFr);
-  const excerptEn = parseIntroduction(parsed.data.excerptEn);
+  const excerptEn = synchronizeRichTextLayout(excerptFr, parseIntroduction(parsed.data.excerptEn));
   const resolvedBodyFr = bodyFr ?? paragraphsToRichTextDocument([richTextPlainText(excerptFr)]);
   const resolvedBodyEn = bodyEn ?? paragraphsToRichTextDocument([richTextPlainText(excerptEn)]);
   const body2Fr = parsed.data.body2Fr ? parseRichTextInput(parsed.data.body2Fr, 1) : null;
-  const body2En = parsed.data.body2En ? parseRichTextInput(parsed.data.body2En, 1) : null;
+  const body2EnInput = parsed.data.body2En ? parseRichTextInput(parsed.data.body2En, 1) : null;
+  const body2En = body2Fr && body2EnInput ? synchronizeRichTextLayout(body2Fr, body2EnInput) : body2EnInput;
   const resolvedBody2Fr = body2Fr && body2En ? body2Fr : null;
   const resolvedBody2En = body2Fr && body2En ? body2En : null;
   let layoutConfig = defaultAdviceLayout;
@@ -272,8 +336,53 @@ function LanguageTabs({ label, french, english }: { label: string; french: React
   </div>;
 }
 
+function AutomaticAdviceTranslation({ formId }: { formId: string }) {
+  const fetcher = useFetcher<AdviceTranslationResponse>();
+  const formRef = useRef<HTMLFormElement | null>(null);
+  useEffect(() => {
+    const translation = fetcher.data?.translation;
+    if (!translation) return;
+    const form = formRef.current;
+    if (!form) return;
+    const directFields = Object.entries(translation).filter(([name]) => !["customTextEn", "customImageAltEn"].includes(name));
+    for (const [name, value] of directFields) {
+      const field = form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${name}"]`);
+      if (!field) continue;
+      field.value = String(value);
+      if (["excerptEn", "bodyEn", "body2En"].includes(name)) field.dispatchEvent(new Event("rich-text-translation", { bubbles: true }));
+      else field.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    for (const [prefix, value] of [["customTextEn-", translation.customTextEn], ["customImageAltEn-", translation.customImageAltEn]] as const) {
+      try {
+        const translatedFields = JSON.parse(value) as Record<string, unknown>;
+        for (const [id, text] of Object.entries(translatedFields)) {
+          const field = form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${prefix}${CSS.escape(id)}"]`);
+          if (!field || typeof text !== "string") continue;
+          field.value = text;
+          field.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      } catch { /* The server still returns the translated standard fields. */ }
+    }
+  }, [fetcher.data]);
+  const translate = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const form = document.getElementById(formId) as HTMLFormElement | null;
+    if (!form) return;
+    formRef.current = form;
+    const names = ["titleFr", "excerptFr", "bodyFr", "body2Fr", "seoTitleFr", "seoDescriptionFr", "shortIntroFr", "introImageAltFr", "bodyImageAltFr", "body2ImageAltFr"];
+    const values: Record<string, string> = Object.fromEntries(names.map((name) => [name, form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${name}"]`)?.value ?? ""]));
+    values.customTextFr = JSON.stringify(Object.fromEntries(Array.from(form.querySelectorAll<HTMLTextAreaElement>('textarea[name^="customTextFr-"]'), (field) => [field.name.slice("customTextFr-".length), field.value])));
+    values.customImageAltFr = JSON.stringify(Object.fromEntries(Array.from(form.querySelectorAll<HTMLInputElement>('input[name^="customImageAltFr-"]'), (field) => [field.name.slice("customImageAltFr-".length), field.value])));
+    fetcher.submit({ intent: "translate_advice", ...values }, { method: "post" });
+  };
+  return <div className="admin-editor__translation-action"><button className="ui-button ui-button--ghost" type="button" onClick={translate} disabled={fetcher.state !== "idle"}>{fetcher.state === "idle" ? "Traduire en anglais" : "Traduction en cours…"}</button>{fetcher.data?.ok === false ? <small className="form-error" aria-live="polite">{fetcher.data.message}</small> : null}</div>;
+}
+
 function StoryImage({ url, alt }: { url: string; alt: string }) {
   return url ? <img src={url} alt={alt} /> : <div className="admin-editorial-block__placeholder">Aucune image</div>;
+}
+
+export function removeAdviceLayoutItem(items: readonly AdviceLayoutItem[], item: AdviceLayoutItem) {
+  return items.filter((currentItem) => currentItem.id !== item.id);
 }
 
 function AdviceLayoutOrganizer({ initialLayout }: { initialLayout: AdviceLayout }) {
@@ -302,7 +411,7 @@ function AdviceLayoutOrganizer({ initialLayout }: { initialLayout: AdviceLayout 
     setDragged(null);
   };
   const removeLayoutItem = (item: AdviceLayoutItem) => {
-    setLayoutState((current) => ({ ...current, items: current.items.filter((currentItem) => currentItem.id !== item.id && currentItem.customId !== item.customId) }));
+    setLayoutState((current) => ({ ...current, items: removeAdviceLayoutItem(current.items, item) }));
     if (item.customId) setCustomItems((items) => items.filter((customItem) => customItem.id !== item.customId));
   };
   const requestLayoutRemoval = (item: AdviceLayoutItem) => setPendingRemoval({ kind: "layout", item, label: item.label ?? labels[item.compartment] });
@@ -426,8 +535,9 @@ function ArticleForm({ article, demo }: { article?: Article; demo: boolean }) {
   const block = (position: 1 | 2, locale: "Fr" | "En", translation: Translation | undefined, data: Record<string, unknown> | undefined) => <fieldset className="admin-editorial-block__language"><legend>{locale === "Fr" ? "Français" : "English"}</legend><RichTextEditor name={position === 1 ? `body${locale}` : `body2${locale}`} label={locale === "Fr" ? "Texte" : "Text"} initialContent={position === 1 ? storedBlocksToRichTextDocument(translation?.blocks) : storedBlocksToRichTextDocument([{ type: "richText", content: data?.body2 }])} disabled={demo} /><input type="hidden" name={position === 1 ? `bodyImageUrl${locale}` : `body2ImageUrl${locale}`} value={String(position === 1 ? data?.bodyImageUrl ?? "" : data?.body2ImageUrl ?? "")} /><AdminImageEditorInput name={position === 1 ? `bodyImageFile${locale}` : `body2ImageFile${locale}`} label={locale === "Fr" ? "Image du bloc" : "Block image"} help="JPEG, PNG ou WebP · recadrage au ratio 75:83" currentPreviewUrl={String(position === 1 ? data?.bodyImageUrl ?? "" : data?.body2ImageUrl ?? "")} defaultAspect="75:83" lockAspect defaultOutputWidth={1500} /><div className="field"><label>{locale === "Fr" ? "Texte alternatif" : "Alternative text"}<input name={position === 1 ? `bodyImageAlt${locale}` : `body2ImageAlt${locale}`} defaultValue={String(position === 1 ? data?.bodyImageAlt ?? "" : data?.body2ImageAlt ?? "")} /></label></div></fieldset>;
   const editorial = (position: 1 | 2, imageFirst: boolean) => <section className={`admin-editorial-block admin-advice-editor__block${imageFirst ? "" : " admin-advice-editor__block--copy-first"}`}><header className="admin-editorial-block__heading"><div><p className="eyebrow">Bloc {position}</p><h3>{imageFirst ? "Image à gauche · texte à droite" : "Texte à gauche · image à droite"}</h3></div></header><div className="admin-editorial-block__layout"><div className="admin-editorial-block__image"><StoryImage url={String(position === 1 ? frLayout?.bodyImageUrl ?? "" : frLayout?.body2ImageUrl ?? "")} alt={String(position === 1 ? frLayout?.bodyImageAlt ?? "" : frLayout?.body2ImageAlt ?? "")} /></div><div className="admin-editorial-block__content"><LanguageTabs label={`Langue du bloc ${position}`} french={block(position, "Fr", fr, frLayout)} english={block(position, "En", en, enLayout)} /></div></div></section>;
   const actionLabel = article ? "Modifier" : null;
+  const formId = `advice-form-${article?.id ?? "new"}`;
   const layoutOrganizer = <AdviceLayoutOrganizer initialLayout={parseAdviceLayoutWithCustomItems(frLayout?.layoutConfig)} />;
-  return <Form method="post" encType="multipart/form-data" className="admin-advice-editor"><input type="hidden" name="intent" value="save_advice" /><input type="hidden" name="id" value={article?.id ?? ""} /><section className="admin-advice-editor__top"><div className="admin-advice-editor__settings"><p className="eyebrow">Publication</p><div className="form-grid"><label>Slug<input name="slug" defaultValue={article?.slug ?? ""} required /></label><label>Statut<select name="status" defaultValue={article?.status ?? "draft"}><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label><label>Date de publication<input name="publishedAt" type="datetime-local" defaultValue={(article?.published_at ?? new Date().toISOString()).slice(0, 16)} required /></label></div></div><section className="admin-advice-editor__introduction"><h2>Titre et introduction</h2><LanguageTabs label="Langue du titre et de l’introduction" french={intro("Fr", fr)} english={intro("En", en)} /></section></section>{layoutOrganizer}{editorial(1, false)}{editorial(2, true)}<section className="admin-advice-editor__seo"><h3>Référencement</h3><LanguageTabs label="Langue du référencement" french={<fieldset className="admin-editorial-block__language"><legend>Français</legend><div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? ""} required /></label></div><div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? ""} required /></label></div></fieldset>} english={<fieldset className="admin-editorial-block__language"><legend>English</legend><div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? ""} required /></label></div><div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? ""} required /></label></div></fieldset>} /></section><div className="admin-editor__actions"><button className="ui-button ui-button--default" disabled={demo}>{actionLabel ?? <><Plus /> Nouveau blog</>}</button>{article ? <Link className="ui-button ui-button--ghost" to={`/conseils/${article.slug}`}>Lire l’article</Link> : null}</div></Form>;
+  return <Form id={formId} method="post" encType="multipart/form-data" className="admin-advice-editor"><input type="hidden" name="intent" value="save_advice" /><input type="hidden" name="id" value={article?.id ?? ""} /><section className="admin-advice-editor__top"><div className="admin-advice-editor__settings"><p className="eyebrow">Publication</p><div className="form-grid"><label>Slug<input name="slug" defaultValue={article?.slug ?? ""} required /></label><label>Statut<select name="status" defaultValue={article?.status ?? "draft"}><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label><label>Date de publication<input name="publishedAt" type="datetime-local" defaultValue={(article?.published_at ?? new Date().toISOString()).slice(0, 16)} required /></label></div></div><section className="admin-advice-editor__introduction"><h2>Titre et introduction</h2><LanguageTabs label="Langue du titre et de l’introduction" french={intro("Fr", fr)} english={intro("En", en)} /></section></section>{layoutOrganizer}{editorial(1, false)}{editorial(2, true)}<section className="admin-advice-editor__seo"><h3>Référencement</h3><LanguageTabs label="Langue du référencement" french={<fieldset className="admin-editorial-block__language"><legend>Français</legend><div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? ""} required /></label></div><div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? ""} required /></label></div></fieldset>} english={<fieldset className="admin-editorial-block__language"><legend>English</legend><div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? ""} required /></label></div><div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? ""} required /></label></div></fieldset>} /></section><div className="admin-editor__actions"><button className="ui-button ui-button--default" disabled={demo}>{actionLabel ?? <><Plus /> Nouveau blog</>}</button>{article ? <Link className="ui-button ui-button--ghost" to={`/conseils/${article.slug}`}>Lire l’article</Link> : null}<AutomaticAdviceTranslation formId={formId} /></div></Form>;
 }
 
 export default function AdminAdvice() {

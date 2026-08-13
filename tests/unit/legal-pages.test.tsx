@@ -28,5 +28,7 @@ describe("legal pages", () => {
     expect(alternatePath("/en/legal-notice")).toBe("/mentions-legales");
     expect(alternatePath("/politique-de-confidentialite")).toBe("/en/privacy-policy");
     expect(alternatePath("/en/privacy-policy")).toBe("/politique-de-confidentialite");
+    expect(alternatePath("/conseils/guide-filtre")).toBe("/en/tips/guide-filtre");
+    expect(alternatePath("/en/tips/guide-filtre")).toBe("/conseils/guide-filtre");
   });
 });

@@ -69,6 +69,7 @@ export function alternatePath(pathname: string): string {
   if (pathname === "/en/privacy-policy") return "/politique-de-confidentialite";
   if (pathname.startsWith("/en/")) return pathname.slice(3) || "/";
   if (pathname.startsWith("/boutique/")) return pathname.replace("/boutique/", "/en/shop/");
+  if (pathname.startsWith("/conseils/")) return pathname.replace("/conseils/", "/en/tips/");
   const mappings: Record<string, string> = {
     "/": "/en",
     "/boutique": "/en/shop",
