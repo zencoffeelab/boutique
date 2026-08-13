@@ -43,6 +43,26 @@ function EditableTable({ node, updateAttributes, deleteNode, editor }: { node: {
   return <NodeViewWrapper className="rich-text-editor__table-node"><div className="rich-text-editor__table-actions"><button type="button" onClick={addRow} disabled={!editor.isEditable}>+ ligne</button><button type="button" onClick={removeRow} disabled={!editor.isEditable || rows.length <= 1}>− ligne</button><button type="button" onClick={addColumn} disabled={!editor.isEditable}>+ colonne</button><button type="button" onClick={removeColumn} disabled={!editor.isEditable || (rows[0]?.length ?? 1) <= 1}>− colonne</button><button type="button" className="rich-text-editor__table-delete" onClick={() => { if (editor.isEditable && window.confirm("Supprimer ce tableau ?")) deleteNode(); }} disabled={!editor.isEditable}>Supprimer le tableau</button></div><table><tbody>{rows.map((row, rowIndex) => <tr key={`row-${rowIndex}`}>{row.map((cell, columnIndex) => { const Cell = rowIndex === 0 ? "th" : "td"; return <Cell key={`cell-${rowIndex}-${columnIndex}`}><input value={cell} disabled={!editor.isEditable} onChange={(event) => updateCell(rowIndex, columnIndex, event.currentTarget.value)} /></Cell>; })}</tr>)}</tbody></table></NodeViewWrapper>;
 }
 
+function EditableAccordion({ node, updateAttributes, deleteNode, editor }: { node: { attrs: { title?: unknown; body?: unknown; bodyDocument?: unknown } }; updateAttributes: (attrs: Record<string, unknown>) => void; deleteNode: () => void; editor: { isEditable: boolean } }) {
+  const title = String(node.attrs.title ?? "");
+  const body = String(node.attrs.body ?? "");
+  const titleInput = useRef<HTMLInputElement>(null);
+  const bodyInput = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (titleInput.current && document.activeElement !== titleInput.current && titleInput.current.value !== title) titleInput.current.value = title;
+    if (bodyInput.current && document.activeElement !== bodyInput.current && bodyInput.current.value !== body) bodyInput.current.value = body;
+  }, [title, body]);
+  const updateBody = (value: string) => {
+    const bodyDocument = { type: "doc" as const, content: value.split(/\r?\n/).map((line) => ({ type: "paragraph" as const, content: line ? [{ type: "text" as const, text: line }] : [] })) };
+    updateAttributes({ body: value, bodyDocument: JSON.stringify(bodyDocument) });
+  };
+  return <NodeViewWrapper className="rich-text-editor__accordion-node">
+    <label>Titre<input ref={titleInput} defaultValue={title} disabled={!editor.isEditable} onInput={(event) => updateAttributes({ title: event.currentTarget.value })} /></label>
+    <label>Contenu<textarea ref={bodyInput} defaultValue={body} disabled={!editor.isEditable} rows={4} onInput={(event) => updateBody(event.currentTarget.value)} /></label>
+    <button type="button" className="rich-text-editor__accordion-delete" disabled={!editor.isEditable} onClick={() => { if (window.confirm("Supprimer cet accordéon ?")) deleteNode(); }}>Supprimer l’accordéon</button>
+  </NodeViewWrapper>;
+}
+
 const contentTable = Node.create({
   name: "contentTable",
   group: "block",
@@ -60,6 +80,7 @@ const contentAccordion = Node.create({
   addAttributes: () => ({ title: { default: "Titre de l’accordéon" }, body: { default: "Contenu à afficher" }, bodyDocument: { default: null } }),
   parseHTML: () => [{ tag: "details[data-rich-accordion]" }],
   renderHTML: ({ node }) => ["details", { "data-rich-accordion": "true" }, ["summary", {}, String(node.attrs.title ?? "")], ["p", {}, String(node.attrs.body ?? "")]],
+  addNodeView: () => ReactNodeViewRenderer(EditableAccordion),
 });
 
 export function RichTextEditor({ name, initialContent, disabled = false, label }: RichTextEditorProps) {
@@ -119,14 +140,14 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
     const targetInput = hiddenInput.current;
     if (!sourceInput) return;
     const synchronize = () => {
-      const source = parseRichTextInput(sourceInput.value, 1);
+    const source = parseRichTextInput(sourceInput?.value ?? "", 1);
       if (!source) return;
       const target = parseRichTextInput(JSON.stringify(editor.getJSON()), name === "excerptEn" ? 0 : 1) ?? initialContent;
       editor.commands.setContent(synchronizeRichTextLayout(source, target));
     };
     const applyTranslatedContent = () => {
       if (!targetInput) return;
-      const translated = parseRichTextInput(targetInput.value, name === "excerptEn" ? 0 : 1);
+      const translated = parseRichTextInput(targetInput?.value ?? "", name === "excerptEn" ? 0 : 1);
       if (translated) editor.commands.setContent(translated, { emitUpdate: false });
     };
     synchronize();

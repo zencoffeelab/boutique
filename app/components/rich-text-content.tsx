@@ -46,7 +46,7 @@ function renderNode(node: RichTextNode, index: number, accordionState?: Accordio
     case "contentAccordion": {
       const open = accordionState?.openAccordion === key;
       const body = accordionBodyDocument(String(node.attrs?.bodyDocument ?? node.attrs?.body ?? ""));
-      return <div className={`rich-text-accordion${open ? " is-open" : ""}`} key={key}><button type="button" className="rich-text-accordion__trigger" aria-expanded={open} onMouseDown={(event) => { event.preventDefault(); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); accordionState?.setOpenAccordion(open ? null : key); }}>{String(node.attrs?.title ?? "")}</button>{open ? <div className="rich-text-accordion__body">{body.content.map((child, childIndex) => renderNode(child, childIndex, accordionState))}</div> : null}</div>;
+      return <details className={`rich-text-accordion${open ? " is-open" : ""}`} key={key} open={open}><summary className="rich-text-accordion__trigger" onClick={(event) => { event.preventDefault(); event.stopPropagation(); accordionState?.setOpenAccordion(open ? null : key); }}>{String(node.attrs?.title ?? "")}</summary>{open ? <div className="rich-text-accordion__body">{body.content.map((child, childIndex) => renderNode(child, childIndex, accordionState))}</div> : null}</details>;
     }
     default: return null;
   }

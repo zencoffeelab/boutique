@@ -34,6 +34,18 @@ function adviceLayout(value: unknown): AdviceLayout {
   return normalizedSlots.length === 3 ? { items: items.length ? items : defaultAdviceLayout.items, elements, slots: normalizedSlots, customItems, customText, shortIntroFr, shortIntroEn } : defaultAdviceLayout;
 }
 
+function customTextContent(value: unknown) {
+  if (value && typeof value === "object" && (value as { type?: unknown }).type === "doc" && Array.isArray((value as { content?: unknown }).content)) return value as Parameters<typeof RichTextContent>[0]["content"];
+  const text = typeof value === "string" ? value : String(value ?? "");
+  return parseRichTextInput(text, 0) ?? [text];
+}
+
+function customTextValue(primary: unknown, fallback: unknown) {
+  if (typeof primary === "string" && primary.trim()) return primary;
+  if (primary && typeof primary === "object") return primary;
+  return fallback;
+}
+
 function AdviceStory({ article, locale, storyImages }: { article: Awaited<ReturnType<typeof loader>>["article"]; locale: "fr-FR" | "en-GB"; storyImages: Array<{ src: string; alt: string }> }) {
   const layout = adviceLayout((article.story[locale] as typeof article.story["fr-FR"] & { layoutConfig?: unknown }).layoutConfig);
   const texts: Partial<Record<AdviceElement, typeof article.body["fr-FR"]>> = { introText: article.excerptBody?.[locale] ?? [article.excerpt[locale]], bodyText: article.body[locale], body2Text: article.body2?.[locale] };
@@ -46,7 +58,7 @@ function AdviceStory({ article, locale, storyImages }: { article: Awaited<Return
   const renderItem = (item: AdviceLayoutItem) => {
     if (item.compartment === "title") return null;
     const customItem = item.customId ? layout.customItems.find((custom) => custom.id === item.customId) : undefined;
-    if (item.compartment === "text" && item.customId && customItem) return <div className="advice-story__text" key={item.id}><RichTextContent content={[layout.customText?.[customItem.id] ?? (locale === "fr-FR" ? customItem.textFr : customItem.textEn) ?? ""]} /></div>;
+    if (item.compartment === "text" && item.customId && customItem) return <div className="advice-story__text advice-story__custom-text" key={item.id}><RichTextContent content={customTextContent(customTextValue(layout.customText?.[customItem.id], locale === "fr-FR" ? customItem.textFr : customItem.textEn) ?? "")} /></div>;
     if (item.compartment === "image" && item.customId && customItem?.imageUrl) return <figure className="advice-story__image" key={item.id}><img src={customItem.imageUrl} alt={locale === "fr-FR" ? customItem.imageAltFr ?? "" : customItem.imageAltEn ?? ""} /></figure>;
     if (item.compartment === "text" && item.element && texts[item.element]) return <div className="advice-story__text" key={item.id}><RichTextContent content={texts[item.element]!} /></div>;
     if (item.compartment === "image" && item.element && images[item.element]) return <figure className="advice-story__image" key={item.id}><img src={images[item.element]!.src} alt={images[item.element]!.alt} /></figure>;
@@ -55,7 +67,7 @@ function AdviceStory({ article, locale, storyImages }: { article: Awaited<Return
     return null;
   };
   const placedCustomIds = new Set(layout.items.map((item) => item.customId).filter(Boolean));
-  return <div className="advice-story">{layout.items.map(renderItem)}{layout.customItems.filter((item) => !placedCustomIds.has(item.id)).map((item) => item.type === "text" ? <div className="advice-story__text" key={item.id}><RichTextContent content={[layout.customText?.[item.id] ?? (locale === "fr-FR" ? item.textFr : item.textEn) ?? ""]} /></div> : item.imageUrl ? <figure className="advice-story__image" key={item.id}><img src={item.imageUrl} alt={locale === "fr-FR" ? item.imageAltFr ?? "" : item.imageAltEn ?? ""} /></figure> : null)}</div>;
+  return <div className="advice-story">{layout.items.map(renderItem)}{layout.customItems.filter((item) => !placedCustomIds.has(item.id)).map((item) => item.type === "text" ? <div className="advice-story__text advice-story__custom-text" key={item.id}><RichTextContent content={customTextContent(customTextValue(layout.customText?.[item.id], locale === "fr-FR" ? item.textFr : item.textEn) ?? "")} /></div> : item.imageUrl ? <figure className="advice-story__image" key={item.id}><img src={item.imageUrl} alt={locale === "fr-FR" ? item.imageAltFr ?? "" : item.imageAltEn ?? ""} /></figure> : null)}</div>;
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

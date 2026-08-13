@@ -31,7 +31,7 @@ function parseAdviceLayout(value: unknown): AdviceLayout {
   const slots = parsed.data.slots ? (parsed.data.slots.length === 2 ? [{ text: "intro" as const, image: "intro" as const }, ...parsed.data.slots] : parsed.data.slots) : defaultAdviceLayout.slots;
   const legacyElements = slots.flatMap((slot) => [`${slot.text}Text`, `${slot.image}Image`] as AdviceElement[]);
   const elements = parsed.data.elements?.length ? [...new Set([...parsed.data.elements, ...defaultAdviceLayout.elements])] : [...new Set(legacyElements)];
-  const items = parsed.data.items?.length ? parsed.data.items.map((item) => ({ ...item, label: item.label || defaultAdviceLayout.items.find((defaultItem) => defaultItem.id === item.id)?.label })) : defaultAdviceLayout.items;
+  const items = parsed.data.items?.length ? parsed.data.items.map((item) => ({ ...item, label: item.label?.trim().slice(0, 120) || defaultAdviceLayout.items.find((defaultItem) => defaultItem.id === item.id)?.label })) : defaultAdviceLayout.items;
   return { items, elements, slots, customItems: [], shortIntroFr: typeof (value as { shortIntroFr?: unknown }).shortIntroFr === "string" ? (value as { shortIntroFr: string }).shortIntroFr : "", shortIntroEn: typeof (value as { shortIntroEn?: unknown }).shortIntroEn === "string" ? (value as { shortIntroEn: string }).shortIntroEn : "" };
 }
 
@@ -72,6 +72,8 @@ const schema = z.object({
   shortIntroFr: z.string().max(200_000).optional(), shortIntroEn: z.string().max(200_000).optional(),
 });
 const deleteSchema = z.object({ intent: z.literal("delete_advice"), id: z.uuid() });
+const archiveSchema = z.object({ intent: z.literal("archive_advice"), id: z.uuid() });
+const restoreSchema = z.object({ intent: z.literal("restore_advice"), id: z.uuid() });
 const translateAdviceSchema = z.object({
   intent: z.literal("translate_advice"),
   titleFr: z.string().trim().min(1), excerptFr: z.string().trim().min(1), bodyFr: z.string().trim().min(1),
@@ -165,16 +167,31 @@ export async function action({ request }: ActionFunctionArgs) {
     return translateAdviceToEnglish(parsed.data);
   }
   if (!client) return { ok: false, message: "Base indisponible." };
+  if (form.intent === "archive_advice" || form.intent === "restore_advice") {
+    const parsedAction = form.intent === "archive_advice" ? archiveSchema.safeParse(form) : restoreSchema.safeParse(form);
+    if (!parsedAction.success) return { ok: false, message: "Article invalide." };
+    const { error } = await client.from("advice_articles").update({ status: form.intent === "archive_advice" ? "archived" : "draft" }).eq("id", parsedAction.data.id);
+    if (error) return { ok: false, message: error.message };
+    return { ok: true, message: form.intent === "archive_advice" ? "Article archivé et récupérable." : "Article restauré en brouillon." };
+  }
   if (form.intent === "delete_advice") {
     const parsed = deleteSchema.safeParse(form);
     if (!parsed.success) return { ok: false, message: "Article invalide." };
     const { data: before, error: readError } = await client.from("advice_articles").select("*,advice_translations(*)").eq("id", parsed.data.id).maybeSingle();
     if (readError) return { ok: false, message: readError.message };
     if (!before) return { ok: false, message: "Article introuvable." };
-    const { error } = await client.from("advice_articles").delete().eq("id", parsed.data.id);
+    const { error } = await client.from("advice_articles").update({ status: "archived" }).eq("id", parsed.data.id);
     if (error) return { ok: false, message: error.message };
     await client.from("audit_log").insert({ actor_id: admin.id, action: "advice.deleted", entity_type: "advice_article", entity_id: parsed.data.id, before_data: before });
     return { ok: true, message: "Conseil supprimé." };
+  }
+  if (form.intent === "archive_advice" || form.intent === "restore_advice") {
+    const parsedAction = form.intent === "archive_advice" ? archiveSchema.safeParse(form) : restoreSchema.safeParse(form);
+    if (!parsedAction.success) return { ok: false, message: "Article invalide." };
+    const nextStatus = form.intent === "archive_advice" ? "archived" : "draft";
+    const { error } = await client.from("advice_articles").update({ status: nextStatus }).eq("id", parsedAction.data.id);
+    if (error) return { ok: false, message: error.message };
+    return { ok: true, message: form.intent === "archive_advice" ? "Article archivé. Il peut être restauré depuis cette liste." : "Article restauré en brouillon." };
   }
   const validationForm = { ...form };
   const requiredFields = ["slug", "status", "publishedAt", "titleFr", "titleEn", "excerptFr", "excerptEn", "bodyFr", "bodyEn", "seoTitleFr", "seoTitleEn", "seoDescriptionFr", "seoDescriptionEn"];
@@ -276,10 +293,17 @@ export async function action({ request }: ActionFunctionArgs) {
     item.imageAltFr = String(formData.get(`customImageAltFr-${item.id}`) ?? item.imageAltFr ?? "");
     item.imageAltEn = String(formData.get(`customImageAltEn-${item.id}`) ?? item.imageAltEn ?? "");
   }
-  const customText = (suffix: "Fr" | "En") => Object.fromEntries(customItems.filter((item) => item.type === "text").map((item) => [item.id, String(formData.get(`customText${suffix}-${item.id}`) ?? (suffix === "Fr" ? item.textFr : item.textEn) ?? "")]));
+  const textFieldValue = (name: string, fallback: string) => {
+    const values = formData.getAll(name).map((value) => typeof value === "string" ? value : "");
+    for (let index = values.length - 1; index >= 0; index -= 1) {
+      if (values[index]?.trim().length) return values[index];
+    }
+    return values.length ? values[values.length - 1] : fallback;
+  };
+  const customText = (suffix: "Fr" | "En") => Object.fromEntries(customItems.filter((item) => item.type === "text").map((item) => [item.id, textFieldValue(`customText${suffix}-${item.id}`, (suffix === "Fr" ? item.textFr : item.textEn) ?? "")]));
   const customItemsForSave = customItems.map((item) => {
     const { confirmed: _confirmed, ...persistedItem } = item;
-    return item.type === "text" ? { ...persistedItem, textFr: String(formData.get(`customTextFr-${item.id}`) ?? item.textFr ?? ""), textEn: String(formData.get(`customTextEn-${item.id}`) ?? item.textEn ?? "") } : persistedItem;
+    return item.type === "text" ? { ...persistedItem, textFr: textFieldValue(`customTextFr-${item.id}`, item.textFr ?? ""), textEn: textFieldValue(`customTextEn-${item.id}`, item.textEn ?? "") } : persistedItem;
   });
   const translation = (locale: "fr-FR" | "en-GB", suffix: "Fr" | "En", body: typeof bodyFr, body2: typeof body2Fr) => ({
     article_id: mutation.data.id,
@@ -372,7 +396,8 @@ function AutomaticAdviceTranslation({ formId }: { formId: string }) {
     const names = ["titleFr", "excerptFr", "bodyFr", "body2Fr", "seoTitleFr", "seoDescriptionFr", "shortIntroFr", "introImageAltFr", "bodyImageAltFr", "body2ImageAltFr"];
     const values: Record<string, string> = Object.fromEntries(names.map((name) => {
       const fields = form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(`input[name="${name}"], textarea[name="${name}"]`);
-      return [name, fields.item(fields.length - 1)?.value ?? ""];
+      const field = fields.length > 0 ? fields[fields.length - 1] : null;
+      return [name, field ? field.value : ""];
     }));
     values.customTextFr = JSON.stringify(Object.fromEntries(Array.from(form.querySelectorAll<HTMLInputElement>('input[name^="customTextFr-"]'), (field) => [field.name.slice("customTextFr-".length), field.value])));
     values.customImageAltFr = JSON.stringify(Object.fromEntries(Array.from(form.querySelectorAll<HTMLInputElement>('input[name^="customImageAltFr-"]'), (field) => [field.name.slice("customImageAltFr-".length), field.value])));
@@ -429,7 +454,7 @@ function AdviceLayoutOrganizer({ initialLayout }: { initialLayout: AdviceLayout 
     onDrop={() => moveElement(index)}
   >
     <span className="admin-advice-layout__handle" aria-hidden="true">⋮⋮</span>
-    <input className="admin-advice-layout__label" aria-label={`Nom de ${labels[item.compartment]}`} value={item.label ?? labels[item.compartment]} onChange={(event) => setLayoutState((current) => ({ ...current, items: current.items.map((currentItem, currentIndex) => currentIndex === index ? { ...currentItem, label: event.currentTarget.value } : currentItem) }))} onClick={(event) => event.stopPropagation()} />
+    <input className="admin-advice-layout__label" aria-label={`Nom de ${labels[item.compartment]}`} maxLength={120} value={item.label ?? labels[item.compartment]} onChange={(event) => { const label = event.currentTarget.value.slice(0, 120); setLayoutState((current) => ({ ...current, items: current.items.map((currentItem, currentIndex) => currentIndex === index ? { ...currentItem, label } : currentItem) })); }} onClick={(event) => event.stopPropagation()} />
     <button type="button" className="ui-button ui-button--ghost admin-advice-layout__remove" onClick={(event) => { event.stopPropagation(); requestLayoutRemoval(item); }}>Supprimer</button>
   </div>;
   const addCustomItem = (type: "text" | "image") => {
@@ -437,7 +462,10 @@ function AdviceLayoutOrganizer({ initialLayout }: { initialLayout: AdviceLayout 
     setCustomItems((items) => [...items, item]);
   };
   const confirmCustomItem = (id: string, type: "text" | "image") => {
-    setCustomItems((items) => items.map((item) => item.id === id ? { ...item, confirmed: true } : item));
+    setCustomItems((items) => {
+      const nextItem = { id: `custom-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, confirmed: false } as AdviceCustomItem;
+      return [...items.map((item) => item.id === id ? { ...item, confirmed: true } : item), nextItem];
+    });
     setLayoutState((current) => current.items.some((item) => item.customId === id) ? current : { ...current, items: [...current.items, { id: `layout-${id}`, compartment: type, customId: id, label: type === "text" ? "Espace texte" : "Espace image" }] });
   };
   const removeCustomItem = (id: string) => {

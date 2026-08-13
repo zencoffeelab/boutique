@@ -2089,6 +2089,36 @@ button:disabled {
   overflow-x: clip;
   display: block;
 }
+.rich-text-editor__accordion-node {
+  display: grid;
+  gap: 0.65rem;
+  margin: 1rem 0;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  background: var(--cream-dark);
+}
+.rich-text-editor__accordion-node label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 700;
+}
+.rich-text-editor__accordion-node input,
+.rich-text-editor__accordion-node textarea {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font: inherit;
+  resize: vertical;
+}
+.rich-text-editor__accordion-delete {
+  justify-self: start;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--red, #9d3b2f);
+  background: transparent;
+  color: var(--red, #9d3b2f);
+  cursor: pointer;
+}
 .advice-detail-page {
   width: 100%;
   max-width: 100vw;
@@ -2131,6 +2161,35 @@ body.advice-detail-overflow-hidden {
 .advice-story__text {
   max-width: 46rem;
   margin-inline: auto;
+}
+.advice-story__custom-text > .rich-text-content {
+  font: 400 1rem/1.65 var(--serif);
+}
+.advice-story__custom-text > .rich-text-content p {
+  max-width: none;
+  margin: 1em 0;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+}
+.advice-story__custom-text > .rich-text-content p:first-child { margin-top: 0; }
+.advice-story__custom-text > .rich-text-content p:last-child { margin-bottom: 0; }
+.advice-story__custom-text > .rich-text-content h2 {
+  max-width: none;
+  margin: 1.5rem 0 0.65rem;
+  font-size: 2rem;
+}
+.advice-story__custom-text > .rich-text-content h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1.45rem;
+}
+.advice-story__custom-text > .rich-text-content h2:first-child,
+.advice-story__custom-text > .rich-text-content h3:first-child { margin-top: 0; }
+.advice-story__custom-text > .rich-text-content ul,
+.advice-story__custom-text > .rich-text-content ol {
+  margin: 1em 0;
+  font: inherit;
+  line-height: inherit;
 }
 .advice-story__image {
   display: flex;
@@ -2220,10 +2279,10 @@ body.advice-detail-overflow-hidden {
 }
 .rich-text-accordion {
   margin: 2rem 0;
-  border: 1px solid color-mix(in srgb, var(--cream) 32%, transparent);
+  border: 1px solid var(--green);
   border-radius: 0.35rem;
-  background: #56634f;
-  color: var(--cream);
+  background: #fff;
+  color: var(--ink);
 }
 .rich-text-accordion__trigger {
   display: block;
@@ -2232,18 +2291,142 @@ body.advice-detail-overflow-hidden {
   cursor: pointer;
   border: 0;
   background: transparent;
-  color: var(--cream);
+  color: var(--green);
   font: inherit;
   text-align: left;
   font-weight: 700;
 }
 .rich-text-accordion__body {
+  display: block;
   margin: 0;
   padding: 0 1.25rem 1.25rem;
-  color: var(--cream);
+  color: var(--ink);
 }
-.rich-text-accordion__body p:first-child { margin-top: 0; }
-.rich-text-accordion__body p:last-child { margin-bottom: 0; }
+.rich-text-accordion__body > * {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+.rich-text-accordion__body > * + * {
+  margin-top: 0.75rem;
+}
+.rich-text-accordion__body p,
+.advice-story .product-story-block__copy .rich-text-accordion__body p {
+  max-width: none;
+  margin: 0;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+.rich-text-accordion__body p:empty {
+  min-height: 1.65em;
+}
+.rich-text-accordion__body p + p,
+.advice-story .product-story-block__copy .rich-text-accordion__body p + p {
+  margin-top: 1rem;
+}
+.rich-text-accordion__body h2,
+.rich-text-accordion__body h3,
+.advice-story .product-story-block__copy .rich-text-accordion__body h2,
+.advice-story .product-story-block__copy .rich-text-accordion__body h3 {
+  max-width: none;
+  margin: 0;
+  color: inherit;
+}
+.rich-text-accordion__body h2,
+.advice-story .product-story-block__copy .rich-text-accordion__body h2 { font-size: 1.35rem; }
+.rich-text-accordion__body h3,
+.advice-story .product-story-block__copy .rich-text-accordion__body h3 { font-size: 1.15rem; }
+.rich-text-accordion__body ul,
+.rich-text-accordion__body ol {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: inherit;
+  font: inherit;
+}
+.rich-text-accordion__body blockquote {
+  margin: 0;
+  color: inherit;
+}
+.rich-text-accordion__body a { color: inherit; }
+
+/* Les accordéons éditoriaux reprennent exactement le langage visuel de la FAQ. */
+.rich-text-accordion {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+}
+.rich-text-content > p + .rich-text-accordion {
+  margin-top: 1.5rem;
+}
+.rich-text-accordion:not(:has(~ .rich-text-accordion)) {
+  border-bottom: 1px solid var(--line);
+}
+.rich-text-accordion__trigger {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 1.5rem 3rem 1.5rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 500 clamp(1.2rem, 2vw, 1.65rem) / 1.2 var(--serif);
+  cursor: pointer;
+  list-style: none;
+  text-align: left;
+}
+.rich-text-accordion__trigger::-webkit-details-marker {
+  display: none;
+}
+.rich-text-accordion__trigger::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--ink);
+  content: "+";
+  font: 400 1.35rem/1 var(--sans);
+  transform: translateY(-50%);
+}
+.rich-text-accordion.is-open .rich-text-accordion__trigger::after {
+  background: var(--ink);
+  color: var(--paper);
+  content: "−";
+}
+.rich-text-accordion__body {
+  display: block;
+  max-width: 44rem;
+  padding: 0 0 1.5rem;
+  color: var(--ink);
+  animation: faq-answer-reveal 180ms ease-out;
+}
+.rich-text-accordion__body > * {
+  color: inherit;
+}
+.rich-text-accordion__body p,
+.advice-story .product-story-block__copy .rich-text-accordion__body p {
+  max-width: 42rem;
+  margin: 0;
+  color: inherit;
+  font: 400 clamp(0.9rem, 1vw, 1.08rem) / 1.65 var(--sans);
+  white-space: pre-line;
+}
+.rich-text-accordion__body p + p,
+.advice-story .product-story-block__copy .rich-text-accordion__body p + p {
+  margin-top: 0;
+}
 .rich-text-insert-panel {
   display: grid;
   gap: 0.75rem;
