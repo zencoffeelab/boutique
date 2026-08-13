@@ -17,3 +17,8 @@ export function safeJson<T>(value: string | null, fallback: T): T {
     return fallback;
   }
 }
+
+export function firstSentence(value: string): string {
+  const text = value.trim();
+  return text.match(/^.*?[.!?](?:\s|$)/s)?.[0].trim() ?? text;
+}

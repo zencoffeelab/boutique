@@ -288,17 +288,17 @@ export async function getPackagingPresets(): Promise<PackagingPreset[]> {
   }));
 }
 
-export async function getArticles(): Promise<AdviceArticle[]> {
+export async function getArticles(options: { includeUnpublished?: boolean } = {}): Promise<AdviceArticle[]> {
   if (!hasSupabaseConfig()) return demoArticles;
   const client = createServiceSupabase();
   if (!client) throw new Error("Supabase service configuration is incomplete.");
-  const { data, error } = await client
+  let query = client
     .from("advice_articles")
     .select(
       "slug,published_at,advice_translations(locale,title,excerpt,blocks)",
-    )
-    .eq("status", "published")
-    .order("published_at", { ascending: false });
+    );
+  if (!options.includeUnpublished) query = query.eq("status", "published");
+  const { data, error } = await query.order("published_at", { ascending: false });
   if (error) throw new Error(`Unable to load advice: ${error.message}`);
   return (data ?? []).flatMap((article: any) => {
     const fr = article.advice_translations?.find(

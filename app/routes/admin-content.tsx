@@ -33,7 +33,7 @@ type ContentPage = {
   status: "draft" | "published" | "archived";
   content_page_translations: ContentTranslation[];
 };
-type PublishedAdvice = { id: string; slug: string; published_at: string; advice_translations: Array<{ locale: "fr-FR" | "en-GB"; title: string }> };
+type AdminAdvice = { id: string; slug: string; status: "draft" | "published" | "archived"; published_at: string; advice_translations: Array<{ locale: "fr-FR" | "en-GB"; title: string }> };
 
 const pageSchema = z.object({
   intent: z.literal("save_page"),
@@ -108,10 +108,10 @@ function aboutBlock(translation: ContentTranslation | undefined, type: string) {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
-  if (admin.demo) return { demo: true, pages: [] as ContentPage[], publishedAdvice: [] as PublishedAdvice[], navigation: await getSiteNavigation(), comingSoon: defaultComingSoonSettings };
+  if (admin.demo) return { demo: true, pages: [] as ContentPage[], adviceArticles: [] as AdminAdvice[], navigation: await getSiteNavigation(), comingSoon: defaultComingSoonSettings };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
-  const [{ data, error }, { data: publishedAdvice, error: adviceError }, navigation, comingSoon] = await Promise.all([
+  const [{ data, error }, { data: adviceArticles, error: adviceError }, navigation, comingSoon] = await Promise.all([
     client
       .from("content_pages")
       .select("*,content_page_translations(*)")
@@ -121,15 +121,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
       .order("page_key"),
     client
       .from("advice_articles")
-      .select("id,slug,published_at,advice_translations(locale,title)")
-      .eq("status", "published")
-      .order("published_at", { ascending: false }),
+      .select("id,slug,status,published_at,advice_translations(locale,title)")
+      .order("created_at", { ascending: false }),
     getSiteNavigation(),
     getComingSoonSettings(),
   ]);
   if (error) throw new Response(error.message, { status: 500 });
   if (adviceError) throw new Response(adviceError.message, { status: 500 });
-  return { demo: false, pages: (data ?? []) as ContentPage[], publishedAdvice: (publishedAdvice ?? []) as PublishedAdvice[], navigation, comingSoon };
+  return { demo: false, pages: (data ?? []) as ContentPage[], adviceArticles: (adviceArticles ?? []) as AdminAdvice[], navigation, comingSoon };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -434,7 +433,7 @@ function HomeFields({ language, statement, values }: { language: "Français" | "
 }
 
 export default function AdminContent() {
-  const { demo, pages, publishedAdvice, navigation, comingSoon } = useLoaderData<typeof loader>();
+  const { demo, pages, adviceArticles, navigation, comingSoon } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const location = useLocation();
   const activeTab = new URLSearchParams(location.search).get("tab");
@@ -469,7 +468,7 @@ export default function AdminContent() {
             <div className="admin-content-page__journal">
               <p>Gérez la page Blog et les articles déjà publiés.</p>
               <div className="admin-content-page__actions"><Link className="ui-button ui-button--ghost" to="/conseils">Voir le journal</Link><Link className="ui-button ui-button--default" to="/admin/conseils?new=1">Nouveau blog</Link></div>
-              {publishedAdvice.length ? <ul>{publishedAdvice.map((article) => <li key={article.id}><Link to={`/admin/conseils?article=${article.id}`}>{article.advice_translations.find((translation) => translation.locale === "fr-FR")?.title ?? article.slug}</Link><span>{new Date(article.published_at).toLocaleDateString("fr-FR")}</span></li>)}</ul> : <p className="admin-muted">Aucune publication n’est encore publiée.</p>}
+              {adviceArticles.length ? <ul>{adviceArticles.map((article) => <li key={article.id}><Link to={`/admin/conseils?article=${article.id}`}>{article.advice_translations.find((translation) => translation.locale === "fr-FR")?.title ?? article.slug}</Link><span>{article.status} · {new Date(article.published_at).toLocaleDateString("fr-FR")}</span></li>)}</ul> : <p className="admin-muted">Aucun article n’est encore enregistré.</p>}
             </div>
           </details>;
           return <details className="ui-card admin-content-page" key={key}>

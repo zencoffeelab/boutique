@@ -14,7 +14,12 @@ describe("email mailbox worker", () => {
   });
 
   it("parses and stores an incoming message for the administrator mailbox", async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify([{ id: "11111111-1111-4111-8111-111111111111" }]), { status: 201, headers: { "Content-Type": "application/json" } }));
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        return new Response(JSON.stringify([{ id: "11111111-1111-4111-8111-111111111111" }]), { status: 201, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify([{ id: "22222222-2222-4222-8222-222222222222" }]), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
     vi.stubGlobal("fetch", fetchMock);
     const raw = [
       "Message-ID: <incoming-test@example.com>",
@@ -39,7 +44,7 @@ describe("email mailbox worker", () => {
       SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
     })).resolves.toBe("11111111-1111-4111-8111-111111111111");
 
-    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const request = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "POST")?.[1] as RequestInit;
     expect(JSON.parse(String(request.body))).toMatchObject({
       direction: "inbound",
       sender_address: "alice@example.com",

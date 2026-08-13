@@ -1,6 +1,6 @@
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { RichTextDocument, RichTextMark, RichTextNode } from "~/lib/rich-text";
-import { paragraphsToRichTextDocument, safeHref } from "~/lib/rich-text";
+import { paragraphsToRichTextDocument, parseRichTextInput, safeHref } from "~/lib/rich-text";
 
 export function RichTextContent({ content }: { content: RichTextDocument | readonly string[] }) {
   const document: RichTextDocument = Array.isArray(content)
@@ -15,8 +15,12 @@ export function RichTextContent({ content }: { content: RichTextDocument | reado
     if (!root) return;
     root.style.removeProperty("min-height");
   }, [document, openAccordion]);
-  const accordionBodies = document.content.filter((node) => node.type === "contentAccordion").map((node) => String(node.attrs?.body ?? ""));
-  return <div ref={contentRef} className="rich-text-content">{document.content.map((node, index) => renderNode(node, index, accordionState))}{accordionBodies.map((body, index) => <div className="rich-text-accordion-measure" data-rich-accordion-measure key={`accordion-measure-${index}`}><p>{body}</p></div>)}</div>;
+  const accordionBodies = document.content.filter((node) => node.type === "contentAccordion").map((node) => accordionBodyDocument(String(node.attrs?.bodyDocument ?? node.attrs?.body ?? "")));
+  return <div ref={contentRef} className="rich-text-content">{document.content.map((node, index) => renderNode(node, index, accordionState))}{accordionBodies.map((body, index) => <div className="rich-text-accordion-measure" data-rich-accordion-measure key={`accordion-measure-${index}`}>{body.content.map((node, nodeIndex) => renderNode(node, nodeIndex, accordionState))}</div>)}</div>;
+}
+
+function accordionBodyDocument(body: string): RichTextDocument {
+  return parseRichTextInput(body, 0) ?? paragraphsToRichTextDocument([body]);
 }
 
 type AccordionState = { openAccordion: string | null; setOpenAccordion: (key: string | null) => void };
@@ -41,7 +45,8 @@ function renderNode(node: RichTextNode, index: number, accordionState?: Accordio
     }
     case "contentAccordion": {
       const open = accordionState?.openAccordion === key;
-      return <div className={`rich-text-accordion${open ? " is-open" : ""}`} key={key}><button type="button" className="rich-text-accordion__trigger" aria-expanded={open} onMouseDown={(event) => { event.preventDefault(); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); accordionState?.setOpenAccordion(open ? null : key); }}>{String(node.attrs?.title ?? "")}</button>{open ? <p className="rich-text-accordion__body">{String(node.attrs?.body ?? "")}</p> : null}</div>;
+      const body = accordionBodyDocument(String(node.attrs?.bodyDocument ?? node.attrs?.body ?? ""));
+      return <div className={`rich-text-accordion${open ? " is-open" : ""}`} key={key}><button type="button" className="rich-text-accordion__trigger" aria-expanded={open} onMouseDown={(event) => { event.preventDefault(); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); accordionState?.setOpenAccordion(open ? null : key); }}>{String(node.attrs?.title ?? "")}</button>{open ? <div className="rich-text-accordion__body">{body.content.map((child, childIndex) => renderNode(child, childIndex, accordionState))}</div> : null}</div>;
     }
     default: return null;
   }

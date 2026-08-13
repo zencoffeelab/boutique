@@ -5,8 +5,11 @@ import { useEffect } from "react";
 import { EditorialStory } from "~/components/editorial-story";
 import { RichTextContent } from "~/components/rich-text-content";
 import { getArticles, getProducts } from "~/lib/catalog.server";
+import { requireAdmin } from "~/lib/auth.server";
 import { getLocale } from "~/lib/i18n";
+import { parseRichTextInput } from "~/lib/rich-text";
 import { pageMeta } from "~/lib/seo";
+import { firstSentence } from "~/lib/utils";
 
 type AdviceElement = "introText" | "introImage" | "bodyText" | "bodyImage" | "body2Text" | "body2Image";
 type AdviceCompartment = "title" | "text" | "image" | "textImage" | "imageText";
@@ -47,8 +50,8 @@ function AdviceStory({ article, locale, storyImages }: { article: Awaited<Return
     if (item.compartment === "image" && item.customId && customItem?.imageUrl) return <figure className="advice-story__image" key={item.id}><img src={customItem.imageUrl} alt={locale === "fr-FR" ? customItem.imageAltFr ?? "" : customItem.imageAltEn ?? ""} /></figure>;
     if (item.compartment === "text" && item.element && texts[item.element]) return <div className="advice-story__text" key={item.id}><RichTextContent content={texts[item.element]!} /></div>;
     if (item.compartment === "image" && item.element && images[item.element]) return <figure className="advice-story__image" key={item.id}><img src={images[item.element]!.src} alt={images[item.element]!.alt} /></figure>;
-    if (item.compartment === "textImage") return <EditorialStory key={item.id} content={texts.bodyText ?? []} images={[images.bodyImage ?? { src: "/media/home-hero-coffee-cherries.jpg", alt: "Coffee cherries" }]} splitSections={false} lockBlockSize />;
-    if (item.compartment === "imageText") return <EditorialStory key={item.id} content={texts.body2Text ?? []} images={[images.body2Image ?? { src: "/media/home-hero-coffee-cherries.jpg", alt: "Coffee cherries" }]} imageFirst splitSections={false} lockBlockSize heightBuffer={4} />;
+    if (item.compartment === "textImage") return <EditorialStory key={item.id} content={texts.bodyText ?? []} images={[images.bodyImage ?? { src: "/media/home-hero-coffee-cherries.jpg", alt: "Coffee cherries" }]} splitSections={false} />;
+    if (item.compartment === "imageText") return <EditorialStory key={item.id} content={texts.body2Text ?? []} images={[images.body2Image ?? { src: "/media/home-hero-coffee-cherries.jpg", alt: "Coffee cherries" }]} imageFirst splitSections={false} />;
     return null;
   };
   const placedCustomIds = new Set(layout.items.map((item) => item.customId).filter(Boolean));
@@ -57,7 +60,9 @@ function AdviceStory({ article, locale, storyImages }: { article: Awaited<Return
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const locale = getLocale(request);
-  const [articles, products] = await Promise.all([getArticles(), getProducts({ status: "published", availableOnly: false })]);
+  const preview = new URL(request.url).searchParams.has("preview");
+  if (preview) await requireAdmin(request);
+  const [articles, products] = await Promise.all([getArticles({ includeUnpublished: preview }), getProducts({ status: "published", availableOnly: false })]);
   const article = articles.find((item) => item.slug === params.slug);
   if (!article) throw new Response(locale === "fr-FR" ? "Article introuvable" : "Article not found", { status: 404 });
   const relatedArticles = articles.filter((item) => item.slug !== article.slug).slice(0, 3);
@@ -79,9 +84,9 @@ export default function AdviceDetail() {
     };
   }, []);
   return <article className="advice-detail-page">
-    <header className="page-hero advice-detail__top"><p className="eyebrow">{new Date(article.publishedAt).toLocaleDateString(english ? "en-GB" : "fr-FR")}</p><h1>{article.title[locale]}</h1><p className="lede advice-detail__intro">{(adviceLayout((article.story[locale] as typeof article.story["fr-FR"] & { layoutConfig?: unknown }).layoutConfig)[english ? "shortIntroEn" : "shortIntroFr"] || article.excerpt[locale])}</p></header>
+    <header className="page-hero advice-detail__top"><p className="eyebrow">{new Date(article.publishedAt).toLocaleDateString(english ? "en-GB" : "fr-FR")}</p><h1>{article.title[locale]}</h1><p className="lede advice-detail__intro">{(() => { const value = adviceLayout((article.story[locale] as typeof article.story["fr-FR"] & { layoutConfig?: unknown }).layoutConfig)[english ? "shortIntroEn" : "shortIntroFr"] || article.excerpt[locale]; return typeof value === "string" && value.trim().startsWith("{") ? <RichTextContent content={parseRichTextInput(value, 0) ?? [value]} /> : value; })()}</p></header>
     <AdviceStory article={article} locale={locale} storyImages={storyImages} />
-    <div className="article-body advice-detail__body advice-detail__action"><Link className="text-link advice-detail__back" to={shopPath}>{english ? "Visit the shop" : "Visiter la boutique"}</Link></div>
+    <div className="article-body advice-detail__body advice-detail__action"><Link className="button button--ghost advice-detail__back" to={shopPath}>{english ? "Visit the shop" : "Visiter la boutique"}<ArrowRight aria-hidden="true" /></Link></div>
     {relatedArticles.length ? <section className="advice-related" aria-labelledby="advice-related-title">
       <div className="page-shell">
         <div className="section-header">
@@ -92,7 +97,7 @@ export default function AdviceDetail() {
           {relatedArticles.map((relatedArticle) => <article className="article-card" key={relatedArticle.slug}>
             <p className="eyebrow">{new Date(relatedArticle.publishedAt).toLocaleDateString(english ? "en-GB" : "fr-FR")}</p>
             <h2>{relatedArticle.title[locale]}</h2>
-            <p>{relatedArticle.excerpt[locale]}</p>
+            <p>{firstSentence(relatedArticle.excerpt[locale])}</p>
             <Link className="text-link" to={`${advicePath}/${relatedArticle.slug}`}>{english ? "Read the guide" : "Lire le guide"}<ArrowRight aria-hidden="true" /></Link>
           </article>)}
         </div>

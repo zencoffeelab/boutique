@@ -57,7 +57,7 @@ const contentAccordion = Node.create({
   name: "contentAccordion",
   group: "block",
   atom: true,
-  addAttributes: () => ({ title: { default: "Titre de l’accordéon" }, body: { default: "Contenu à afficher" } }),
+  addAttributes: () => ({ title: { default: "Titre de l’accordéon" }, body: { default: "Contenu à afficher" }, bodyDocument: { default: null } }),
   parseHTML: () => [{ tag: "details[data-rich-accordion]" }],
   renderHTML: ({ node }) => ["details", { "data-rich-accordion": "true" }, ["summary", {}, String(node.attrs.title ?? "")], ["p", {}, String(node.attrs.body ?? "")]],
 });
@@ -114,7 +114,8 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
     if (!editor || disabled || !["excerptEn", "bodyEn", "body2En"].includes(name)) return;
     const sourceName = name.replace(/En$/, "Fr");
     const form = hiddenInput.current?.form;
-    const sourceInput = form?.querySelector<HTMLInputElement>(`input[name="${sourceName}"]`);
+    const sourceInputs = form?.querySelectorAll<HTMLInputElement>(`input[name="${sourceName}"]`);
+    const sourceInput = sourceInputs ? sourceInputs.item(sourceInputs.length - 1) : null;
     const targetInput = hiddenInput.current;
     if (!sourceInput) return;
     const synchronize = () => {
@@ -175,7 +176,8 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
   const insertAccordion = (title: string, body: string) => {
     if (!editor) return;
     if (!title.trim() || !body.trim()) return;
-    editor.chain().focus().insertContent({ type: "contentAccordion", attrs: { title: title.trim(), body: body.trim() } }).run();
+    const bodyDocument = { type: "doc" as const, content: body.split(/\r?\n/).map((line) => ({ type: "paragraph" as const, content: line.trim() ? [{ type: "text" as const, text: line.trim() }] : [] })) };
+    editor.chain().focus().insertContent({ type: "contentAccordion", attrs: { title: title.trim(), body: body.trim(), bodyDocument: JSON.stringify(bodyDocument) } }).run();
     setInsertMode(null);
   };
 

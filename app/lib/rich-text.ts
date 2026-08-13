@@ -128,6 +128,7 @@ export function synchronizeRichTextLayout(source: RichTextDocument, target: Rich
         attrs: {
           title: typeof targetAttrs?.title === "string" ? targetAttrs.title : "Read more",
           body: typeof targetAttrs?.body === "string" ? targetAttrs.body : targetNode ? richTextPlainText({ type: "doc", content: [targetNode] }).trim() : nextText(""),
+          bodyDocument: typeof targetAttrs?.bodyDocument === "string" ? targetAttrs.bodyDocument : null,
         },
       } satisfies RichTextNode;
     }
@@ -182,9 +183,12 @@ function normalizeNode(value: unknown, depth: number, budget: { nodes: number })
     node.attrs = { rows: rows.slice(0, 30).flatMap((row) => Array.isArray(row) ? [row.slice(0, 12).map((cell) => typeof cell === "string" ? cell.slice(0, 500) : "")] : []) };
   } else if (value.type === "contentAccordion") {
     const attrs = isRecord(value.attrs) ? value.attrs : {};
+    const rawBody = typeof attrs.body === "string" ? attrs.body.slice(0, 10_000) : "";
+    const embeddedBody = rawBody.trim().startsWith("{") ? parseRichTextInput(rawBody, 0) : null;
     node.attrs = {
       title: typeof attrs.title === "string" ? attrs.title.slice(0, 300) : "",
-      body: typeof attrs.body === "string" ? attrs.body.slice(0, 10_000) : "",
+      body: embeddedBody ? richTextPlainText(embeddedBody).trim() : rawBody,
+      bodyDocument: typeof attrs.bodyDocument === "string" ? attrs.bodyDocument.slice(0, 50_000) : embeddedBody ? JSON.stringify(embeddedBody) : null,
     };
   }
   if (Array.isArray(value.content)) {

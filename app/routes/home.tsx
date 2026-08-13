@@ -7,6 +7,7 @@ import { getArticles, getProducts } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { JsonLd, pageMeta } from "~/lib/seo";
 import { getContentPage } from "~/lib/content.server";
+import { firstSentence } from "~/lib/utils";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request);
@@ -108,7 +109,7 @@ export default function Home() {
 
       <section className="section page-shell">
         <div className="section-header"><div><p className="eyebrow">Journal</p><h2>{english ? "Brew better" : "Mieux préparer"}</h2></div></div>
-        <div className="article-grid">{articles.map((article) => <article className="article-card" key={article.slug}><p className="eyebrow">{new Date(article.publishedAt).toLocaleDateString(english ? "en-GB" : "fr-FR")}</p><h2>{article.title[locale]}</h2><p>{article.excerpt[locale]}</p><Link className="text-link" to={`${english ? "/en/tips" : "/conseils"}/${article.slug}`}>{english ? "Read" : "Lire"}<ArrowRight aria-hidden="true" /></Link></article>)}</div>
+        <div className="article-grid">{articles.map((article) => <article className="article-card" key={article.slug}><p className="eyebrow">{new Date(article.publishedAt).toLocaleDateString(english ? "en-GB" : "fr-FR")}</p><h2>{article.title[locale]}</h2><p>{firstSentence(article.excerpt[locale])}</p><Link className="text-link" to={`${english ? "/en/tips" : "/conseils"}/${article.slug}`}>{english ? "Read" : "Lire"}<ArrowRight aria-hidden="true" /></Link></article>)}</div>
       </section>
     </>
   );
