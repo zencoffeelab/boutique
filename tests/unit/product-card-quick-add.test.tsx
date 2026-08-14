@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MemoryRouter } from "react-router";
@@ -18,6 +18,19 @@ afterEach(cleanup);
 beforeEach(() => window.localStorage.removeItem("zcl:cart:v1"));
 
 describe("product card price menu", () => {
+  it("requests the hover visual only when the card is hovered", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <CartProvider>
+          <ProductCard product={{ ...demoProducts[0], hoverImageUrl: "https://cdn.example.com/hover.webp" }} locale="fr-FR" />
+        </CartProvider>
+      </MemoryRouter>,
+    );
+    expect(container.querySelector(".product-card__hover-image")).not.toBeInTheDocument();
+    fireEvent.mouseEnter(container.querySelector(".product-card")!);
+    expect(container.querySelector(".product-card__hover-image")).toHaveAttribute("src", "https://cdn.example.com/hover.webp");
+  });
+
   it("opens from the cart button and adds the selected format", async () => {
     const user = userEvent.setup();
     render(

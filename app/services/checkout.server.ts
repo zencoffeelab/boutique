@@ -58,7 +58,7 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
       cancel_url: `${config.VITE_SITE_URL}${quote.locale === "en-GB" ? "/en/checkout" : "/commande"}?canceled=1`,
       metadata: { order_id: order.id, quote_id: quote.id, audience: quote.audience },
       payment_intent_data: { metadata: { order_id: order.id } },
-      line_items: [...quote.lines.map((line) => ({ quantity: line.quantity, price_data: { currency: "eur" as const, unit_amount: line.unitPriceCents, product_data: { name: line.productName, description: line.variantLabel, images: line.imageUrl ? [line.imageUrl] : undefined, metadata: { variant_id: line.variantId } } } })), ...(rate.amountCents > 0 ? [{ quantity: 1, price_data: { currency: "eur" as const, unit_amount: rate.amountCents, product_data: { name: quote.locale === "en-GB" ? "Shipping" : "Livraison", description: shippingRateLabel(rate) } } }] : [])],
+      line_items: [...quote.lines.map((line) => ({ quantity: line.quantity, price_data: { currency: "eur" as const, unit_amount: line.unitPriceCents, product_data: { name: line.productName, description: line.variantLabel, images: line.imageUrl ? [new URL(line.imageUrl, config.VITE_SITE_URL).toString()] : undefined, metadata: { variant_id: line.variantId } } } })), ...(rate.amountCents > 0 ? [{ quantity: 1, price_data: { currency: "eur" as const, unit_amount: rate.amountCents, product_data: { name: quote.locale === "en-GB" ? "Shipping" : "Livraison", description: shippingRateLabel(rate) } } }] : [])],
       locale: quote.locale === "fr-FR" ? "fr" : "en",
     };
     let session;

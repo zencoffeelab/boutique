@@ -105,12 +105,10 @@ describe("product card", () => {
     expect(html).toContain("product-thumbnail-label__image");
   });
 
-  it("renders the optional hover image as a decorative lazy image", () => {
+  it("does not download the optional hover image before interaction", () => {
     const html = renderHoverCard();
-    expect(html).toContain('class="product-card__hover-image"');
-    expect(html).toContain('src="https://cdn.example.com/hover.webp"');
-    expect(html).toContain('alt=""');
-    expect(html).toContain('loading="lazy"');
+    expect(html).not.toContain('class="product-card__hover-image"');
+    expect(html).not.toContain('src="https://cdn.example.com/hover.webp"');
   });
 
   it("places the archived badge inside the product image and hides the price", () => {

@@ -1,4 +1,5 @@
 import type { LoaderFunctionArgs } from "react-router";
+import { publicMediaDeliveryUrl } from "~/lib/public-media";
 
 const brandStorageUrl = "https://fmkjnjmitsudzjjbrkoa.supabase.co/storage/v1/object/public/product-media/brand";
 
@@ -19,7 +20,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
     status: 302,
     headers: {
       "Cache-Control": "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800",
-      Location: publicUrl,
+      Location: publicMediaDeliveryUrl(publicUrl),
     },
   });
 }

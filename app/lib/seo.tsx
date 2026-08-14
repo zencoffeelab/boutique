@@ -2,6 +2,7 @@ import type { Locale, Product } from "~/domain/types";
 import { alternatePath } from "~/lib/i18n";
 
 const origin = "https://www.zencoffeelab.com";
+const absoluteUrl = (value: string) => new URL(value, origin).toString();
 
 export function pageMeta(title: string, description: string, pathname: string, image?: string) {
   const canonical = `${origin}${pathname}`;
@@ -18,7 +19,7 @@ export function pageMeta(title: string, description: string, pathname: string, i
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:url", content: canonical },
-    ...(image ? [{ property: "og:image", content: image }] : []),
+    ...(image ? [{ property: "og:image", content: absoluteUrl(image) }] : []),
     { name: "twitter:card", content: "summary_large_image" },
   ];
 }
@@ -41,7 +42,7 @@ export function productStructuredData(product: Product, locale: Locale) {
     "@type": "Product",
     name: translation.name,
     description: translation.shortDescription,
-    image: product.media.map((media) => media.url),
+    image: product.media.map((media) => absoluteUrl(media.url)),
     brand: { "@type": "Brand", name: "Zen Coffee Lab" },
     ...(offers.length ? { offers } : {}),
   };

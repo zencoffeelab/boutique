@@ -12,6 +12,7 @@ import type {
   ResolvedCartLine,
 } from "~/domain/types";
 import { env, hasSupabaseConfig } from "./env.server";
+import { mapPublicMediaUrls, publicMediaDeliveryUrl } from "./public-media";
 import { createServiceSupabase } from "./supabase.server";
 import { paragraphsToRichTextDocument, parseRichTextInput, richTextPlainText, storedBlocksToRichTextDocument, synchronizeRichTextLayout } from "./rich-text";
 
@@ -44,15 +45,15 @@ function mapDatabaseProduct(row: any): Product {
     professionalEnabled: row.professional_enabled ?? false,
     professionalStockKg: Number(row.professional_stock_kg ?? 0),
     professionalStockReservedKg: Number(row.professional_stock_reserved_kg ?? 0),
-    thumbnailLabelUrl: row.thumbnail_label_public_url ?? null,
+    thumbnailLabelUrl: row.thumbnail_label_public_url ? publicMediaDeliveryUrl(row.thumbnail_label_public_url) : null,
     thumbnailBackgroundColor: row.thumbnail_background_color ?? "#d9ddd3",
-    hoverImageUrl: row.hover_image_public_url ?? null,
+    hoverImageUrl: row.hover_image_public_url ? publicMediaDeliveryUrl(row.hover_image_public_url) : null,
     translations,
     media: row.product_media
       .toSorted((a: any, b: any) => a.position - b.position)
       .map((media: any) => ({
         id: media.id,
-        url: media.public_url,
+        url: publicMediaDeliveryUrl(media.public_url),
         alt: { "fr-FR": media.alt_fr, "en-GB": media.alt_en },
         width: media.width,
         height: media.height,
@@ -63,7 +64,7 @@ function mapDatabaseProduct(row: any): Product {
       .map((block: any) => ({
         id: block.id,
         position: block.position,
-        imageUrl: block.public_url,
+        imageUrl: publicMediaDeliveryUrl(block.public_url),
         imageAlt: { "fr-FR": block.alt_fr, "en-GB": block.alt_en },
         title: { "fr-FR": block.title_fr, "en-GB": block.title_en },
         body: { "fr-FR": block.body_fr, "en-GB": block.body_en },
@@ -321,7 +322,7 @@ export async function getArticles(options: { includeUnpublished?: boolean } = {}
     };
     const story = (translation: any) => {
       const layout = translation.blocks?.find((block: any) => block.type === "storyLayout")?.content ?? {};
-      return { ...layout, layoutConfig: layout.layoutConfig, introImageUrl: layout.introImageUrl ?? layout.imageUrl, introImageAlt: layout.introImageAlt ?? layout.imageAlt, bodyImageUrl: layout.bodyImageUrl ?? layout.imageUrl, bodyImageAlt: layout.bodyImageAlt ?? layout.imageAlt, bodyImageFirst: layout.bodyImageFirst ?? layout.imageFirst };
+      return mapPublicMediaUrls({ ...layout, layoutConfig: layout.layoutConfig, introImageUrl: layout.introImageUrl ?? layout.imageUrl, introImageAlt: layout.introImageAlt ?? layout.imageAlt, bodyImageUrl: layout.bodyImageUrl ?? layout.imageUrl, bodyImageAlt: layout.bodyImageAlt ?? layout.imageAlt, bodyImageFirst: layout.bodyImageFirst ?? layout.imageFirst });
     };
     return [
       {

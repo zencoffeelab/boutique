@@ -16,11 +16,16 @@ import {
   type ImageCropAspect,
   type ImageCropRect,
 } from "~/lib/image-editor";
+import {
+  PUBLIC_MEDIA_MAX_DIMENSION,
+  PUBLIC_MEDIA_MAX_UPLOAD_BYTES,
+} from "~/lib/public-media";
 
 const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const maximumSourceBytes = 40_000_000;
-const maximumOutputBytes = 8_000_000;
-const maximumOutputDimension = 10_000;
+const maximumOutputBytes = PUBLIC_MEDIA_MAX_UPLOAD_BYTES;
+const maximumOutputDimension = PUBLIC_MEDIA_MAX_DIMENSION;
+const webpQualitySteps = [0.84, 0.76, 0.68];
 
 export type AdminProcessedImage = Readonly<{
   file: File;
@@ -68,19 +73,69 @@ function drawCrop(
   );
 }
 
-function canvasBlob(canvas: HTMLCanvasElement, type: string) {
+function canvasBlob(canvas: HTMLCanvasElement, quality: number) {
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (blob) => blob ? resolve(blob) : reject(new Error("La création de l’image a échoué.")),
-      type,
-      type === "image/png" ? undefined : 0.9,
+      "image/webp",
+      quality,
     );
   });
 }
 
-function outputFileName(file: File, type: string) {
+function outputFileName(file: File) {
   const baseName = file.name.replace(/\.[^.]+$/, "") || "image";
-  return `${baseName}-recadree.${type === "image/png" ? "png" : "webp"}`;
+  return `${baseName}-optimisee.webp`;
+}
+
+async function optimizedImage({
+  sourceFile,
+  sourceImage,
+  aspect,
+  zoom,
+  positionX,
+  positionY,
+  requestedWidth,
+}: {
+  sourceFile: File;
+  sourceImage: HTMLImageElement;
+  aspect: ImageCropAspect;
+  zoom: number;
+  positionX: number;
+  positionY: number;
+  requestedWidth: number;
+}): Promise<AdminProcessedImage> {
+  const ratio = imageAspectRatio(aspect, sourceImage.naturalWidth, sourceImage.naturalHeight);
+  const initialOutput = resizedImageDimensions({ requestedWidth, ratio, maximumDimension: maximumOutputDimension });
+  const crop = calculateImageCrop({
+    sourceWidth: sourceImage.naturalWidth,
+    sourceHeight: sourceImage.naturalHeight,
+    aspect,
+    zoom,
+    positionX,
+    positionY,
+  });
+  let width = initialOutput.width;
+  let height = initialOutput.height;
+
+  for (let resizeAttempt = 0; resizeAttempt < 5; resizeAttempt += 1) {
+    const canvas = document.createElement("canvas");
+    drawCrop(canvas, sourceImage, crop, width, height);
+    for (const quality of webpQualitySteps) {
+      const blob = await canvasBlob(canvas, quality);
+      if (blob.size <= maximumOutputBytes) {
+        return {
+          file: new File([blob], outputFileName(sourceFile), { type: "image/webp", lastModified: Date.now() }),
+          width,
+          height,
+        };
+      }
+    }
+    width = Math.max(320, Math.round(width * 0.82));
+    height = Math.max(1, Math.round(width / ratio));
+  }
+
+  throw new Error(`L’image ne peut pas être compressée sous ${(maximumOutputBytes / 1_000_000).toFixed(1)} Mo.`);
 }
 
 function assignInputFile(input: HTMLInputElement | null, file: File | null) {
@@ -196,6 +251,18 @@ export function AdminImageEditorInput({
     assignInputFile(processedInputRef.current, processedImage?.file ?? null);
   };
 
+  const commitProcessedImage = async (nextProcessedImage: AdminProcessedImage) => {
+    assignInputFile(inputRef.current, nextProcessedImage.file);
+    if (processedInputRef.current) processedInputRef.current.disabled = false;
+    assignInputFile(processedInputRef.current, nextProcessedImage.file);
+    if (processedObjectUrlRef.current) URL.revokeObjectURL(processedObjectUrlRef.current);
+    const previewUrl = URL.createObjectURL(nextProcessedImage.file);
+    processedObjectUrlRef.current = previewUrl;
+    setProcessedImage(nextProcessedImage);
+    setProcessedPreviewUrl(previewUrl);
+    await onProcessed?.(nextProcessedImage);
+  };
+
   const cancelEditing = () => {
     restoreProcessedSelection();
     setError(null);
@@ -221,9 +288,6 @@ export function AdminImageEditorInput({
     const file = event.currentTarget.files?.[0];
     if (!file) return;
     setError(null);
-    assignInputFile(processedInputRef.current, null);
-    setProcessedImage(null);
-    setProcessedPreviewUrl(null);
     if (!acceptedImageTypes.has(file.type)) {
       setError("Choisissez une image JPEG, PNG ou WebP.");
       assignInputFile(inputRef.current, processedImage?.file ?? null);
@@ -234,22 +298,41 @@ export function AdminImageEditorInput({
       assignInputFile(inputRef.current, processedImage?.file ?? null);
       return;
     }
+    const previousProcessedImage = processedImage;
+    assignInputFile(inputRef.current, null);
+    assignInputFile(processedInputRef.current, null);
+    setProcessing(true);
     if (sourceObjectUrlRef.current) URL.revokeObjectURL(sourceObjectUrlRef.current);
     const source = URL.createObjectURL(file);
     sourceObjectUrlRef.current = source;
     try {
       const image = await loadImage(source);
+      const initialWidth = defaultWidthForImage(image.naturalWidth, image.naturalHeight, defaultAspect, defaultOutputWidth);
       setSourceFile(file);
       setSourceImage(image);
       setAspect(defaultAspect);
       setZoom(1);
       setPositionX(0);
       setPositionY(0);
-      setOutputWidth(defaultWidthForImage(image.naturalWidth, image.naturalHeight, defaultAspect, defaultOutputWidth));
+      setOutputWidth(initialWidth);
+      const generated = await optimizedImage({
+        sourceFile: file,
+        sourceImage: image,
+        aspect: defaultAspect,
+        zoom: 1,
+        positionX: 0,
+        positionY: 0,
+        requestedWidth: initialWidth,
+      });
+      await commitProcessedImage(generated);
       if (!dialogRef.current?.open) dialogRef.current?.showModal();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Cette image ne peut pas être lue.");
-      assignInputFile(inputRef.current, processedImage?.file ?? null);
+      assignInputFile(inputRef.current, previousProcessedImage?.file ?? null);
+      assignInputFile(processedInputRef.current, previousProcessedImage?.file ?? null);
+      setProcessedImage(previousProcessedImage);
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -270,44 +353,24 @@ export function AdminImageEditorInput({
     try {
       const widthField = dialogRef.current?.querySelector<HTMLInputElement>('input[type="number"]');
       const requestedWidth = Number(widthField?.value ?? outputWidth);
-      const finalOutput = resizedImageDimensions({ requestedWidth, ratio, maximumDimension: maximumOutputDimension });
-      const crop = calculateImageCrop({
-        sourceWidth,
-        sourceHeight,
+      const generated = await optimizedImage({
+        sourceFile,
+        sourceImage,
         aspect,
         zoom,
         positionX,
         positionY,
+        requestedWidth,
       });
-      const canvas = document.createElement("canvas");
-      drawCrop(canvas, sourceImage, crop, finalOutput.width, finalOutput.height);
-      const outputType = sourceFile.type === "image/png" ? "image/png" : "image/webp";
-      const blob = await canvasBlob(canvas, outputType);
-      if (blob.size > maximumOutputBytes) {
-        throw new Error("L’image produite dépasse 8 Mo. Réduisez sa largeur de sortie.");
-      }
-      const file = new File([blob], outputFileName(sourceFile, outputType), {
-        type: outputType,
-        lastModified: Date.now(),
-      });
-      const verificationUrl = URL.createObjectURL(file);
+      const verificationUrl = URL.createObjectURL(generated.file);
       try {
         const generatedImage = await loadImage(verificationUrl);
-        if (generatedImage.naturalWidth !== finalOutput.width || generatedImage.naturalHeight !== finalOutput.height)
+        if (generatedImage.naturalWidth !== generated.width || generatedImage.naturalHeight !== generated.height)
           throw new Error("Les dimensions générées ne correspondent pas à la largeur finale choisie.");
       } finally {
         URL.revokeObjectURL(verificationUrl);
       }
-      const nextProcessedImage = { file, width: finalOutput.width, height: finalOutput.height };
-      assignInputFile(inputRef.current, file);
-      if (processedInputRef.current) processedInputRef.current.disabled = false;
-      assignInputFile(processedInputRef.current, file);
-      if (processedObjectUrlRef.current) URL.revokeObjectURL(processedObjectUrlRef.current);
-      const previewUrl = URL.createObjectURL(file);
-      processedObjectUrlRef.current = previewUrl;
-      setProcessedImage(nextProcessedImage);
-      setProcessedPreviewUrl(previewUrl);
-      await onProcessed?.(nextProcessedImage);
+      await commitProcessedImage(generated);
       dialogRef.current?.close();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Le traitement de l’image a échoué.");
@@ -357,7 +420,7 @@ export function AdminImageEditorInput({
       name={`${name}Source`}
       type="file"
       accept="image/jpeg,image/png,image/webp"
-      required={required && !processedImage}
+      required={processing || (required && !processedImage)}
       disabled={!hydrated}
       onChange={handleFile}
     />
@@ -386,6 +449,7 @@ export function AdminImageEditorInput({
         {processedImage ? (
           <small>{processedImage.width} × {processedImage.height} px · {(processedImage.file.size / 1_000_000).toFixed(2)} Mo</small>
         ) : help ? <small>{help}</small> : null}
+        <small>Redimensionnement et compression WebP automatiques · 2 000 px et 1,5 Mo maximum</small>
         <div className="admin-image-input__actions">
           <label
             className="ui-button ui-button--outline"
@@ -417,7 +481,7 @@ export function AdminImageEditorInput({
           <div>
             <p className="eyebrow">Éditeur d’image</p>
             <h2 id={titleId}>Recadrer et redimensionner</h2>
-            <p id={descriptionId}>Déplacez l’image, ajustez le zoom puis choisissez sa largeur finale.</p>
+            <p id={descriptionId}>Une version WebP optimisée est déjà prête. Ajustez le cadrage ou la largeur si nécessaire.</p>
           </div>
           <button type="button" aria-label="Fermer l’éditeur d’image" onClick={cancelEditing}>
             <X aria-hidden="true" />

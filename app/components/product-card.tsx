@@ -77,6 +77,7 @@ function ProductCardQuickAdd({ product, locale, audience }: { product: Product; 
 
 export function ProductCard({ product, locale, audience, quickAdd = false, quoteAdd = false }: { product: Product; locale: Locale; audience?: Audience; quickAdd?: boolean; quoteAdd?: boolean }) {
   const titleId = useId();
+  const [hoverImageRequested, setHoverImageRequested] = useState(false);
   const translation = product.translations[locale];
   const resolvedAudience = audience ?? product.variants.flatMap((variant) => variant.offers)[0]?.audience ?? "retail";
   const baseHref = locale === "fr-FR" ? `/boutique/${product.slug}` : `/en/shop/${product.slug}`;
@@ -85,7 +86,7 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
   const pack200Offer = pack200?.offers.find((offer) => offer.audience === resolvedAudience && offer.active);
   const composedThumbnail = Boolean(product.thumbnailLabelUrl);
   return (
-    <article className="product-card">
+    <article className="product-card" onMouseEnter={() => setHoverImageRequested(true)} onFocus={() => setHoverImageRequested(true)}>
       <div className="product-card__media">
         <div
           className={`product-card__image${composedThumbnail ? " product-card__image--composed" : ""}`}
@@ -105,7 +106,7 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
             height={640}
             loading="lazy"
           />}
-          {product.hoverImageUrl ? <img
+          {product.hoverImageUrl && hoverImageRequested ? <img
             className="product-card__hover-image"
             src={product.hoverImageUrl}
             alt=""

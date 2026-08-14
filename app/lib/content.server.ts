@@ -1,4 +1,5 @@
 import type { Locale } from "~/domain/types";
+import { mapPublicMediaUrls } from "~/lib/public-media";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
 export type ContentPage = {
@@ -11,7 +12,7 @@ export async function getContentPage(pageKey: string, locale: Locale): Promise<C
   const client = createServiceSupabase(); if (!client) return null;
   const { data } = await client.from("content_pages").select("status,content_page_translations(title,seo_title,seo_description,blocks,locale)").eq("page_key", pageKey).eq("status", "published").maybeSingle();
   const translation = data?.content_page_translations?.find((item: any) => item.locale === locale); if (!translation) return null;
-  return { title: translation.title, seoTitle: translation.seo_title, seoDescription: translation.seo_description, blocks: translation.blocks ?? [] };
+  return { title: translation.title, seoTitle: translation.seo_title, seoDescription: translation.seo_description, blocks: mapPublicMediaUrls(translation.blocks ?? []) };
 }
 
 export async function getFaqItems(locale: Locale) {

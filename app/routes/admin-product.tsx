@@ -24,6 +24,7 @@ import { buildVariantOffers } from "~/domain/professional-quote";
 import type { ProductEditorialBlock, ProductVariant } from "~/domain/types";
 import { requireAdmin } from "~/lib/auth.server";
 import { getAdminProducts } from "~/lib/catalog.server";
+import { PUBLIC_MEDIA_CACHE_SECONDS, PUBLIC_MEDIA_MAX_UPLOAD_BYTES } from "~/lib/public-media";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
 const productSchema = z.object({
@@ -231,11 +232,11 @@ async function saveEditorialBlock({
     };
   if (
     hasNewImage &&
-    (file.size > 8_000_000 || !productImageExtensions[file.type])
+    (file.size > PUBLIC_MEDIA_MAX_UPLOAD_BYTES || !productImageExtensions[file.type])
   )
     return {
       ok: false as const,
-      message: `L’image du bloc ${position} doit être au format JPEG, PNG ou WebP et peser au maximum 8 Mo.`,
+      message: `L’image du bloc ${position} doit être optimisée en JPEG, PNG ou WebP et peser au maximum 1,5 Mo.`,
     };
 
   let storagePath = existing?.storage_path as string | undefined;
@@ -247,6 +248,7 @@ async function saveEditorialBlock({
       .from("product-media")
       .upload(uploadedPath, await file.arrayBuffer(), {
         contentType: file.type,
+        cacheControl: String(PUBLIC_MEDIA_CACHE_SECONDS),
       });
     if (uploadError) return { ok: false as const, message: uploadError.message };
     storagePath = uploadedPath;
@@ -365,8 +367,8 @@ export async function action({ request }: ActionFunctionArgs) {
     const hasNewFile = isUploadFile(file) && file.size > 0;
     if (!hasNewFile && !existing.thumbnail_label_public_url)
       return { ok: false, message: "Ajoutez un fichier d’étiquette." };
-    if (hasNewFile && (file.size > 8_000_000 || !productImageExtensions[file.type]))
-      return { ok: false, message: "L’étiquette doit être au format PNG, WebP ou JPEG et peser au maximum 8 Mo." };
+    if (hasNewFile && (file.size > PUBLIC_MEDIA_MAX_UPLOAD_BYTES || !productImageExtensions[file.type]))
+      return { ok: false, message: "L’étiquette doit être optimisée en PNG, WebP ou JPEG et peser au maximum 1,5 Mo." };
 
     let storagePath = existing.thumbnail_label_storage_path as string | null;
     let publicUrl = existing.thumbnail_label_public_url as string | null;
@@ -375,7 +377,7 @@ export async function action({ request }: ActionFunctionArgs) {
       uploadedPath = `thumbnails/${productId}/label-${crypto.randomUUID()}.${productImageExtensions[file.type]}`;
       const { error: uploadError } = await client.storage
         .from("product-media")
-        .upload(uploadedPath, await file.arrayBuffer(), { contentType: file.type });
+        .upload(uploadedPath, await file.arrayBuffer(), { contentType: file.type, cacheControl: String(PUBLIC_MEDIA_CACHE_SECONDS) });
       if (uploadError) return { ok: false, message: uploadError.message };
       storagePath = uploadedPath;
       publicUrl = client.storage.from("product-media").getPublicUrl(uploadedPath).data.publicUrl;
@@ -408,8 +410,8 @@ export async function action({ request }: ActionFunctionArgs) {
     const file = uploadedFile(form, "file");
     if (!z.string().uuid().safeParse(productId).success)
       return { ok: false, message: "Produit invalide." };
-    if (!(isUploadFile(file)) || file.size === 0 || file.size > 8_000_000 || !productImageExtensions[file.type])
-      return { ok: false, message: "L’image de survol doit être au format JPEG, PNG ou WebP et peser au maximum 8 Mo." };
+    if (!(isUploadFile(file)) || file.size === 0 || file.size > PUBLIC_MEDIA_MAX_UPLOAD_BYTES || !productImageExtensions[file.type])
+      return { ok: false, message: "L’image de survol doit être optimisée en JPEG, PNG ou WebP et peser au maximum 1,5 Mo." };
 
     const { data: existing, error: readError } = await client
       .from("products")
@@ -422,7 +424,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const uploadedPath = `hover-images/${productId}/image-${crypto.randomUUID()}.${productImageExtensions[file.type]}`;
     const { error: uploadError } = await client.storage
       .from("product-media")
-      .upload(uploadedPath, await file.arrayBuffer(), { contentType: file.type });
+      .upload(uploadedPath, await file.arrayBuffer(), { contentType: file.type, cacheControl: String(PUBLIC_MEDIA_CACHE_SECONDS) });
     if (uploadError) return { ok: false, message: uploadError.message };
     const publicUrl = client.storage.from("product-media").getPublicUrl(uploadedPath).data.publicUrl;
     const { error: updateError } = await client.from("products").update({
@@ -551,7 +553,7 @@ export async function action({ request }: ActionFunctionArgs) {
     if (
       !(isUploadFile(file)) ||
       file.size === 0 ||
-      file.size > 8_000_000 ||
+      file.size > PUBLIC_MEDIA_MAX_UPLOAD_BYTES ||
       !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
       !altFr ||
       !altEn
@@ -559,13 +561,13 @@ export async function action({ request }: ActionFunctionArgs) {
       return {
         ok: false,
         message:
-          "Image JPEG/PNG/WebP (8 Mo maximum) et textes alternatifs requis.",
+          "Image optimisée JPEG/PNG/WebP (1,5 Mo maximum) et textes alternatifs requis.",
       };
     const extension = productImageExtensions[file.type];
     const path = `${productId}/${crypto.randomUUID()}.${extension}`;
     const { error } = await client.storage
       .from("product-media")
-      .upload(path, await file.arrayBuffer(), { contentType: file.type });
+      .upload(path, await file.arrayBuffer(), { contentType: file.type, cacheControl: String(PUBLIC_MEDIA_CACHE_SECONDS) });
     if (error) return { ok: false, message: error.message };
     const url = client.storage.from("product-media").getPublicUrl(path)
       .data.publicUrl;
@@ -1823,6 +1825,7 @@ const adminProductSections = [
 
 function AdminProductAnchorNavigation({ isNew }: { isNew: boolean }) {
   const navigationRef = useRef<HTMLElement>(null);
+  const manualActivationUntilRef = useRef(0);
   const sections = isNew ? adminProductSections.slice(0, 1) : adminProductSections;
   const [activeSection, setActiveSection] = useState(sections[0].id);
 
@@ -1830,6 +1833,7 @@ function AdminProductAnchorNavigation({ isNew }: { isNew: boolean }) {
     let frame = 0;
     const updateActiveSection = () => {
       frame = 0;
+      if (performance.now() < manualActivationUntilRef.current) return;
       const reachedPageBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
       if (reachedPageBottom) {
         setActiveSection(sections.at(-1)?.id ?? sections[0].id);
@@ -1873,7 +1877,10 @@ function AdminProductAnchorNavigation({ isNew }: { isNew: boolean }) {
       className={activeSection === section.id ? "is-active" : undefined}
       href={`#${section.id}`}
       aria-current={activeSection === section.id ? "location" : undefined}
-      onClick={() => setActiveSection(section.id)}
+      onClick={() => {
+        manualActivationUntilRef.current = performance.now() + 750;
+        setActiveSection(section.id);
+      }}
       key={section.id}
     >{section.label}</a>)}
   </nav>;

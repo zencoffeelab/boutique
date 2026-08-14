@@ -191,8 +191,8 @@ test("every product image upload opens the crop and resize editor", async ({
     name: input.files?.[0]?.name,
     type: input.files?.[0]?.type,
   }))).toEqual({
-    name: "zen-coffee-bag-resealable-recadree.png",
-    type: "image/png",
+    name: "zen-coffee-bag-resealable-optimisee.webp",
+    type: "image/webp",
   });
 });
 

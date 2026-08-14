@@ -10,6 +10,7 @@ import { RichTextEditor } from "~/components/rich-text-editor";
 import { requireAdmin } from "~/lib/auth.server";
 import { defaultComingSoonSettings } from "~/lib/coming-soon";
 import { getComingSoonSettings } from "~/lib/coming-soon.server";
+import { PUBLIC_MEDIA_CACHE_SECONDS, PUBLIC_MEDIA_MAX_UPLOAD_BYTES } from "~/lib/public-media";
 import {
   paragraphsToRichTextDocument,
   parseRichTextInput,
@@ -93,9 +94,9 @@ function isUploadFile(value: FormDataEntryValue | null): value is File {
 
 async function uploadAboutImage(client: any, file: FormDataEntryValue | null, locale: string, slot: string, previousPath = "") {
   if (!isUploadFile(file) || file.size === 0) return { path: previousPath, url: "" };
-  if (file.size > 8_000_000 || !aboutImageExtensions[file.type]) throw new Error("Les images doivent être au format JPEG, PNG ou WebP et peser au maximum 8 Mo.");
+  if (file.size > PUBLIC_MEDIA_MAX_UPLOAD_BYTES || !aboutImageExtensions[file.type]) throw new Error("Les images doivent être optimisées en JPEG, PNG ou WebP et peser au maximum 1,5 Mo.");
   const path = `pages/a-propos/${locale}/${slot}-${crypto.randomUUID()}.${aboutImageExtensions[file.type]}`;
-  const { error } = await client.storage.from("product-media").upload(path, await file.arrayBuffer(), { contentType: file.type });
+  const { error } = await client.storage.from("product-media").upload(path, await file.arrayBuffer(), { contentType: file.type, cacheControl: String(PUBLIC_MEDIA_CACHE_SECONDS) });
   if (error) throw new Error(error.message);
   if (previousPath) await client.storage.from("product-media").remove([previousPath]);
   return { path, url: client.storage.from("product-media").getPublicUrl(path).data.publicUrl };

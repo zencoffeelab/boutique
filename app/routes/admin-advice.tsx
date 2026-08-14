@@ -9,6 +9,7 @@ import { AdminSeoAnalysis } from "~/components/admin-seo-analysis";
 import { RichTextEditor } from "~/components/rich-text-editor";
 import { requireAdmin } from "~/lib/auth.server";
 import { paragraphsToRichTextDocument, parseRichTextInput, richTextPlainText, storedBlocksToRichTextDocument, synchronizeRichTextLayout } from "~/lib/rich-text";
+import { PUBLIC_MEDIA_CACHE_SECONDS, PUBLIC_MEDIA_MAX_UPLOAD_BYTES } from "~/lib/public-media";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
 type Translation = { locale: "fr-FR" | "en-GB"; title: string; excerpt: string; blocks: Array<{ type?: string; content: unknown }>; seo_title: string; seo_description: string; focus_keyphrase?: string };
@@ -264,10 +265,10 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!isUploadFile(fileValue)) return null;
     const file = fileValue as File;
     if (file.size === 0) return null;
-    if (file.size > 8_000_000 || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Les images doivent être au format JPEG, PNG ou WebP et peser moins de 8 Mo.");
+    if (file.size > PUBLIC_MEDIA_MAX_UPLOAD_BYTES || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Les images doivent être optimisées en JPEG, PNG ou WebP et peser moins de 1,5 Mo.");
     const extension = file.type === "image/png" ? "png" : file.type === "image/jpeg" ? "jpg" : "webp";
     const path = `${mutation.data.id}/${position === 0 ? "intro" : `block-${position}`}-${locale}-${crypto.randomUUID()}.${extension}`;
-    const { error: uploadError } = await client.storage.from("advice-media").upload(path, await file.arrayBuffer(), { contentType: file.type });
+    const { error: uploadError } = await client.storage.from("advice-media").upload(path, await file.arrayBuffer(), { contentType: file.type, cacheControl: String(PUBLIC_MEDIA_CACHE_SECONDS) });
     if (uploadError) throw new Error(uploadError.message);
     return client.storage.from("advice-media").getPublicUrl(path).data.publicUrl;
   };
