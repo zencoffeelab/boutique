@@ -5,12 +5,13 @@ import { Form, Link, useActionData, useFetcher, useLoaderData, useLocation } fro
 import { z } from "zod";
 import { AdminShell } from "~/components/admin-shell";
 import { AdminImageEditorInput } from "~/components/admin-image-editor-input";
+import { AdminSeoAnalysis } from "~/components/admin-seo-analysis";
 import { RichTextEditor } from "~/components/rich-text-editor";
 import { requireAdmin } from "~/lib/auth.server";
 import { paragraphsToRichTextDocument, parseRichTextInput, richTextPlainText, storedBlocksToRichTextDocument, synchronizeRichTextLayout } from "~/lib/rich-text";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
-type Translation = { locale: "fr-FR" | "en-GB"; title: string; excerpt: string; blocks: Array<{ type?: string; content: unknown }>; seo_title: string; seo_description: string };
+type Translation = { locale: "fr-FR" | "en-GB"; title: string; excerpt: string; blocks: Array<{ type?: string; content: unknown }>; seo_title: string; seo_description: string; focus_keyphrase?: string };
 type Article = { id: string; slug: string; status: "draft" | "published" | "archived"; published_at: string; advice_translations: Translation[] };
 type AdviceElement = "introText" | "introImage" | "bodyText" | "bodyImage" | "body2Text" | "body2Image";
 type AdviceCompartment = "title" | "text" | "image" | "textImage" | "imageText";
@@ -62,6 +63,7 @@ const schema = z.object({
   body2En: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().min(20).optional()),
   seoTitleFr: z.string().trim().min(3), seoTitleEn: z.string().trim().min(3),
   seoDescriptionFr: z.string().trim().min(10), seoDescriptionEn: z.string().trim().min(10),
+  focusKeyphraseFr: z.string().trim().max(160).optional().default(""), focusKeyphraseEn: z.string().trim().max(160).optional().default(""),
   introImageUrlFr: z.string().trim().max(2000).optional(), introImageUrlEn: z.string().trim().max(2000).optional(),
   introImageAltFr: z.string().trim().max(300).optional(), introImageAltEn: z.string().trim().max(300).optional(),
   bodyImageUrlFr: z.string().trim().max(2000).optional(), bodyImageUrlEn: z.string().trim().max(2000).optional(),
@@ -209,6 +211,7 @@ export async function action({ request }: ActionFunctionArgs) {
       if (field === "body") return JSON.stringify(storedBlocksToRichTextDocument(translation.blocks));
       if (field === "seoTitle") return translation.seo_title;
       if (field === "seoDescription") return translation.seo_description;
+      if (field === "focusKeyphrase") return translation.focus_keyphrase ?? "";
       if (field === "body2") {
         const value = storedLayout(translation).body2;
         return value ? JSON.stringify(storedBlocksToRichTextDocument([{ type: "richText", content: value }])) : undefined;
@@ -221,7 +224,7 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!("status" in validationForm) && typeof existing?.status === "string") validationForm.status = existing.status;
     if (!("publishedAt" in validationForm) && typeof existing?.published_at === "string") validationForm.publishedAt = existing.published_at.slice(0, 16);
     for (const suffix of ["Fr", "En"] as const) {
-      for (const field of ["title", "excerpt", "body", "seoTitle", "seoDescription", "body2", "introImageUrl", "introImageAlt", "layoutConfig"]) {
+      for (const field of ["title", "excerpt", "body", "seoTitle", "seoDescription", "focusKeyphrase", "body2", "introImageUrl", "introImageAlt", "layoutConfig"]) {
         const name = `${field}${suffix}`;
         if (!(name in validationForm)) {
           const value = storedValue(field, suffix);
@@ -312,6 +315,7 @@ export async function action({ request }: ActionFunctionArgs) {
     excerpt: JSON.stringify(suffix === "Fr" ? excerptFr : excerptEn),
     seo_title: parsed.data[`seoTitle${suffix}`],
     seo_description: parsed.data[`seoDescription${suffix}`],
+    focus_keyphrase: parsed.data[`focusKeyphrase${suffix}`],
     blocks: [
       { type: "richText", content: body },
       { type: "storyLayout", content: {
@@ -446,6 +450,7 @@ function AdviceLayoutOrganizer({ initialLayout }: { initialLayout: AdviceLayout 
   const requestLayoutRemoval = (item: AdviceLayoutItem) => setPendingRemoval({ kind: "layout", item, label: item.label ?? labels[item.compartment] });
   const labels: Record<AdviceCompartment, string> = { title: "Titre", text: "Espace texte", image: "Espace image", textImage: "Bloc texte + image", imageText: "Bloc image + texte" };
   const card = (item: AdviceLayoutItem, index: number) => <div
+    key={item.id}
     className="admin-advice-layout__item"
     draggable
     onDragStart={() => setDragged(index)}
@@ -519,7 +524,7 @@ function AdviceLayoutOrganizer({ initialLayout }: { initialLayout: AdviceLayout 
         <span className="admin-feedback-modal__icon"><Trash2 aria-hidden="true" /></span>
         <div><p className="eyebrow">Validation</p><h2 id="advice-delete-title">Confirmer la suppression</h2><p>Supprimer « {pendingRemoval?.label ?? "cet élément"} » de la mise en page ?</p></div>
         <div className="admin-advice-delete-modal__actions"><button type="button" className="ui-button ui-button--danger" onClick={confirmPendingRemoval}>Supprimer</button><button type="button" className="ui-button ui-button--ghost" onClick={() => removalDialogRef.current?.close()}>Annuler</button></div>
-        <form className="admin-feedback-modal__close" method="dialog"><button type="submit" aria-label="Fermer la confirmation"><X aria-hidden="true" /></button></form>
+        <div className="admin-feedback-modal__close"><button type="button" aria-label="Fermer la confirmation" onClick={() => removalDialogRef.current?.close()}><X aria-hidden="true" /></button></div>
       </div>
     </dialog>
   </section>;
@@ -575,15 +580,50 @@ function SeparatedArticleIntroduction({ fr, en, frLayout, demo }: { fr?: Transla
 function ArticleForm({ article, demo }: { article?: Article; demo: boolean }) {
   const fr = article?.advice_translations.find((item) => item.locale === "fr-FR");
   const en = article?.advice_translations.find((item) => item.locale === "en-GB");
+  const formId = `advice-form-${article?.id ?? "new"}`;
   const frLayout = layout(fr);
   const enLayout = layout(en);
   const intro = (locale: "Fr" | "En", translation?: Translation) => <fieldset className="admin-editorial-block__language"><legend>{locale === "Fr" ? "Français" : "English"}</legend>{locale === "Fr" ? <AdminImageEditorInput name="introImageFileShared" label="Image commune sous le titre" help="Cette image sera utilisée dans les deux langues · JPEG, PNG ou WebP · recadrage libre" currentPreviewUrl={String(layout(translation)?.introImageUrl ?? "")} defaultAspect="original" defaultOutputWidth={1500} /> : null}<div className="field"><label>{locale === "Fr" ? "Titre" : "Title"}<input name={`title${locale}`} defaultValue={translation?.title ?? ""} required /></label></div><div className="field"><label>{locale === "Fr" ? "Texte alternatif de l’image" : "Image alternative text"}<input name={`introImageAlt${locale}`} defaultValue={String(layout(translation)?.introImageAlt ?? "")} /></label></div><RichTextEditor name={`excerpt${locale}`} label="Introduction" initialContent={parseIntroduction(translation?.excerpt ?? "")} disabled={demo} /></fieldset>;
   const block = (position: 1 | 2, locale: "Fr" | "En", translation: Translation | undefined, data: Record<string, unknown> | undefined) => <fieldset className="admin-editorial-block__language"><legend>{locale === "Fr" ? "Français" : "English"}</legend><RichTextEditor name={position === 1 ? `body${locale}` : `body2${locale}`} label={locale === "Fr" ? "Texte" : "Text"} initialContent={position === 1 ? storedBlocksToRichTextDocument(translation?.blocks) : storedBlocksToRichTextDocument([{ type: "richText", content: data?.body2 }])} disabled={demo} /><input type="hidden" name={position === 1 ? `bodyImageUrl${locale}` : `body2ImageUrl${locale}`} value={String(position === 1 ? data?.bodyImageUrl ?? "" : data?.body2ImageUrl ?? "")} /><AdminImageEditorInput name={position === 1 ? `bodyImageFile${locale}` : `body2ImageFile${locale}`} label={locale === "Fr" ? "Image du bloc" : "Block image"} help="JPEG, PNG ou WebP · recadrage au ratio 75:83" currentPreviewUrl={String(position === 1 ? data?.bodyImageUrl ?? "" : data?.body2ImageUrl ?? "")} defaultAspect="75:83" lockAspect defaultOutputWidth={1500} /><div className="field"><label>{locale === "Fr" ? "Texte alternatif" : "Alternative text"}<input name={position === 1 ? `bodyImageAlt${locale}` : `body2ImageAlt${locale}`} defaultValue={String(position === 1 ? data?.bodyImageAlt ?? "" : data?.body2ImageAlt ?? "")} /></label></div></fieldset>;
   const editorial = (position: 1 | 2, imageFirst: boolean) => <section className={`admin-editorial-block admin-advice-editor__block${imageFirst ? "" : " admin-advice-editor__block--copy-first"}`}><header className="admin-editorial-block__heading"><div><p className="eyebrow">Bloc {position}</p><h3>{imageFirst ? "Image à gauche · texte à droite" : "Texte à gauche · image à droite"}</h3></div></header><div className="admin-editorial-block__layout"><div className="admin-editorial-block__image"><StoryImage url={String(position === 1 ? frLayout?.bodyImageUrl ?? "" : frLayout?.body2ImageUrl ?? "")} alt={String(position === 1 ? frLayout?.bodyImageAlt ?? "" : frLayout?.body2ImageAlt ?? "")} /></div><div className="admin-editorial-block__content"><LanguageTabs label={`Langue du bloc ${position}`} french={block(position, "Fr", fr, frLayout)} english={block(position, "En", en, enLayout)} /></div></div></section>;
+  const seoFields = (locale: "Fr" | "En", translation?: Translation) => {
+    const french = locale === "Fr";
+    return <fieldset className="admin-editorial-block__language">
+      <legend>{french ? "Français" : "English"}</legend>
+      <div className="field"><label>{french ? "Titre SEO" : "SEO title"}<input name={`seoTitle${locale}`} defaultValue={translation?.seo_title ?? ""} required /></label></div>
+      <div className="field"><label>{french ? "Description SEO" : "SEO description"}<textarea name={`seoDescription${locale}`} defaultValue={translation?.seo_description ?? ""} required /></label></div>
+      <AdminSeoAnalysis
+        formId={formId}
+        locale={french ? "fr-FR" : "en-GB"}
+        focusKeyphraseName={`focusKeyphrase${locale}`}
+        defaultFocusKeyphrase={translation?.focus_keyphrase ?? ""}
+        titleFieldName={`title${locale}`}
+        seoTitleFieldName={`seoTitle${locale}`}
+        seoDescriptionFieldName={`seoDescription${locale}`}
+        slugFieldName="slug"
+        contentFieldNames={[`shortIntro${locale}`, `excerpt${locale}`, `body${locale}`, `body2${locale}`]}
+        contentFieldPrefixes={[`customText${locale}-`]}
+        imageAltFieldNames={[`introImageAlt${locale}`, `bodyImageAlt${locale}`, `body2ImageAlt${locale}`]}
+        imageAltFieldPrefixes={[`customImageAlt${locale}-`]}
+        disabled={demo}
+      />
+    </fieldset>;
+  };
   const actionLabel = article ? "Modifier" : null;
-  const formId = `advice-form-${article?.id ?? "new"}`;
   const layoutOrganizer = <><AdviceLayoutOrganizer initialLayout={parseAdviceLayoutWithCustomItems(frLayout?.layoutConfig)} /><SeparatedArticleIntroduction fr={fr} en={en} frLayout={frLayout} demo={demo} /></>;
-  return <Form id={formId} method="post" encType="multipart/form-data" className="admin-advice-editor"><input type="hidden" name="intent" value="save_advice" /><input type="hidden" name="id" value={article?.id ?? ""} /><section className="admin-advice-editor__top"><div className="admin-advice-editor__settings"><p className="eyebrow">Publication</p><div className="form-grid"><label>Slug<input name="slug" defaultValue={article?.slug ?? ""} required /></label><label>Statut<select name="status" defaultValue={article?.status ?? "draft"}><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label><label>Date de publication<input name="publishedAt" type="datetime-local" defaultValue={(article?.published_at ?? new Date().toISOString()).slice(0, 16)} required /></label></div></div><section className="admin-advice-editor__introduction"><h2>Titre et introduction</h2><LanguageTabs label="Langue du titre et de l’introduction" french={intro("Fr", fr)} english={intro("En", en)} /></section></section>{layoutOrganizer}{editorial(1, false)}{editorial(2, true)}<section className="admin-advice-editor__seo"><h3>Référencement</h3><LanguageTabs label="Langue du référencement" french={<fieldset className="admin-editorial-block__language"><legend>Français</legend><div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? ""} required /></label></div><div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? ""} required /></label></div></fieldset>} english={<fieldset className="admin-editorial-block__language"><legend>English</legend><div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? ""} required /></label></div><div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? ""} required /></label></div></fieldset>} /></section><div className="admin-editor__actions"><button className="ui-button ui-button--default" disabled={demo}>{actionLabel ?? <><Plus /> Nouveau blog</>}</button>{article ? <Link className="ui-button ui-button--ghost" to={`/conseils/${article.slug}${article.status === "draft" ? `?preview=${article.id}` : ""}`}>{article.status === "draft" ? "Aperçu du brouillon" : "Lire l’article"}</Link> : null}<AutomaticAdviceTranslation formId={formId} /></div></Form>;
+  return <Form id={formId} method="post" encType="multipart/form-data" className="admin-advice-editor">
+    <input type="hidden" name="intent" value="save_advice" />
+    <input type="hidden" name="id" value={article?.id ?? ""} />
+    <section className="admin-advice-editor__top">
+      <div className="admin-advice-editor__settings"><p className="eyebrow">Publication</p><div className="form-grid"><label>Slug<input name="slug" defaultValue={article?.slug ?? ""} required /></label><label>Statut<select name="status" defaultValue={article?.status ?? "draft"}><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label><label>Date de publication<input name="publishedAt" type="datetime-local" defaultValue={(article?.published_at ?? new Date().toISOString()).slice(0, 16)} required /></label></div></div>
+      <section className="admin-advice-editor__introduction"><h2>Titre et introduction</h2><LanguageTabs label="Langue du titre et de l’introduction" french={intro("Fr", fr)} english={intro("En", en)} /></section>
+    </section>
+    {layoutOrganizer}
+    {editorial(1, false)}
+    {editorial(2, true)}
+    <section className="admin-advice-editor__seo"><h3>Référencement</h3><LanguageTabs label="Langue du référencement" french={seoFields("Fr", fr)} english={seoFields("En", en)} /></section>
+    <div className="admin-editor__actions"><button className="ui-button ui-button--default" disabled={demo}>{actionLabel ?? <><Plus /> Nouveau blog</>}</button>{article ? <Link className="ui-button ui-button--ghost" to={`/conseils/${article.slug}${article.status === "draft" ? `?preview=${article.id}` : ""}`}>{article.status === "draft" ? "Aperçu du brouillon" : "Lire l’article"}</Link> : null}<AutomaticAdviceTranslation formId={formId} /></div>
+  </Form>;
 }
 
 export default function AdminAdvice() {

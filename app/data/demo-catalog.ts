@@ -203,6 +203,7 @@ export const demoProducts: Product[] = inputs.map((input) => {
         tastingNotes: input.notes,
         seoTitle: `${displayFr} | Café de spécialité`,
         seoDescription: input.descriptionFr,
+        focusKeyphrase: displayFr,
       },
       "en-GB": {
         locale: "en-GB",
@@ -216,6 +217,7 @@ export const demoProducts: Product[] = inputs.map((input) => {
         tastingNotes: input.notes,
         seoTitle: `${displayEn} | Specialty coffee`,
         seoDescription: input.descriptionEn,
+        focusKeyphrase: displayEn,
       },
     },
     media: [

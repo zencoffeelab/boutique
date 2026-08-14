@@ -5,6 +5,7 @@ import { AdminComingSoonEditor } from "~/components/admin-coming-soon-editor";
 import { AdminNavigationOrganizer } from "~/components/admin-navigation-organizer";
 import { AdminShell } from "~/components/admin-shell";
 import { AdminImageEditorInput } from "~/components/admin-image-editor-input";
+import { AdminSeoAnalysis } from "~/components/admin-seo-analysis";
 import { RichTextEditor } from "~/components/rich-text-editor";
 import { requireAdmin } from "~/lib/auth.server";
 import { defaultComingSoonSettings } from "~/lib/coming-soon";
@@ -24,6 +25,7 @@ type ContentTranslation = {
   title: string;
   seo_title: string;
   seo_description: string;
+  focus_keyphrase?: string;
   blocks: Array<{ type?: unknown; content?: unknown }>;
 };
 
@@ -45,6 +47,8 @@ const pageSchema = z.object({
   seoTitleEn: z.string().trim().min(2),
   seoDescriptionFr: z.string().trim().min(10),
   seoDescriptionEn: z.string().trim().min(10),
+  focusKeyphraseFr: z.string().trim().max(160).optional().default(""),
+  focusKeyphraseEn: z.string().trim().max(160).optional().default(""),
   contentFr: z.string().trim().optional(),
   contentEn: z.string().trim().optional(),
   homeStatementFr: z.string().trim().max(500).optional(),
@@ -269,6 +273,7 @@ export async function action({ request }: ActionFunctionArgs) {
       title: parsed.data.titleFr,
       seo_title: parsed.data.seoTitleFr,
       seo_description: parsed.data.seoDescriptionFr,
+      focus_keyphrase: parsed.data.focusKeyphraseFr,
       blocks: [
         { type: "richText", content: contentFr },
         ...(aboutTranslations ? [{ type: "aboutHero", content: { lede: aboutTranslations[0].lede } }, { type: "aboutStoryImages", content: { images: aboutTranslations[0].storyImages } }, { type: "aboutParagraph2", content: aboutTranslations[0].paragraph2 }] : []),
@@ -280,6 +285,7 @@ export async function action({ request }: ActionFunctionArgs) {
       title: parsed.data.titleEn,
       seo_title: parsed.data.seoTitleEn,
       seo_description: parsed.data.seoDescriptionEn,
+      focus_keyphrase: parsed.data.focusKeyphraseEn,
       blocks: [
         { type: "richText", content: contentEn },
         ...(aboutTranslations ? [{ type: "aboutHero", content: { lede: aboutTranslations[1].lede } }, { type: "aboutStoryImages", content: { images: aboutTranslations[1].storyImages } }, { type: "aboutParagraph2", content: aboutTranslations[1].paragraph2 }] : []),
@@ -382,8 +388,17 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
   const en = page?.content_page_translations.find((translation) => translation.locale === "en-GB");
   const homeFr = homeSettings(fr, "fr-FR");
   const homeEn = homeSettings(en, "en-GB");
+  const formId = `content-page-form-${pageKey}`;
+  const seoContentFields = (suffix: "Fr" | "En") => [
+    `content${suffix}`,
+    `aboutLede${suffix}`,
+    `aboutParagraph1${suffix}`,
+    `aboutParagraph2${suffix}`,
+    `homeStatement${suffix}`,
+    ...[1, 2, 3].flatMap((index) => [`homeValue${index}Title${suffix}`, `homeValue${index}Text${suffix}`]),
+  ];
 
-  return <Form method="post" encType="multipart/form-data">
+  return <Form id={formId} method="post" encType="multipart/form-data">
     <input type="hidden" name="intent" value="save_page" />
     <input type="hidden" name="pageKey" value={pageKey} />
     <div className="field">
@@ -401,6 +416,7 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
         <div className="field"><label>Titre<input name="titleFr" defaultValue={fr?.title ?? pageKey} required /></label></div>
         <div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? pageKey} required /></label></div>
         <div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? "Description à compléter avant publication."} required /></label></div>
+        <AdminSeoAnalysis formId={formId} locale="fr-FR" focusKeyphraseName="focusKeyphraseFr" defaultFocusKeyphrase={fr?.focus_keyphrase ?? ""} titleFieldName="titleFr" seoTitleFieldName="seoTitleFr" seoDescriptionFieldName="seoDescriptionFr" slugValue={pageKey} contentFieldNames={seoContentFields("Fr")} imageAltFieldNames={["aboutStoryAlt1Fr", "aboutStoryAlt2Fr"]} disabled={demo} />
         {pageKey === "a-propos" ? null : <RichTextEditor name="contentFr" label="Paragraphes" initialContent={initialContent(fr, placeholderFr)} disabled={demo} />}
         {pageKey === "a-propos" ? <AboutPageFields translation={fr} language="fr-FR" shared /> : null}
         {pageKey === "accueil" ? <HomeFields language="Français" statement={homeFr.statement} values={homeFr.values} /> : null}
@@ -410,6 +426,7 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
         <div className="field"><label>Title<input name="titleEn" defaultValue={en?.title ?? pageKey} required /></label></div>
         <div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? pageKey} required /></label></div>
         <div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? "Description to complete before publication."} required /></label></div>
+        <AdminSeoAnalysis formId={formId} locale="en-GB" focusKeyphraseName="focusKeyphraseEn" defaultFocusKeyphrase={en?.focus_keyphrase ?? ""} titleFieldName="titleEn" seoTitleFieldName="seoTitleEn" seoDescriptionFieldName="seoDescriptionEn" slugValue={pageKey} contentFieldNames={seoContentFields("En")} imageAltFieldNames={["aboutStoryAlt1En", "aboutStoryAlt2En"]} disabled={demo} />
         {pageKey === "a-propos" ? null : <RichTextEditor name="contentEn" label="Paragraphs" initialContent={initialContent(en, placeholderEn)} disabled={demo} />}
         {pageKey === "a-propos" ? <AboutPageFields translation={en} language="en-GB" shared={false} /> : null}
         {pageKey === "accueil" ? <HomeFields language="English" statement={homeEn.statement} values={homeEn.values} /> : null}

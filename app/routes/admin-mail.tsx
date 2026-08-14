@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { data, Form, Link, redirect, useActionData, useLoaderData, useNavigation } from "react-router";
 import { z } from "zod";
+import { AdminEmailBody } from "~/components/admin-email-body";
 import { AdminShell } from "~/components/admin-shell";
 import { requireAdmin } from "~/lib/auth.server";
 import { env } from "~/lib/env.server";
@@ -10,7 +11,7 @@ import { createServiceSupabase } from "~/lib/supabase.server";
 import { escapeEmailHtml } from "~/services/email-templates.server";
 
 type MailAddress = { name?: string; address: string };
-type MailAttachment = { id: string; filename: string; mime_type: string; size_bytes: number };
+type MailAttachment = { id: string; filename: string; mime_type: string; size_bytes: number; content_id: string | null; disposition: "attachment" | "inline" | null };
 type MailLabel = { id: string; name: string; color: string };
 type AdminMailMessage = {
   id: string;
@@ -22,6 +23,7 @@ type AdminMailMessage = {
   reply_to_address: string | null;
   subject: string;
   text_body: string | null;
+  html_body: string | null;
   message_id_header: string | null;
   in_reply_to_header: string | null;
   references_header: string | null;
@@ -114,7 +116,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const client = createServiceSupabase();
   if (!client) throw new Response("Base de données indisponible.", { status: 503 });
   const [messageResult, labelsResult, inboxResult, unreadResult, sentResult] = await Promise.all([
-    client.from("admin_mail_messages").select("id,direction,sender_name,sender_address,recipients,cc_addresses,reply_to_address,subject,text_body,message_id_header,in_reply_to_header,references_header,parent_id,label_id,is_read,provider_id,raw_size,received_at,sent_at,created_at,admin_mail_labels(id,name,color),admin_mail_attachments(id,filename,mime_type,size_bytes)").order("created_at", { ascending: false }).limit(250),
+    client.from("admin_mail_messages").select("id,direction,sender_name,sender_address,recipients,cc_addresses,reply_to_address,subject,text_body,html_body,message_id_header,in_reply_to_header,references_header,parent_id,label_id,is_read,provider_id,raw_size,received_at,sent_at,created_at,admin_mail_labels(id,name,color),admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)").order("created_at", { ascending: false }).limit(250),
     client.from("admin_mail_labels").select("id,name,color").order("name", { ascending: true }),
     client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound"),
     client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound").eq("is_read", false),
@@ -302,7 +304,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const filename = safeStorageFilename(file.filename, index);
     const storagePath = `${stored.id}/${String(index + 1).padStart(2, "0")}-${filename}`;
     const uploaded = await client.storage.from("admin-mail-attachments").upload(storagePath, file.bytes, { contentType: file.mimeType, upsert: true });
-    if (!uploaded.error) await client.from("admin_mail_attachments").insert({ message_id: stored.id, filename: file.filename || filename, mime_type: file.mimeType, size_bytes: file.bytes.byteLength, storage_path: storagePath });
+    if (!uploaded.error) await client.from("admin_mail_attachments").insert({ message_id: stored.id, filename: file.filename || filename, mime_type: file.mimeType, size_bytes: file.bytes.byteLength, storage_path: storagePath, content_id: null, disposition: "attachment" });
   }
   await client.from("audit_log").insert({ actor_id: admin.id, action: parent ? "admin_mail.replied" : "admin_mail.sent", entity_type: "admin_mail_message", entity_id: stored.id, after_data: { recipient: parsed.data.recipient, subject: parsed.data.subject, providerId: sent.data.id, attachmentCount: preparedFiles.length } });
   throw redirect(`/admin/messagerie?view=sent&message=${stored.id}&confirmation=mail-sent`);
@@ -330,6 +332,10 @@ function formatFileSize(bytes: number) {
   if (bytes < 1_024) return `${bytes} o`;
   if (bytes < 1_048_576) return `${Math.round(bytes / 1_024)} Ko`;
   return `${(bytes / 1_048_576).toFixed(1).replace(".", ",")} Mo`;
+}
+
+function downloadableAttachments(message: AdminMailMessage) {
+  return message.admin_mail_attachments.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id);
 }
 
 function replySubject(subject: string) {
@@ -401,6 +407,7 @@ function MailComposer({ replyMessage, composeToken, result }: { replyMessage: Ad
 
 function MailDetail({ message, view, query, labels, labelFilter }: { message: AdminMailMessage; view: MailboxView; query: string; labels: MailLabel[]; labelFilter: string }) {
   const recipientText = message.recipients.map((recipient) => recipient.name ? `${recipient.name} <${recipient.address}>` : recipient.address).join(", ");
+  const messageAttachments = downloadableAttachments(message);
   return <article className="admin-mail-detail">
     <header className="admin-mail-detail__heading">
       <div><p className="eyebrow">{message.direction === "inbound" ? "Message reçu" : "Message envoyé"}</p><h2>{message.subject}</h2>{message.admin_mail_labels ? <MailLabelBadge label={message.admin_mail_labels} /> : null}</div>
@@ -442,10 +449,16 @@ function MailDetail({ message, view, query, labels, labelFilter }: { message: Ad
       <div><dt>À</dt><dd>{recipientText || "—"}</dd></div>
       <div><dt>Date</dt><dd><time dateTime={messageDate(message)}>{dateFormatter.format(new Date(messageDate(message)))}</time></dd></div>
     </dl>
-    {message.admin_mail_attachments.length > 0 ? <section className="admin-mail-attachments" aria-label="Pièces jointes">
-      {message.admin_mail_attachments.map((attachment) => <a key={attachment.id} href={`/admin/messagerie/${message.id}/pieces-jointes/${attachment.id}`}><Paperclip aria-hidden="true" /><span><strong>{attachment.filename}</strong><small>{formatFileSize(attachment.size_bytes)}</small></span><Download aria-hidden="true" /></a>)}
+    {messageAttachments.length > 0 ? <section className="admin-mail-attachments" aria-label="Pièces jointes">
+      {messageAttachments.map((attachment) => <a key={attachment.id} href={`/admin/messagerie/${message.id}/pieces-jointes/${attachment.id}`}><Paperclip aria-hidden="true" /><span><strong>{attachment.filename}</strong><small>{formatFileSize(attachment.size_bytes)}</small></span><Download aria-hidden="true" /></a>)}
     </section> : null}
-    <div className="admin-mail-detail__body">{message.text_body || "Ce message ne contient pas de version texte consultable."}</div>
+    <AdminEmailBody
+      key={message.id}
+      messageId={message.id}
+      html={message.html_body}
+      text={message.text_body}
+      attachments={message.admin_mail_attachments}
+    />
   </article>;
 }
 
@@ -481,7 +494,9 @@ export default function AdminMail() {
           <button className="ui-button ui-button--danger ui-button--sm" type="submit"><Trash2 aria-hidden="true" /> Supprimer la sélection</button>
         </Form>
         <div className="admin-mail-list__items">
-          {messages.map((message) => <div className="admin-mail-list__row" key={message.id}>
+          {messages.map((message) => {
+            const attachmentCount = downloadableAttachments(message).length;
+            return <div className="admin-mail-list__row" key={message.id}>
             <input className="admin-mail-list__checkbox" type="checkbox" name="messageIds" value={message.id} form="mail-bulk-actions" aria-label={`Sélectionner ${message.subject}`} />
             <Form method="post" className="admin-mail-open-form">
               <input type="hidden" name="intent" value="open" />
@@ -494,10 +509,10 @@ export default function AdminMail() {
               <span className="admin-mail-item__subject">{message.subject}</span>
               {message.admin_mail_labels ? <MailLabelBadge label={message.admin_mail_labels} /> : null}
               <span className="admin-mail-item__preview">{message.text_body?.slice(0, 120) || "Aucun aperçu disponible"}</span>
-              {message.admin_mail_attachments.length > 0 ? <span className="admin-mail-item__attachment"><Paperclip aria-hidden="true" /> {message.admin_mail_attachments.length}</span> : null}
+              {attachmentCount > 0 ? <span className="admin-mail-item__attachment"><Paperclip aria-hidden="true" /> {attachmentCount}</span> : null}
               </button>
             </Form>
-          </div>)}
+          </div>})}
           {messages.length === 0 ? <p className="admin-empty-state">{query || labelFilter ? "Aucun message ne correspond à ces filtres." : view === "inbox" ? "Aucun e-mail reçu pour le moment." : "Aucun e-mail envoyé pour le moment."}</p> : null}
         </div>
       </aside>

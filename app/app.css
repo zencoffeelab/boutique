@@ -7760,11 +7760,83 @@ body.advice-detail-overflow-hidden {
   overflow-wrap: anywhere;
 }
 
-.admin-mail-detail__body {
-  min-height: 12rem;
-  padding: 1.5rem 0;
+.admin-email-body {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding-top: 1.25rem;
   border-top: 1px solid #edf0ea;
+}
+
+.admin-email-body__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.admin-email-body__toolbar--end {
+  justify-content: flex-end;
+}
+
+.admin-email-body__toolbar > div {
+  display: inline-flex;
+  padding: 0.2rem;
+  border: 1px solid #d5dbd1;
+  border-radius: 0.55rem;
+  background: #f4f6f1;
+}
+
+.admin-email-body__toolbar button {
+  min-height: 2.15rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: #596255;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.admin-email-body__toolbar button:hover,
+.admin-email-body__toolbar button:focus-visible,
+.admin-email-body__toolbar button.is-active {
+  border-color: #c7d0c2;
+  background: #fff;
+  color: #293225;
+}
+
+.admin-email-body__privacy {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.5rem;
+  background: #f5f2e8;
+  color: #675f42;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.admin-email-body__frame {
+  width: 100%;
+  height: min(68vh, 48rem);
+  min-height: 30rem;
+  border: 1px solid #dce1d8;
+  border-radius: 0.6rem;
+  background: #fff;
+}
+
+.admin-email-body__text {
+  min-height: 12rem;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid #e1e5de;
+  border-radius: 0.5rem;
+  background: #fbfcfa;
   color: #2d342a;
+  font-family: inherit;
   font-size: 0.94rem;
   line-height: 1.75;
   overflow-wrap: anywhere;
@@ -7924,5 +7996,217 @@ body.advice-detail-overflow-hidden {
   .admin-mail-compose__form > button {
     width: 100%;
     justify-self: stretch;
+  }
+  .admin-email-body__toolbar,
+  .admin-email-body__toolbar--end {
+    align-items: stretch;
+    justify-content: stretch;
+  }
+  .admin-email-body__toolbar > div,
+  .admin-email-body__toolbar > button {
+    flex: 1;
+  }
+  .admin-email-body__toolbar > div > button {
+    flex: 1;
+  }
+  .admin-email-body__frame {
+    min-height: 24rem;
+  }
+}
+
+.admin-seo-analysis {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 1rem;
+  min-width: 0;
+  margin-top: 0.5rem;
+  padding: 1rem;
+  border: 1px solid #d4dbcf;
+  border-radius: 0.45rem;
+  background: #f7faf5;
+}
+
+.admin-seo-analysis__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid #dce3d8;
+}
+
+.admin-seo-analysis__heading > div {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.admin-seo-analysis__heading strong {
+  font-size: 1.05rem;
+}
+
+.admin-seo-analysis__heading small,
+.admin-seo-analysis__keyphrase > small,
+.admin-seo-analysis__privacy {
+  color: #677064;
+}
+
+.admin-seo-analysis__heading a {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #bfcbb9;
+  border-radius: 999px;
+  color: #3d6435;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.admin-seo-analysis__keyphrase {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.admin-seo-analysis__keyphrase label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.admin-seo-analysis__status,
+.admin-seo-analysis__notice,
+.admin-seo-analysis__success {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: 0.3rem;
+  background: #edf2e9;
+  color: #566052;
+}
+
+.admin-seo-analysis__success {
+  background: #e3f1df;
+  color: #31562a;
+}
+
+.admin-seo-analysis__preview {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem;
+  border: 1px solid #e1e4df;
+  border-radius: 0.35rem;
+  background: #fff;
+  font-family: Arial, sans-serif;
+}
+
+.admin-seo-analysis__preview > span {
+  overflow: hidden;
+  color: #202124;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-seo-analysis__preview > strong {
+  overflow-wrap: anywhere;
+  color: #1a0dab;
+  font-size: 1.1rem;
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.admin-seo-analysis__preview > p {
+  margin: 0;
+  color: #4d5156;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.admin-seo-analysis__preview > small {
+  margin-top: 0.3rem;
+  color: #777;
+}
+
+.admin-seo-analysis__scores {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.admin-seo-analysis__scores > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border-left: 0.35rem solid #aeb5aa;
+  background: #fff;
+}
+
+.admin-seo-analysis__scores > .is-good { border-left-color: #4c8b3f; }
+.admin-seo-analysis__scores > .is-ok { border-left-color: #d39b25; }
+.admin-seo-analysis__scores > .is-bad { border-left-color: #c74c3c; }
+
+.admin-seo-analysis__checks {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.admin-seo-analysis__checks h5 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.admin-seo-analysis__results {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-seo-analysis__results li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.admin-seo-analysis__results li > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.admin-seo-analysis__results strong {
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.admin-seo-analysis__results small {
+  color: #687064;
+  line-height: 1.4;
+}
+
+.admin-seo-analysis__dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-top: 0.25rem;
+  border-radius: 50%;
+  background: #c74c3c;
+}
+
+.admin-seo-analysis__results .is-ok .admin-seo-analysis__dot { background: #d39b25; }
+.admin-seo-analysis__results .is-good .admin-seo-analysis__dot { background: #4c8b3f; }
+
+.admin-seo-analysis__passed summary {
+  cursor: pointer;
+  color: #3d6435;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.admin-seo-analysis__passed .admin-seo-analysis__results {
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 600px) {
+  .admin-seo-analysis__scores {
+    grid-template-columns: 1fr;
   }
 }

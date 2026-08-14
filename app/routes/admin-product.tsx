@@ -18,6 +18,7 @@ import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type 
 import { AdminShell } from "~/components/admin-shell";
 import { AdminImageEditorInput } from "~/components/admin-image-editor-input";
 import { AdminProductThumbnailForm } from "~/components/admin-product-thumbnail-form";
+import { AdminSeoAnalysis } from "~/components/admin-seo-analysis";
 import { formatMoney } from "~/domain/money";
 import { buildVariantOffers } from "~/domain/professional-quote";
 import type { ProductEditorialBlock, ProductVariant } from "~/domain/types";
@@ -55,6 +56,8 @@ const productSchema = z.object({
   seoTitleEn: z.string().trim().min(2),
   seoDescriptionFr: z.string().trim().min(10),
   seoDescriptionEn: z.string().trim().min(10),
+  focusKeyphraseFr: z.string().trim().max(160).optional().default(""),
+  focusKeyphraseEn: z.string().trim().max(160).optional().default(""),
 });
 const automaticTranslationSchema = z.object({
   intent: z.literal("translate_product_to_english"),
@@ -152,6 +155,7 @@ const emptyTranslation = (locale: "fr-FR" | "en-GB") => ({
   tastingNotes: [],
   seoTitle: "",
   seoDescription: "",
+  focusKeyphrase: "",
 });
 
 type EditorialBlockFields = z.infer<typeof editorialBlockFieldsSchema>;
@@ -971,6 +975,7 @@ export async function action({ request }: ActionFunctionArgs) {
         .filter(Boolean),
       seo_title: parsed.data.seoTitleFr,
       seo_description: parsed.data.seoDescriptionFr,
+      focus_keyphrase: parsed.data.focusKeyphraseFr,
     },
     {
       locale: "en-GB",
@@ -987,6 +992,7 @@ export async function action({ request }: ActionFunctionArgs) {
         .filter(Boolean),
       seo_title: parsed.data.seoTitleEn,
       seo_description: parsed.data.seoDescriptionEn,
+      focus_keyphrase: parsed.data.focusKeyphraseEn,
     },
   ].map((translation) => ({ ...translation, product_id: savedProductId }));
   const { error: translationError } = await client
@@ -1142,6 +1148,29 @@ function TranslationFields({
             />
           </label>
         </div>
+        <AdminSeoAnalysis
+          formId="product-editor-form"
+          locale={language === "Français" ? "fr-FR" : "en-GB"}
+          focusKeyphraseName={`focusKeyphrase${suffix}`}
+          defaultFocusKeyphrase={translation.focusKeyphrase ?? ""}
+          titleFieldName={`name${suffix}`}
+          seoTitleFieldName={`seoTitle${suffix}`}
+          seoDescriptionFieldName={`seoDescription${suffix}`}
+          slugFieldName="slug"
+          contentFieldNames={[
+            `short${suffix}`,
+            `producer${suffix}`,
+            `region${suffix}`,
+            `variety${suffix}`,
+            `process${suffix}`,
+            `notes${suffix}`,
+            `editorial1Title${suffix}`,
+            `editorial1Body${suffix}`,
+            `editorial2Title${suffix}`,
+            `editorial2Body${suffix}`,
+          ]}
+          imageAltFieldNames={[`editorial1Alt${suffix}`, `editorial2Alt${suffix}`]}
+        />
         <div className="field">
           <label>
             Producteur
@@ -1801,6 +1830,11 @@ function AdminProductAnchorNavigation({ isNew }: { isNew: boolean }) {
     let frame = 0;
     const updateActiveSection = () => {
       frame = 0;
+      const reachedPageBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+      if (reachedPageBottom) {
+        setActiveSection(sections.at(-1)?.id ?? sections[0].id);
+        return;
+      }
       const firstTarget = document.getElementById(sections[0].id);
       const targetScrollMargin = firstTarget
         ? Number.parseFloat(window.getComputedStyle(firstTarget).scrollMarginTop) || 0

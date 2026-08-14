@@ -23,15 +23,16 @@ describe("advice administration", () => {
     expect(removeAdviceLayoutItem(items, items[1])).toEqual([items[0], items[2]]);
   });
 
-  it("deletes an article and records its previous content in the audit log", async () => {
+  it("archives a deleted article and records its previous content in the audit log", async () => {
     const before = { id: articleId, slug: "guide-v60", advice_translations: [{ locale: "fr-FR", title: "Guide V60" }] };
-    const deleteEq = vi.fn(async () => ({ error: null }));
+    const updateEq = vi.fn(async () => ({ error: null }));
+    const update = vi.fn(() => ({ eq: updateEq }));
     const auditInsert = vi.fn(async () => ({ error: null }));
     const client = {
       from: vi.fn((table: string) => {
         if (table === "advice_articles") return {
           select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: before, error: null }) }) }),
-          delete: () => ({ eq: deleteEq }),
+          update,
         };
         if (table === "audit_log") return { insert: auditInsert };
         throw new Error(`Unexpected table: ${table}`);
@@ -43,7 +44,8 @@ describe("advice administration", () => {
     form.set("id", articleId);
 
     await expect(action({ request: new Request("http://localhost/admin/conseils", { method: "POST", body: form }), params: {}, context: {} } as never)).resolves.toEqual({ ok: true, message: "Conseil supprimé." });
-    expect(deleteEq).toHaveBeenCalledWith("id", articleId);
+    expect(update).toHaveBeenCalledWith({ status: "archived" });
+    expect(updateEq).toHaveBeenCalledWith("id", articleId);
     expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ action: "advice.deleted", entity_id: articleId, before_data: before }));
   });
 

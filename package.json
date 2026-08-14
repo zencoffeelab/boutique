@@ -39,6 +39,7 @@
     "resend": "^6.8.0",
     "stripe": "^22.3.2",
     "tailwind-merge": "^3.3.1",
+    "yoastseo": "^3.6.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -63,5 +64,8 @@
     "vite": "^8.1.5",
     "vitest": "^4.1.0",
     "wrangler": "^4.113.0"
+  },
+  "overrides": {
+    "@babel/runtime": "^7.26.10"
   }
 }

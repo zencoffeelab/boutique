@@ -94,7 +94,7 @@ async function classificationLabelId(env: EmailForwardingEnv, name: string) {
 
 async function persistAttachments(env: EmailForwardingEnv, messageId: string, attachments: Attachment[]) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || attachments.length === 0) return;
-  const rows: Array<{ message_id: string; filename: string; mime_type: string; size_bytes: number; storage_path: string }> = [];
+  const rows: Array<{ message_id: string; filename: string; mime_type: string; size_bytes: number; storage_path: string; content_id: string | null; disposition: "attachment" | "inline" | null }> = [];
 
   for (const [index, attachment] of attachments.entries()) {
     const content = attachmentBytes(attachment);
@@ -107,7 +107,15 @@ async function persistAttachments(env: EmailForwardingEnv, messageId: string, at
       body: Uint8Array.from(content).buffer,
     });
     if (!upload.ok) throw new Error(`Unable to store attachment ${filename}: ${upload.status}`);
-    rows.push({ message_id: messageId, filename: attachment.filename || filename, mime_type: attachment.mimeType || "application/octet-stream", size_bytes: content.byteLength, storage_path: storagePath });
+    rows.push({
+      message_id: messageId,
+      filename: attachment.filename || filename,
+      mime_type: attachment.mimeType || "application/octet-stream",
+      size_bytes: content.byteLength,
+      storage_path: storagePath,
+      content_id: attachment.contentId?.trim().replace(/^<|>$/g, "") || null,
+      disposition: attachment.disposition,
+    });
   }
 
   const stored = await fetch(`${env.SUPABASE_URL}/rest/v1/admin_mail_attachments?on_conflict=storage_path`, {
@@ -166,7 +174,7 @@ export async function persistIncomingEmail(message: ForwardableEmail, env: Email
     storedMessageId = ((await existing.json()) as Array<{ id: string }>)[0]?.id;
   }
   if (!storedMessageId) throw new Error("Incoming email storage returned no identifier.");
-  await persistAttachments(env, storedMessageId, parsed.attachments.filter((attachment) => attachment.disposition !== "inline" || !attachment.related));
+  await persistAttachments(env, storedMessageId, parsed.attachments);
   return storedMessageId;
 }
 

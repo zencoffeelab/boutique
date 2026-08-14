@@ -123,6 +123,7 @@ test("product editor provides two editable editorial blocks", async ({
   await expect(page).toHaveURL(/#product-gallery$/);
   await expect(sectionNavigation.getByRole("link", { name: "Galerie" })).toHaveAttribute("aria-current", "location");
   const gallerySection = page.locator("#product-gallery");
+  await gallerySection.scrollIntoViewIfNeeded();
   await expect(gallerySection).toBeInViewport();
   const galleryItems = gallerySection.locator(".admin-media-item");
   expect(await galleryItems.count()).toBeGreaterThan(0);
@@ -169,8 +170,9 @@ test("every product image upload opens the crop and resize editor", async ({
 
   const firstEditorialBlock = page.locator(".admin-editorial-block").first();
   await expect(firstEditorialBlock.locator(".admin-image-input")).toHaveAttribute("data-ready", "true");
-  const fileInput = firstEditorialBlock.locator('input[type="file"]');
-  await expect(fileInput).toHaveAttribute("name", "editorial1File");
+  const fileInput = firstEditorialBlock.locator('input[type="file"].admin-image-input__native');
+  await expect(fileInput).toHaveAttribute("name", "editorial1FileSource");
+  await expect(firstEditorialBlock.locator('input[type="file"].admin-image-input__processed')).toHaveAttribute("name", "editorial1FileProcessed");
   expect(await fileInput.evaluate((input) => input.closest("form")?.id)).toBe("product-editor-form");
   await fileInput.setInputFiles(resolve("public/media/product-cards/zen-coffee-bag-resealable.png"));
 
@@ -204,11 +206,11 @@ test("FAQ and advice management use separate pages", async ({ page }) => {
   ).toHaveCount(0);
   await page
     .getByRole("navigation", { name: "Administration" })
-    .getByRole("link", { name: "Conseils", exact: true })
+    .getByRole("link", { name: "Blog", exact: true })
     .click();
   await expect(page).toHaveURL(/\/admin\/conseils$/);
   await expect(
-    page.getByRole("heading", { name: "Conseils", exact: true }),
+    page.getByRole("heading", { name: "Blog", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Nouvelle question" }),

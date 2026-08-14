@@ -46,6 +46,7 @@ export type ProductTranslation = Readonly<{
   tastingNotes: readonly string[];
   seoTitle: string;
   seoDescription: string;
+  focusKeyphrase: string;
 }>;
 
 export type ProductMedia = Readonly<{

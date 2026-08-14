@@ -31,6 +31,7 @@ function mapDatabaseProduct(row: any): Product {
         tastingNotes: translation.tasting_notes ?? [],
         seoTitle: translation.seo_title,
         seoDescription: translation.seo_description,
+        focusKeyphrase: translation.focus_keyphrase ?? "",
       },
     ]),
   ) as Product["translations"];

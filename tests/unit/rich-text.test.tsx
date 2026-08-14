@@ -22,7 +22,7 @@ describe("rich advice content", () => {
 
     const synchronized = synchronizeRichTextLayout(french, english);
     expect(synchronized.content[0]).toEqual({ type: "contentTable", attrs: { rows: [["EN 1", ""], ["", ""]] } });
-    expect(synchronized.content[1]).toEqual({ type: "contentAccordion", attrs: { title: "Read more", body: "EN details" } });
+    expect(synchronized.content[1]).toEqual({ type: "contentAccordion", attrs: { title: "Read more", body: "EN details", bodyDocument: null } });
   });
 
   it("matches translated accordion content by special-node order", () => {
@@ -36,7 +36,7 @@ describe("rich advice content", () => {
     ] }), 1)!;
 
     const synchronized = synchronizeRichTextLayout(french, english);
-    expect(synchronized.content[1]).toEqual({ type: "contentAccordion", attrs: { title: "English title", body: "English body" } });
+    expect(synchronized.content[1]).toEqual({ type: "contentAccordion", attrs: { title: "English title", body: "English body", bodyDocument: null } });
   });
 
   it("reads double-encoded introductions and fills every translated table cell", () => {
