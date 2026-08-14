@@ -1241,7 +1241,7 @@ button:disabled {
   left: -80%;
   width: 260.72%;
   height: 463.64%;
-  background: url("/media/product-cards/zen-coffee-bag-resealable.png") center / 100% 100% no-repeat;
+  background: url("/media/product-cards/zen-coffee-bag-resealable.webp") center / 100% 100% no-repeat;
   content: "";
   mix-blend-mode: multiply;
   filter: grayscale(1) contrast(2.4) brightness(0.88);

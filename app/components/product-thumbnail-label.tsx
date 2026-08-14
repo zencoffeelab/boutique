@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-export const PRODUCT_THUMBNAIL_BAG_URL = "/media/product-cards/zen-coffee-bag-resealable.png";
+export const PRODUCT_THUMBNAIL_BAG_URL = "/media/product-cards/zen-coffee-bag-resealable.webp";
 
 export function ProductPackArtwork({
   labelUrl,

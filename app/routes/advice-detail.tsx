@@ -51,9 +51,9 @@ function AdviceStory({ article, locale, storyImages }: { article: Awaited<Return
   const texts: Partial<Record<AdviceElement, typeof article.body["fr-FR"]>> = { introText: article.excerptBody?.[locale] ?? [article.excerpt[locale]], bodyText: article.body[locale], body2Text: article.body2?.[locale] };
   const story = article.story[locale];
   const images: Partial<Record<AdviceElement, { src: string; alt: string }>> = {
-    introImage: story.introImageUrl ? { src: story.introImageUrl, alt: story.introImageAlt ?? "Coffee" } : (storyImages[0] ?? { src: "/media/home-hero-coffee-cherries.jpg", alt: "Coffee cherries" }),
-    bodyImage: story.bodyImageUrl ? { src: story.bodyImageUrl, alt: story.bodyImageAlt ?? "Coffee" } : (storyImages[0] ?? { src: "/media/home-hero-coffee-cherries.jpg", alt: "Coffee cherries" }),
-    body2Image: story.body2ImageUrl ? { src: story.body2ImageUrl, alt: story.body2ImageAlt ?? "Coffee" } : (storyImages[1] ?? storyImages[0] ?? { src: "/media/home-hero-coffee-cherries.jpg", alt: "Coffee cherries" }),
+    introImage: story.introImageUrl ? { src: story.introImageUrl, alt: story.introImageAlt ?? "Coffee" } : (storyImages[0] ?? { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" }),
+    bodyImage: story.bodyImageUrl ? { src: story.bodyImageUrl, alt: story.bodyImageAlt ?? "Coffee" } : (storyImages[0] ?? { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" }),
+    body2Image: story.body2ImageUrl ? { src: story.body2ImageUrl, alt: story.body2ImageAlt ?? "Coffee" } : (storyImages[1] ?? storyImages[0] ?? { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" }),
   };
   const renderItem = (item: AdviceLayoutItem) => {
     if (item.compartment === "title") return null;
@@ -62,8 +62,8 @@ function AdviceStory({ article, locale, storyImages }: { article: Awaited<Return
     if (item.compartment === "image" && item.customId && customItem?.imageUrl) return <figure className="advice-story__image" key={item.id}><img src={customItem.imageUrl} alt={locale === "fr-FR" ? customItem.imageAltFr ?? "" : customItem.imageAltEn ?? ""} /></figure>;
     if (item.compartment === "text" && item.element && texts[item.element]) return <div className="advice-story__text" key={item.id}><RichTextContent content={texts[item.element]!} /></div>;
     if (item.compartment === "image" && item.element && images[item.element]) return <figure className="advice-story__image" key={item.id}><img src={images[item.element]!.src} alt={images[item.element]!.alt} /></figure>;
-    if (item.compartment === "textImage") return <EditorialStory key={item.id} content={texts.bodyText ?? []} images={[images.bodyImage ?? { src: "/media/home-hero-coffee-cherries.jpg", alt: "Coffee cherries" }]} splitSections={false} />;
-    if (item.compartment === "imageText") return <EditorialStory key={item.id} content={texts.body2Text ?? []} images={[images.body2Image ?? { src: "/media/home-hero-coffee-cherries.jpg", alt: "Coffee cherries" }]} imageFirst splitSections={false} />;
+    if (item.compartment === "textImage") return <EditorialStory key={item.id} content={texts.bodyText ?? []} images={[images.bodyImage ?? { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" }]} splitSections={false} />;
+    if (item.compartment === "imageText") return <EditorialStory key={item.id} content={texts.body2Text ?? []} images={[images.body2Image ?? { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" }]} imageFirst splitSections={false} />;
     return null;
   };
   const placedCustomIds = new Set(layout.items.map((item) => item.customId).filter(Boolean));

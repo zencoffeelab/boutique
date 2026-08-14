@@ -68,7 +68,7 @@ export default function Home() {
       }} />
       <section className="hero">
         <div className="hero__media">
-          <img src="/media/home-hero-coffee-cherries.jpg" alt={english ? "Coffee cherries ripening on a coffee plant" : "Cerises de café mûrissant sur un caféier"} width="1674" height="941" fetchPriority="high" />
+          <img src="/media/home-hero-coffee-cherries.webp" alt={english ? "Coffee cherries ripening on a coffee plant" : "Cerises de café mûrissant sur un caféier"} width="1672" height="941" fetchPriority="high" />
           <div className="hero__copy">
             <p className="eyebrow">{english ? "Micro-roastery" : "micro-torréfacteur"} · Tours</p>
             <h1>{english ? <>A roast tailored to the <em>origin.</em></> : <>Une torréfaction pensée pour l’<em>origine.</em></>}</h1>

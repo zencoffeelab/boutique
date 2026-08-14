@@ -84,7 +84,7 @@ export function EditorialStory({ content, images, imageFirst = false, splitSecti
       window.cancelAnimationFrame(secondFrame);
     };
   }, [lockBlockSize]);
-  const fallback = { src: "/media/home-hero-coffee-cherries.jpg", alt: "Coffee cherries" };
+  const fallback = { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" };
   return <div ref={storyRef} className="product-story editorial-story">{blocks.map((block, index) => {
     const imageFirstForBlock = (index + (imageFirst ? 1 : 0)) % 2 === 1;
     const image = images[index % Math.max(images.length, 1)] ?? fallback;

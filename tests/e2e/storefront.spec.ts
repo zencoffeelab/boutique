@@ -35,7 +35,7 @@ test("home hero overlays its centered white content on a balanced full-width ima
   await expect(copy.getByRole("link", { name: "Notre approche" })).toHaveCSS("color", "rgb(255, 255, 255)");
   await expect(copy.getByText(/Des cafés traçables/)).toHaveCount(0);
   await expect(hero.locator(".hero__media-title")).toHaveCount(0);
-  await expect(media.locator("img")).toHaveAttribute("src", "/media/home-hero-coffee-cherries.jpg");
+  await expect(media.locator("img")).toHaveAttribute("src", "/media/home-hero-coffee-cherries.webp");
   await expect(hero.locator(".hero__stamp")).toHaveCount(0);
 
   const mediaBox = await media.boundingBox();
