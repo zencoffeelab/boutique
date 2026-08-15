@@ -407,9 +407,10 @@ function LanguageTabs({ label, french, english }: { label: string; french: React
   </div>;
 }
 
-function AutomaticAdviceTranslation({ formId }: { formId: string }) {
+function AutomaticAdviceTranslation({ formId, onBusyChange }: { formId: string; onBusyChange?: (busy: boolean) => void }) {
   const fetcher = useFetcher<AdviceTranslationResponse>();
   const formRef = useRef<HTMLFormElement | null>(null);
+  useEffect(() => { onBusyChange?.(fetcher.state !== "idle"); }, [fetcher.state, onBusyChange]);
   useEffect(() => {
     const translation = fetcher.data?.translation;
     if (!translation) return;
@@ -440,6 +441,18 @@ function AutomaticAdviceTranslation({ formId }: { formId: string }) {
     const form = document.getElementById(formId) as HTMLFormElement | null;
     if (!form) return;
     formRef.current = form;
+    const emptyRichText = JSON.stringify({ type: "doc", content: [] });
+    for (const name of ["titleEn", "excerptEn", "bodyEn", "body2En", "seoTitleEn", "seoDescriptionEn", "shortIntroEn", "introImageAltEn", "bodyImageAltEn", "body2ImageAltEn"]) {
+      const fields = form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(`[name="${name}"]`);
+      fields.forEach((field) => {
+        field.value = ["excerptEn", "bodyEn", "body2En", "shortIntroEn"].includes(name) ? emptyRichText : "";
+        field.dispatchEvent(new Event(["excerptEn", "bodyEn", "body2En", "shortIntroEn"].includes(name) ? "rich-text-translation" : "input", { bubbles: true }));
+      });
+    }
+    form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[name^="customTextEn-"], [name^="customImageAltEn-"]').forEach((field) => {
+      field.value = "";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
     const names = ["titleFr", "excerptFr", "bodyFr", "body2Fr", "seoTitleFr", "seoDescriptionFr", "shortIntroFr", "introImageAltFr", "bodyImageAltFr", "body2ImageAltFr"];
     const values: Record<string, string> = Object.fromEntries(names.map((name) => {
       const fields = form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(`input[name="${name}"], textarea[name="${name}"]`);
@@ -628,11 +641,19 @@ function SeparatedArticleIntroduction({ fr, en, frLayout, demo }: { fr?: Transla
 }
 
 function ArticleForm({ article, demo }: { article?: Article; demo: boolean }) {
+  const [translationBusy, setTranslationBusy] = useState(false);
   const fr = article?.advice_translations.find((item) => item.locale === "fr-FR");
   const en = article?.advice_translations.find((item) => item.locale === "en-GB");
   const formId = `advice-form-${article?.id ?? "new"}`;
   const frLayout = layout(fr);
   const enLayout = layout(en);
+  useEffect(() => {
+    const form = document.getElementById(formId);
+    const saveButton = form?.querySelector<HTMLButtonElement>(".admin-editor__actions > button");
+    if (!saveButton) return;
+    saveButton.type = "submit";
+    saveButton.disabled = demo || translationBusy;
+  }, [demo, formId, translationBusy]);
   const intro = (locale: "Fr" | "En", translation?: Translation) => <fieldset className="admin-editorial-block__language"><legend>{locale === "Fr" ? "Français" : "English"}</legend>{locale === "Fr" ? <AdminImageEditorInput name="introImageFileShared" label="Image commune sous le titre" help="Cette image sera utilisée dans les deux langues · JPEG, PNG ou WebP · recadrage libre" currentPreviewUrl={String(layout(translation)?.introImageUrl ?? "")} defaultAspect="original" defaultOutputWidth={1500} /> : null}<div className="field"><label>{locale === "Fr" ? "Titre" : "Title"}<input name={`title${locale}`} defaultValue={translation?.title ?? ""} required /></label></div><div className="field"><label>{locale === "Fr" ? "Texte alternatif de l’image" : "Image alternative text"}<input name={`introImageAlt${locale}`} defaultValue={String(layout(translation)?.introImageAlt ?? "")} /></label></div><RichTextEditor name={`excerpt${locale}`} label="Introduction" initialContent={parseIntroduction(translation?.excerpt ?? "")} disabled={demo} /></fieldset>;
   const block = (position: 1 | 2, locale: "Fr" | "En", translation: Translation | undefined, data: Record<string, unknown> | undefined) => <fieldset className="admin-editorial-block__language"><legend>{locale === "Fr" ? "Français" : "English"}</legend><RichTextEditor name={position === 1 ? `body${locale}` : `body2${locale}`} label={locale === "Fr" ? "Texte" : "Text"} initialContent={position === 1 ? storedBlocksToRichTextDocument(translation?.blocks) : storedBlocksToRichTextDocument([{ type: "richText", content: data?.body2 }])} disabled={demo} /><input type="hidden" name={position === 1 ? `bodyImageUrl${locale}` : `body2ImageUrl${locale}`} value={String(position === 1 ? data?.bodyImageUrl ?? "" : data?.body2ImageUrl ?? "")} /><AdminImageEditorInput name={position === 1 ? `bodyImageFile${locale}` : `body2ImageFile${locale}`} label={locale === "Fr" ? "Image du bloc" : "Block image"} help="JPEG, PNG ou WebP · recadrage au ratio 75:83" currentPreviewUrl={String(position === 1 ? data?.bodyImageUrl ?? "" : data?.body2ImageUrl ?? "")} defaultAspect="75:83" lockAspect defaultOutputWidth={1500} /><div className="field"><label>{locale === "Fr" ? "Texte alternatif" : "Alternative text"}<input name={position === 1 ? `bodyImageAlt${locale}` : `body2ImageAlt${locale}`} defaultValue={String(position === 1 ? data?.bodyImageAlt ?? "" : data?.body2ImageAlt ?? "")} /></label></div></fieldset>;
   const editorial = (position: 1 | 2, imageFirst: boolean) => <section className={`admin-editorial-block admin-advice-editor__block${imageFirst ? "" : " admin-advice-editor__block--copy-first"}`}><header className="admin-editorial-block__heading"><div><p className="eyebrow">Bloc {position}</p><h3>{imageFirst ? "Image à gauche · texte à droite" : "Texte à gauche · image à droite"}</h3></div></header><div className="admin-editorial-block__layout"><div className="admin-editorial-block__image"><StoryImage url={String(position === 1 ? frLayout?.bodyImageUrl ?? "" : frLayout?.body2ImageUrl ?? "")} alt={String(position === 1 ? frLayout?.bodyImageAlt ?? "" : frLayout?.body2ImageAlt ?? "")} /></div><div className="admin-editorial-block__content"><LanguageTabs label={`Langue du bloc ${position}`} french={block(position, "Fr", fr, frLayout)} english={block(position, "En", en, enLayout)} /></div></div></section>;
