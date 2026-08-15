@@ -105,6 +105,9 @@ export type Product = Readonly<{
   media: readonly ProductMedia[];
   editorialBlocks: readonly ProductEditorialBlock[];
   variants: readonly ProductVariant[];
+  stockOnHandGrams: number;
+  stockReservedGrams: number;
+  lowStockThresholdGrams: number;
 }>;
 
 export type ProfessionalQuoteCartLine = Readonly<{

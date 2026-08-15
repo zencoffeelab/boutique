@@ -17,6 +17,9 @@ import { createPublicSupabase, createServiceSupabase } from "./supabase.server";
 import { paragraphsToRichTextDocument, parseRichTextInput, richTextPlainText, storedBlocksToRichTextDocument } from "./rich-text";
 
 function mapDatabaseProduct(row: any): Product {
+  const stockOnHandGrams = Number(row.stock_on_hand_grams ?? (row.product_variants ?? []).reduce((total: number, variant: any) => total + Number(variant.stock_on_hand ?? 0) * Number(variant.weight_grams ?? 0), 0));
+  const stockReservedGrams = Number(row.stock_reserved_grams ?? (row.product_variants ?? []).reduce((total: number, variant: any) => total + Number(variant.stock_reserved ?? 0) * Number(variant.weight_grams ?? 0), 0));
+  const lowStockThresholdGrams = Number(row.low_stock_threshold_grams ?? (row.product_variants ?? []).reduce((total: number, variant: any) => total + Number(variant.low_stock_threshold ?? 0) * Number(variant.weight_grams ?? 0), 0));
   const translations = Object.fromEntries(
     row.product_translations.map((translation: any) => [
       translation.locale,
@@ -75,9 +78,9 @@ function mapDatabaseProduct(row: any): Product {
       label: variant.label,
       weightGrams: variant.weight_grams,
       internalCostCents: variant.internal_cost_cents,
-      stockOnHand: variant.stock_on_hand,
-      stockReserved: variant.stock_reserved,
-      lowStockThreshold: variant.low_stock_threshold,
+      stockOnHand: Math.floor(stockOnHandGrams / variant.weight_grams),
+      stockReserved: Math.max(0, Math.floor(stockOnHandGrams / variant.weight_grams) - Math.floor(Math.max(0, stockOnHandGrams - stockReservedGrams) / variant.weight_grams)),
+      lowStockThreshold: Math.floor(lowStockThresholdGrams / variant.weight_grams),
       hsCode: variant.hs_code,
       customsOriginCountry: variant.customs_origin_country,
       offers: variant.variant_offers.map((offer: any) => ({
@@ -88,6 +91,9 @@ function mapDatabaseProduct(row: any): Product {
         active: offer.active,
       })),
     })),
+    stockOnHandGrams,
+    stockReservedGrams,
+    lowStockThresholdGrams,
   };
 }
 
@@ -101,7 +107,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     .from("products")
     .select(
       `
-      id, slug, status, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
+      id, slug, status, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
       thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
       product_translations(*),
       product_media(*),
@@ -116,7 +122,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const compatibleResult = await client
       .from("products")
       .select(`
-        id, slug, status, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
+        id, slug, status, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
         thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
         product_translations(*),
         product_media(*),
@@ -132,7 +138,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const compatibleResult = await client
       .from("products")
       .select(`
-        id, slug, status, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
+        id, slug, status, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
         thumbnail_label_public_url, thumbnail_background_color,
         product_translations(*),
         product_media(*),
@@ -149,7 +155,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const compatibleResult = await client
       .from("products")
       .select(`
-        id, slug, status, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
+        id, slug, status, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
         product_translations(*),
         product_media(*),
         product_editorial_blocks(*),
@@ -176,15 +182,37 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     if (legacyResult.error) throw new Error(`Unable to load catalog: ${legacyResult.error.message}`);
     return (legacyResult.data ?? []).map(mapDatabaseProduct);
   }
+  if (error?.code === "42703" && error.message.includes("stock_on_hand_grams")) {
+    const legacyResult = await client
+      .from("products")
+      .select(`
+        id, slug, status, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
+        thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
+        product_translations(*),
+        product_media(*),
+        product_editorial_blocks(*),
+        product_variants(*, variant_offers(*))
+      `)
+      .in("status", statuses)
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: false });
+    if (legacyResult.error) throw new Error(`Unable to load catalog: ${legacyResult.error.message}`);
+    return (legacyResult.data ?? []).map(mapDatabaseProduct);
+  }
   if (error) throw new Error(`Unable to load catalog: ${error.message}`);
   return (data ?? []).map(mapDatabaseProduct);
+}
+
+function applyDemoStockModel(product: Product): Product {
+  const availableGrams = Math.max(0, product.stockOnHandGrams - product.stockReservedGrams);
+  return { ...product, variants: product.variants.map((variant) => ({ ...variant, stockOnHand: Math.floor(product.stockOnHandGrams / variant.weightGrams), stockReserved: Math.max(0, Math.floor(product.stockOnHandGrams / variant.weightGrams) - Math.floor(availableGrams / variant.weightGrams)), lowStockThreshold: Math.floor(product.lowStockThresholdGrams / variant.weightGrams) })) };
 }
 
 async function getRawProducts(): Promise<Product[]> {
   const products = hasSupabaseConfig()
     ? await databaseProducts()
     : env().ALLOW_DEMO_DATA
-      ? demoProducts
+      ? demoProducts.map(applyDemoStockModel)
       : (() => {
           throw new Error("Catalog database is not configured.");
         })();

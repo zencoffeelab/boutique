@@ -75,6 +75,9 @@ function supabaseHeaders(env: EmailForwardingEnv, extra?: HeadersInit) {
 
 export function classifyIncomingEmail(input: { senderAddress: string; recipientAddresses: string[]; subject: string; text: string }) {
   const searchable = `${input.subject} ${input.text}`.toLocaleLowerCase("en-US");
+  const noReplyNotification = /(no-?reply|no.?reply)/i.test(input.senderAddress);
+  const actualDeliveryError = /(mailer-daemon|postmaster|bounce|delivery status|undeliverable|failed|failure|error|erreur|exception|stack trace|http 5\d\d)/i.test(`${input.senderAddress} ${input.subject} ${searchable}`);
+  if (noReplyNotification && !actualDeliveryError) return "Système";
   if (/(mailer-daemon|postmaster|no-?reply|no.?reply|bounce|delivery status|undeliverable|erreur|error|failed|failure)/i.test(`${input.senderAddress} ${input.subject}`) || /(exception|stack trace|http 5\d\d|delivery failed|échec de livraison|erreur système)/i.test(searchable)) return "Erreur";
   if (/(system|système|notification|automated|automatique|cron|stripe|sendcloud|supabase|cloudflare)/i.test(`${input.senderAddress} ${searchable}`)) return "Système";
   const professional = /(professionnel|entreprise|société|siret|tva|facture pro|devis|grossiste|revendeur|wholesale|company|business|vat|invoice)/i.test(searchable);

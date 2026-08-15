@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import emailForwarder, { persistIncomingEmail } from "../../workers/email-forwarder";
+import emailForwarder, { classifyIncomingEmail, persistIncomingEmail } from "../../workers/email-forwarder";
 
 describe("email mailbox worker", () => {
+  it("classifies ordinary no-reply notifications as system messages, not errors", () => {
+    expect(classifyIncomingEmail({ senderAddress: "no-reply@stripe.com", recipientAddresses: ["contact@zencoffeelab.com"], subject: "Payment received", text: "Your payment was received." })).toBe("Système");
+    expect(classifyIncomingEmail({ senderAddress: "no-reply@stripe.com", recipientAddresses: ["contact@zencoffeelab.com"], subject: "Delivery failed", text: "The message could not be delivered." })).toBe("Erreur");
+  });
+
   it("rejects mail instead of silently dropping it when storage is unavailable", async () => {
     const setReject = vi.fn();
 

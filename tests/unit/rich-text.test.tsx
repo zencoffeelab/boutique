@@ -22,7 +22,7 @@ describe("rich advice content", () => {
 
     const synchronized = synchronizeRichTextLayout(french, english);
     expect(synchronized.content[0]).toEqual({ type: "contentTable", attrs: { rows: [["EN 1", ""], ["", ""]] } });
-    expect(synchronized.content[1]).toEqual({ type: "contentAccordion", attrs: { title: "Read more", body: "EN details", bodyDocument: null } });
+    expect(synchronized.content[1]).toEqual({ type: "contentAccordion", attrs: { title: "Read more", subtitle: "", body: "EN details", bodyDocument: null, sections: null } });
   });
 
   it("matches translated accordion content by special-node order", () => {
@@ -36,7 +36,20 @@ describe("rich advice content", () => {
     ] }), 1)!;
 
     const synchronized = synchronizeRichTextLayout(french, english);
-    expect(synchronized.content[1]).toEqual({ type: "contentAccordion", attrs: { title: "English title", body: "English body", bodyDocument: null } });
+    expect(synchronized.content[1]).toEqual({ type: "contentAccordion", attrs: { title: "English title", subtitle: "", body: "English body", bodyDocument: null, sections: null } });
+  });
+
+  it("uses translated accordion body text for the stored body document", () => {
+    const french = parseRichTextInput(JSON.stringify({ type: "doc", content: [
+      { type: "contentAccordion", attrs: { title: "Titre français", sections: [{ subtitle: "Sous-titre français", body: "Contenu français", bodyDocument: JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Contenu français" }] }] }) }] } },
+    ] }), 1)!;
+    const english = parseRichTextInput(JSON.stringify({ type: "doc", content: [
+      { type: "contentAccordion", attrs: { title: "English title", sections: [{ subtitle: "English subtitle", body: "English content", bodyDocument: JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Contenu français" }] }] }) }] } },
+    ] }), 1)!;
+
+    const synchronized = synchronizeRichTextLayout(french, english);
+    const section = (synchronized.content[0].attrs?.sections as Array<{ bodyDocument: string }>)[0];
+    expect(JSON.parse(section.bodyDocument).content[0].content[0].text).toBe("English content");
   });
 
   it("reads double-encoded introductions and fills every translated table cell", () => {

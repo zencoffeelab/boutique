@@ -13,8 +13,9 @@ import { requireAdmin } from "~/lib/auth.server";
 import { getAdminProducts } from "~/lib/catalog.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
+const productStockUpdateSchema = z.object({ productId: z.uuid(), stockOnHandGrams: z.coerce.number().int().min(0), lowStockThresholdGrams: z.coerce.number().int().min(0) });
 const variantUpdateSchema = z.object({
-  variantId: z.uuid(), stockOnHand: z.coerce.number().int().min(0), lowStockThreshold: z.coerce.number().int().min(0), internalCostCents: z.coerce.number().int().min(0), proOfferId: z.preprocess((value) => value === "" ? undefined : value, z.uuid().optional()), proPriceCents: z.coerce.number().int().min(0),
+  variantId: z.uuid(), internalCostCents: z.coerce.number().int().min(0), proOfferId: z.preprocess((value) => value === "" ? undefined : value, z.uuid().optional()), proPriceCents: z.coerce.number().int().min(0),
 });
 const productOrderSchema = z.object({ catalogue: z.enum(["current", "archived"]), productIds: z.array(z.uuid()).min(1) });
 
@@ -40,24 +41,37 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   if (intent !== "update_variants") return { ok: false, message: "Action invalide." };
   const values = (name: string) => form.getAll(name).map(String);
+  const productUpdates = values("productId").map((productId, index) => productStockUpdateSchema.safeParse({ productId, stockOnHandGrams: values("stockOnHandGrams")[index], lowStockThresholdGrams: values("lowStockThresholdGrams")[index] }));
   const variantIds = values("variantId");
-  const stocks = values("stockOnHand"), thresholds = values("lowStockThreshold"), costs = values("internalCostCents"), proOfferIds = values("proOfferId"), proPrices = values("proPriceCents");
-  const updates = variantIds.map((variantId, index) => variantUpdateSchema.safeParse({ variantId, stockOnHand: stocks[index], lowStockThreshold: thresholds[index], internalCostCents: costs[index], proOfferId: proOfferIds[index], proPriceCents: proPrices[index] }));
-  if (updates.length === 0 || updates.some((update) => !update.success)) return { ok: false, message: "Valeurs invalides." };
+  const costs = values("internalCostCents"), proOfferIds = values("proOfferId"), proPrices = values("proPriceCents");
+  const updates = variantIds.map((variantId, index) => variantUpdateSchema.safeParse({ variantId, internalCostCents: costs[index], proOfferId: proOfferIds[index], proPriceCents: proPrices[index] }));
+  if (productUpdates.length === 0 || productUpdates.some((update) => !update.success) || updates.some((update) => !update.success)) return { ok: false, message: "Valeurs invalides." };
   const client = createServiceSupabase();
   if (!client) return { ok: false, message: "Base de données indisponible." };
-  const { error } = await client.rpc("admin_update_product_variants", {
-    p_actor_id: admin.id,
-    p_updates: updates.filter((update): update is { success: true; data: z.infer<typeof variantUpdateSchema> } => update.success).map(({ data }) => ({
-      variantId: data.variantId,
-      stockOnHand: data.stockOnHand,
-      lowStockThreshold: data.lowStockThreshold,
-      internalCostCents: data.internalCostCents,
-      proPriceCents: data.proPriceCents,
-    })),
-  });
-  if (error) return { ok: false, message: error.message };
-  return { ok: true, message: `${updates.length} variante${updates.length > 1 ? "s" : ""} enregistrée${updates.length > 1 ? "s" : ""}.` };
+  const stockRows = productUpdates.filter((update): update is { success: true; data: z.infer<typeof productStockUpdateSchema> } => update.success).map(({ data }) => data);
+  const { data: currentProducts, error: readError } = await client.from("products").select("id,stock_reserved_grams").in("id", stockRows.map((row) => row.productId));
+  if (readError) return { ok: false, message: readError.message };
+  for (const row of stockRows) {
+    const current = currentProducts?.find((product) => product.id === row.productId);
+    if (!current || row.stockOnHandGrams < Number(current.stock_reserved_grams ?? 0)) return { ok: false, message: "Le stock total ne peut pas être inférieur au stock réservé." };
+    const { error } = await client.from("products").update({ stock_on_hand_grams: row.stockOnHandGrams, low_stock_threshold_grams: row.lowStockThresholdGrams, updated_at: new Date().toISOString() }).eq("id", row.productId);
+    if (error) return { ok: false, message: error.message };
+  }
+  const variantRows = updates.filter((update): update is { success: true; data: z.infer<typeof variantUpdateSchema> } => update.success).map(({ data }) => data);
+  for (const row of variantRows) {
+    const { error } = await client.from("product_variants").update({ internal_cost_cents: row.internalCostCents, updated_at: new Date().toISOString() }).eq("id", row.variantId);
+    if (error) return { ok: false, message: error.message };
+    if (row.proOfferId) {
+      const { error: offerError } = await client.from("variant_offers").update({ price_cents: row.proPriceCents }).eq("id", row.proOfferId).eq("variant_id", row.variantId);
+      if (offerError) return { ok: false, message: offerError.message };
+    } else {
+      const { error: offerError } = await client.from("variant_offers").upsert({ variant_id: row.variantId, audience: "professional", price_cents: row.proPriceCents, minimum_quantity: 1, active: false }, { onConflict: "variant_id,audience" });
+      if (offerError) return { ok: false, message: offerError.message };
+    }
+  }
+  await client.from("audit_log").insert({ actor_id: admin.id, action: "product.stock_updated", entity_type: "products", entity_id: stockRows[0].productId, after_data: { products: stockRows } });
+  return { ok: true, message: `${stockRows.length} stock${stockRows.length > 1 ? "s" : ""} café et ${variantRows.length} variante${variantRows.length > 1 ? "s" : ""} enregistrés.` };
+
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -82,8 +96,11 @@ function groupProductsByName(products: readonly Product[]): ProductGroup[] {
   for (const product of products) { const name = product.translations["fr-FR"].name.trim() || "Café sans nom"; const key = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr-FR"); const previous = groups.get(key); groups.set(key, previous ? { ...previous, products: [...previous.products, product] } : { id: `${adminCoffeeId(name)}-${adminCoffeeId(product.id)}`, name, products: [product] }); }
   return [...groups.values()].sort((left, right) => left.name.localeCompare(right.name, "fr-FR"));
 }
-function ProductTable({ products, emptyMessage, label }: { products: readonly Product[]; emptyMessage: string; label: string }) {
+function LegacyProductTable({ products, emptyMessage, label }: { products: readonly Product[]; emptyMessage: string; label: string }) {
   return <CardContent style={{ padding: 0 }}><Table aria-label={label}><TableHeader><TableRow><TableHead>Fiche</TableHead><TableHead>Statut</TableHead><TableHead>Variante</TableHead><TableHead>Stock disponible</TableHead><TableHead>Coût interne</TableHead><TableHead>Mise à jour rapide</TableHead></TableRow></TableHeader><TableBody>{products.flatMap((product) => product.variants.length === 0 ? [<TableRow key={product.id}><TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>Ouvrir la fiche</Link></TableCell><TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell><TableCell colSpan={4}><span className="admin-muted">Aucune variante — ouvrez la fiche pour en ajouter une.</span></TableCell></TableRow>] : [...product.variants].sort((left, right) => left.weightGrams - right.weightGrams || left.label.localeCompare(right.label, "fr-FR")).map((variant) => { const availableStock = variant.stockOnHand - variant.stockReserved; const retailOffer = variant.offers.find((offer) => offer.audience === "retail"); const proOffer = variant.offers.find((offer) => offer.audience === "professional"); return <TableRow key={variant.id}><TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>Ouvrir la fiche</Link><br /><small>{variant.sku}</small></TableCell><TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell><TableCell>{variant.label}</TableCell><TableCell><span className={availableStock <= variant.lowStockThreshold ? "admin-stock-warning" : undefined}>{availableStock}</span><br /><small>Réservé : {variant.stockReserved} · Seuil {variant.lowStockThreshold}</small></TableCell><TableCell>{formatMoney(variant.internalCostCents, "fr-FR")}</TableCell><TableCell><div className="admin-quick-form"><input type="hidden" name="variantId" value={variant.id} /><input type="hidden" name="proOfferId" value={proOffer?.id ?? ""} /><label><span>Stock total</span><input name="stockOnHand" type="number" min="0" defaultValue={variant.stockOnHand} /></label><label><span>Seuil d’alerte</span><input name="lowStockThreshold" type="number" min="0" defaultValue={variant.lowStockThreshold} /></label><label><span>Coût en centimes</span><input name="internalCostCents" type="number" min="0" defaultValue={variant.internalCostCents} /></label><label><span>Tarif pro en centimes</span><input name="proPriceCents" type="number" min="0" defaultValue={proOffer?.price.amount ?? retailOffer?.price.amount ?? 0} /></label></div></TableCell></TableRow>; }))}</TableBody></Table>{products.length === 0 ? <p className="admin-empty-state">{emptyMessage}</p> : null}</CardContent>;
+}
+function ProductTable({ products, emptyMessage, label }: { products: readonly Product[]; emptyMessage: string; label: string }) {
+  return <CardContent style={{ padding: 0 }}><Table aria-label={label}><TableHeader><TableRow><TableHead>Fiche</TableHead><TableHead>Statut</TableHead><TableHead>Variante</TableHead><TableHead>Stock disponible</TableHead><TableHead>Coût interne</TableHead><TableHead>Mise à jour rapide</TableHead></TableRow></TableHeader><TableBody>{products.flatMap((product) => product.variants.length === 0 ? [<TableRow key={product.id}><TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>Ouvrir la fiche</Link></TableCell><TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell><TableCell colSpan={4}><span className="admin-muted">Aucune variante — ouvrez la fiche pour en ajouter une.</span></TableCell></TableRow>] : [...product.variants].sort((left, right) => left.weightGrams - right.weightGrams || left.label.localeCompare(right.label, "fr-FR")).map((variant, index) => { const availableGrams = Math.max(0, product.stockOnHandGrams - product.stockReservedGrams); const availableUnits = Math.floor(availableGrams / variant.weightGrams); const thresholdUnits = Math.floor(product.lowStockThresholdGrams / variant.weightGrams); const retailOffer = variant.offers.find((offer) => offer.audience === "retail"); const proOffer = variant.offers.find((offer) => offer.audience === "professional"); return <TableRow key={variant.id}><TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>Ouvrir la fiche</Link><br /><small>{variant.sku}</small></TableCell><TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell><TableCell>{variant.label}</TableCell><TableCell><span className={availableGrams <= product.lowStockThresholdGrams ? "admin-stock-warning" : undefined}>{availableUnits} paquet{availableUnits > 1 ? "s" : ""}</span><br /><small>{availableGrams} g disponibles · seuil {product.lowStockThresholdGrams} g ({thresholdUnits} paquets)</small></TableCell><TableCell>{formatMoney(variant.internalCostCents, "fr-FR")}</TableCell><TableCell><div className="admin-quick-form">{index === 0 ? <><input type="hidden" name="productId" value={product.id} /><label><span>Stock total du café (g)</span><input name="stockOnHandGrams" type="number" min="0" step="1" defaultValue={product.stockOnHandGrams} /></label><label><span>Seuil d’alerte (g)</span><input name="lowStockThresholdGrams" type="number" min="0" step="1" defaultValue={product.lowStockThresholdGrams} /></label></> : null}<input type="hidden" name="variantId" value={variant.id} /><input type="hidden" name="proOfferId" value={proOffer?.id ?? ""} /><label><span>Coût en centimes</span><input name="internalCostCents" type="number" min="0" defaultValue={variant.internalCostCents} /></label><label><span>Tarif pro en centimes</span><input name="proPriceCents" type="number" min="0" defaultValue={proOffer?.price.amount ?? retailOffer?.price.amount ?? 0} /></label></div></TableCell></TableRow>; }))}</TableBody></Table>{products.length === 0 ? <p className="admin-empty-state">{emptyMessage}</p> : null}</CardContent>;
 }
 function CoffeeTabs({ products, emptyMessage, label }: { products: readonly Product[]; emptyMessage: string; label: string }) {
   const groups = groupProductsByName(products); const [activeTab, setActiveTab] = useState(groups[0]?.id ?? ""); useEffect(() => { if (!groups.some((group) => group.id === activeTab)) setActiveTab(groups[0]?.id ?? ""); }, [activeTab, groups]);

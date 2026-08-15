@@ -131,23 +131,33 @@ export function synchronizeRichTextLayout(source: RichTextDocument, target: Rich
       const targetSections = Array.isArray(targetAttrs?.sections) ? targetAttrs.sections : [];
       const translatedSections = sourceSections.length
         ? sourceSections.map((sourceSection, sectionIndex) => {
-          const sourceValue = isRecord(sourceSection) ? sourceSection : {};
-          const targetValue = isRecord(targetSections[sectionIndex]) ? targetSections[sectionIndex] : {};
-          return {
-            subtitle: typeof targetValue.subtitle === "string" ? targetValue.subtitle : typeof sourceValue.subtitle === "string" ? sourceValue.subtitle : "",
-            body: typeof targetValue.body === "string" ? targetValue.body : typeof sourceValue.body === "string" ? sourceValue.body : "",
-            bodyDocument: typeof targetValue.bodyDocument === "string" ? targetValue.bodyDocument : typeof sourceValue.bodyDocument === "string" ? sourceValue.bodyDocument : null,
-          };
-        })
+            const sourceValue = isRecord(sourceSection) ? sourceSection : {};
+            const targetValue = isRecord(targetSections[sectionIndex]) ? targetSections[sectionIndex] : {};
+            const translatedBody = typeof targetValue.body === "string" ? targetValue.body : typeof sourceValue.body === "string" ? sourceValue.body : "";
+            const sourceBodyDocument = richTextDocumentFromAccordionBody(sourceValue);
+            const translatedBodyDocument = sourceBodyDocument
+              ? JSON.stringify(synchronizeRichTextLayout(sourceBodyDocument, plainTextToRichTextDocument(translatedBody)))
+              : null;
+            return {
+              subtitle: typeof targetValue.subtitle === "string" ? targetValue.subtitle : typeof sourceValue.subtitle === "string" ? sourceValue.subtitle : "",
+              body: translatedBody,
+              bodyDocument: translatedBodyDocument ?? (typeof targetValue.bodyDocument === "string" ? targetValue.bodyDocument : typeof sourceValue.bodyDocument === "string" ? sourceValue.bodyDocument : null),
+            };
+          })
         : null;
       const firstSection = translatedSections?.[0];
+      const translatedBody = firstSection?.body ?? (typeof targetAttrs?.body === "string" ? targetAttrs.body : typeof sourceNode.attrs?.body === "string" ? sourceNode.attrs.body : targetNode ? richTextPlainText({ type: "doc", content: [targetNode] }).trim() : nextText(""));
+      const sourceBodyDocument = richTextDocumentFromAccordionAttrs(sourceNode.attrs);
+      const translatedBodyDocument = sourceBodyDocument
+        ? JSON.stringify(synchronizeRichTextLayout(sourceBodyDocument, plainTextToRichTextDocument(translatedBody)))
+        : null;
       return {
         type: "contentAccordion",
         attrs: {
           title: typeof targetAttrs?.title === "string" ? targetAttrs.title : typeof sourceNode.attrs?.title === "string" ? sourceNode.attrs.title : "Read more",
           subtitle: firstSection?.subtitle ?? (typeof targetAttrs?.subtitle === "string" ? targetAttrs.subtitle : typeof sourceNode.attrs?.subtitle === "string" ? sourceNode.attrs.subtitle : ""),
-          body: firstSection?.body ?? (typeof targetAttrs?.body === "string" ? targetAttrs.body : typeof sourceNode.attrs?.body === "string" ? sourceNode.attrs.body : targetNode ? richTextPlainText({ type: "doc", content: [targetNode] }).trim() : nextText("")),
-          bodyDocument: firstSection?.bodyDocument ?? (typeof targetAttrs?.bodyDocument === "string" ? targetAttrs.bodyDocument : typeof sourceNode.attrs?.bodyDocument === "string" ? sourceNode.attrs.bodyDocument : null),
+          body: translatedBody,
+          bodyDocument: translatedBodyDocument ?? firstSection?.bodyDocument ?? (typeof targetAttrs?.bodyDocument === "string" ? targetAttrs.bodyDocument : typeof sourceNode.attrs?.bodyDocument === "string" ? sourceNode.attrs.bodyDocument : null),
           sections: translatedSections ?? (Array.isArray(targetAttrs?.sections) ? targetAttrs.sections : null),
         },
       } satisfies RichTextNode;
@@ -157,6 +167,24 @@ export function synchronizeRichTextLayout(source: RichTextDocument, target: Rich
     return { ...sourceNode, ...(content ? { content } : {}) };
   };
   return { ...source, content: source.content.map((node, index) => clone(node, target.content[index])) };
+}
+
+function plainTextToRichTextDocument(value: string): RichTextDocument {
+  return {
+    type: "doc",
+    content: value.split(/\r?\n/).map((line) => ({
+      type: "paragraph",
+      content: line ? [{ type: "text", text: line }] : [],
+    })),
+  };
+}
+
+function richTextDocumentFromAccordionBody(value: Record<string, unknown>): RichTextDocument | null {
+  return typeof value.bodyDocument === "string" ? parseRichTextInput(value.bodyDocument, 0) : null;
+}
+
+function richTextDocumentFromAccordionAttrs(attrs: Record<string, unknown> | undefined): RichTextDocument | null {
+  return attrs ? richTextDocumentFromAccordionBody(attrs) : null;
 }
 
 function collectRichTextText(node: RichTextNode): string[] {

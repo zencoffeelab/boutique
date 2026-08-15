@@ -100,10 +100,10 @@ function EditableAccordion({ node, updateAttributes, deleteNode, editor }: { nod
   const removeSection = (index: number) => sections.length > 1 && updateSections(sections.filter((_, sectionIndex) => sectionIndex !== index));
   const copyAccordion = () => { if (!editor.isEditable) return; copyRichTextBlock({ type: "contentAccordion", attrs: { title, sections, subtitle: sections[0]?.subtitle ?? "", body: sections[0]?.body ?? "", bodyDocument: sections[0]?.bodyDocument ?? null } }); };
   return <NodeViewWrapper className="rich-text-editor__accordion-node">
-    <label className="rich-text-editor__accordion-title"><span className="sr-only">Titre</span><input ref={titleInput} defaultValue={title} disabled={!editor.isEditable} onInput={(event) => updateAttributes({ title: event.currentTarget.value })} /></label>
+    <label className="rich-text-editor__accordion-title"><span className="sr-only">Titre</span><input ref={titleInput} value={title} disabled={!editor.isEditable} onChange={(event) => updateAttributes({ title: event.currentTarget.value })} /></label>
     {sections.map((section, index) => <div className="rich-text-editor__accordion-section" key={`section-${index}`}>
       <label className="rich-text-editor__accordion-subtitle"><span>Sous-titre {index + 1}</span><input value={section.subtitle} disabled={!editor.isEditable} onChange={(event) => updateSection(index, "subtitle", event.currentTarget.value)} /></label>
-      <label>Contenu<textarea defaultValue={section.body} disabled={!editor.isEditable} rows={4} onChange={(event) => updateSection(index, "body", event.currentTarget.value)} /></label>
+      <label>Contenu<textarea value={section.body} disabled={!editor.isEditable} rows={4} onChange={(event) => updateSection(index, "body", event.currentTarget.value)} /></label>
       {sections.length > 1 ? <button type="button" className="rich-text-editor__accordion-section-delete" disabled={!editor.isEditable} onClick={() => removeSection(index)}>Supprimer ce sous-titre</button> : null}
     </div>)}
     <button type="button" className="rich-text-editor__accordion-section-add" disabled={!editor.isEditable} onClick={addSection}>Ajouter un sous-titre</button>
