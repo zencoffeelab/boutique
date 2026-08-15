@@ -169,11 +169,13 @@ async function translateAdviceToEnglish(fields: z.infer<typeof translateAdviceSc
         const sourceItems = JSON.parse(fields.customTextFr ?? "{}") as Record<string, unknown>;
         const translatedItems = JSON.parse(translation.customTextEn) as Record<string, unknown>;
         return JSON.stringify(Object.fromEntries(Object.entries(sourceItems).map(([id, sourceValue]) => {
-          const sourceDocument = typeof sourceValue === "string" ? parseRichTextInput(sourceValue, 0) : null;
+          const sourceText = typeof sourceValue === "string" ? sourceValue : JSON.stringify(sourceValue);
+          const sourceDocument = sourceText ? parseRichTextInput(sourceText, 0) : null;
           const translatedValue = translatedItems[id];
-          const translatedDocument = typeof translatedValue === "string" ? parseRichTextInput(translatedValue, 0) : null;
+          const translatedText = typeof translatedValue === "string" ? translatedValue : JSON.stringify(translatedValue);
+          const translatedDocument = translatedText ? parseRichTextInput(translatedText, 0) : null;
           if (sourceDocument && translatedDocument && richTextPlainText(translatedDocument).trim()) return [id, JSON.stringify(synchronizeRichTextLayout(sourceDocument, translatedDocument))];
-          return [id, typeof translatedValue === "string" ? translatedValue : sourceValue];
+          return [id, translatedText ?? sourceValue];
         })));
       } catch {
         return translation.customTextEn;
@@ -444,9 +446,10 @@ function AutomaticAdviceTranslation({ formId, onBusyChange }: { formId: string; 
       try {
         const translatedFields = JSON.parse(value) as Record<string, unknown>;
         for (const [id, text] of Object.entries(translatedFields)) {
-          if (typeof text !== "string") continue;
+          const translatedText = typeof text === "string" ? text : JSON.stringify(text);
+          if (!translatedText) continue;
           form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(`[name="${prefix}${CSS.escape(id)}"]`).forEach((field) => {
-            field.value = text;
+            field.value = translatedText;
             field.dispatchEvent(new Event(field.type === "hidden" ? "rich-text-translation" : "input", { bubbles: true }));
           });
         }
