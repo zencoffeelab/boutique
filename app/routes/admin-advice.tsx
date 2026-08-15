@@ -704,8 +704,5 @@ export default function AdminAdvice() {
   const query = new URLSearchParams(useLocation().search);
   const creating = query.get("new") === "1";
   const selected = query.get("article");
-  useEffect(() => {
-    if (result?.message) window.alert(result.message);
-  }, [result]);
   return <AdminShell active="advice"><header className="admin-heading"><div><p className="eyebrow">Mini-CMS</p><h1>Blog</h1><p className="admin-heading__description">Composez chaque publication selon sa mise en page : introduction puis sections alternées texte et image.</p></div>{creating ? null : <Link className="ui-button ui-button--default" to="/admin/conseils?new=1"><Plus /> Nouveau blog</Link>}</header>{result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"}>{result.message}</p> : null}<div className="admin-content-list">{articles.map((article) => { const title = article.advice_translations.find((item) => item.locale === "fr-FR")?.title ?? article.slug; return <details className="ui-card admin-content-page" key={`${article.id}-${creating ? "new" : "list"}`} open={!creating && selected === article.id}><summary><strong>{title}</strong><span className="ui-badge">{article.status}</span></summary><ArticleForm article={article} demo={demo} /><Form method="post" className="admin-delete-form"><input type="hidden" name="intent" value="delete_advice" /><input type="hidden" name="id" value={article.id} /><button className="ui-button ui-button--danger ui-button--sm" disabled={demo}><Trash2 /> Supprimer</button></Form></details>; })}</div>{creating ? <section className="ui-card admin-editor"><ArticleForm demo={demo} /></section> : null}</AdminShell>;
 }
