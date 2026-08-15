@@ -7,7 +7,7 @@ import { RichTextContent } from "~/components/rich-text-content";
 import { getArticles, getProducts } from "~/lib/catalog.server";
 import { requireAdmin } from "~/lib/auth.server";
 import { getLocale } from "~/lib/i18n";
-import { parseRichTextInput } from "~/lib/rich-text";
+import { parseRichTextInput, richTextPlainText } from "~/lib/rich-text";
 import { pageMeta } from "~/lib/seo";
 import { firstSentence } from "~/lib/utils";
 
@@ -37,12 +37,17 @@ function adviceLayout(value: unknown): AdviceLayout {
 function customTextContent(value: unknown) {
   if (value && typeof value === "object" && (value as { type?: unknown }).type === "doc" && Array.isArray((value as { content?: unknown }).content)) return value as Parameters<typeof RichTextContent>[0]["content"];
   const text = typeof value === "string" ? value : String(value ?? "");
-  return parseRichTextInput(text, 0) ?? [text];
+  const parsed = parseRichTextInput(text, 0);
+  return parsed ?? (text.trim().startsWith("{") ? [] : [text]);
 }
 
 function customTextValue(primary: unknown, fallback: unknown) {
-  if (typeof primary === "string" && primary.trim()) return primary;
-  if (primary && typeof primary === "object") return primary;
+  if (typeof primary === "string" && primary.trim()) {
+    const parsed = parseRichTextInput(primary, 0);
+    if (parsed && richTextPlainText(parsed).trim()) return primary;
+    if (!primary.trim().startsWith("{")) return primary;
+  }
+  if (primary && typeof primary === "object" && "content" in primary && Array.isArray((primary as { content?: unknown }).content) && richTextPlainText(primary as Parameters<typeof richTextPlainText>[0]).trim()) return primary;
   return fallback;
 }
 
