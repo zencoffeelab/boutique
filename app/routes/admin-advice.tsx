@@ -429,10 +429,11 @@ function AutomaticAdviceTranslation({ formId, onBusyChange }: { formId: string; 
       try {
         const translatedFields = JSON.parse(value) as Record<string, unknown>;
         for (const [id, text] of Object.entries(translatedFields)) {
-          const field = form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${prefix}${CSS.escape(id)}"]`);
-          if (!field || typeof text !== "string") continue;
-          field.value = text;
-          field.dispatchEvent(new Event("input", { bubbles: true }));
+          if (typeof text !== "string") continue;
+          form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(`[name="${prefix}${CSS.escape(id)}"]`).forEach((field) => {
+            field.value = text;
+            field.dispatchEvent(new Event(field.type === "hidden" ? "rich-text-translation" : "input", { bubbles: true }));
+          });
         }
       } catch { /* The server still returns the translated standard fields. */ }
     }
@@ -459,8 +460,8 @@ function AutomaticAdviceTranslation({ formId, onBusyChange }: { formId: string; 
       const field = fields.length > 0 ? fields[fields.length - 1] : null;
       return [name, field ? field.value : ""];
     }));
-    values.customTextFr = JSON.stringify(Object.fromEntries(Array.from(form.querySelectorAll<HTMLInputElement>('input[name^="customTextFr-"]'), (field) => [field.name.slice("customTextFr-".length), field.value])));
-    values.customImageAltFr = JSON.stringify(Object.fromEntries(Array.from(form.querySelectorAll<HTMLInputElement>('input[name^="customImageAltFr-"]'), (field) => [field.name.slice("customImageAltFr-".length), field.value])));
+    values.customTextFr = JSON.stringify(Object.fromEntries(Array.from(form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[name^="customTextFr-"]'), (field) => [field.name.slice("customTextFr-".length), field.value])));
+    values.customImageAltFr = JSON.stringify(Object.fromEntries(Array.from(form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[name^="customImageAltFr-"]'), (field) => [field.name.slice("customImageAltFr-".length), field.value])));
     for (const fieldName of ["introImageUrl", "bodyImageUrl", "body2ImageUrl"]) {
       const frenchField = form.querySelector<HTMLInputElement>(`[name="${fieldName}Fr"]`);
       const englishField = form.querySelector<HTMLInputElement>(`[name="${fieldName}En"]`);

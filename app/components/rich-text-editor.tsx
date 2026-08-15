@@ -190,10 +190,10 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
     return () => form.removeEventListener("submit", syncBeforeSubmit);
   }, [editor]);
   useEffect(() => {
-    if (!editor || disabled || !["excerptEn", "bodyEn", "body2En"].includes(name)) return;
+    if (!editor || disabled || !name.endsWith("En")) return;
     const sourceName = name.replace(/En$/, "Fr");
     const form = hiddenInput.current?.form;
-    const sourceInputs = form?.querySelectorAll<HTMLInputElement>(`input[name="${sourceName}"]`);
+    const sourceInputs = form?.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(`[name="${sourceName}"]`);
     const sourceInput = sourceInputs ? sourceInputs.item(sourceInputs.length - 1) : null;
     const targetInput = hiddenInput.current;
     if (!sourceInput) return;
