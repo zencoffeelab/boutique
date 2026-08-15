@@ -344,6 +344,9 @@ export async function action({ request }: ActionFunctionArgs) {
     return values.length ? values[values.length - 1] : fallback;
   };
   const customText = (suffix: "Fr" | "En") => Object.fromEntries(customItems.filter((item) => item.type === "text").map((item) => [item.id, textFieldValue(`customText${suffix}-${item.id}`, (suffix === "Fr" ? item.textFr : item.textEn) ?? "")]));
+  const translatedImageUrl = (position: "body" | "body2", suffix: "Fr" | "En") => suffix === "En"
+    ? uploaded[`${position}ImageFr`] ?? parsed.data[`${position}ImageUrlFr`] ?? ""
+    : uploaded[`${position}ImageFr`] ?? parsed.data[`${position}ImageUrlFr`] ?? "";
   const customItemsForSave = customItems.map((item) => {
     const { confirmed: _confirmed, ...persistedItem } = item;
     return item.type === "text" ? { ...persistedItem, textFr: textFieldValue(`customTextFr-${item.id}`, item.textFr ?? ""), textEn: textFieldValue(`customTextEn-${item.id}`, item.textEn ?? "") } : persistedItem;
@@ -362,11 +365,11 @@ export async function action({ request }: ActionFunctionArgs) {
         introImageUrl: uploaded.introImageShared ?? parsed.data[`introImageUrl${suffix}`] ?? "",
         introImageAlt: parsed.data[`introImageAlt${suffix}`] ?? "",
         introImageFirst: false,
-        bodyImageUrl: uploaded[`bodyImage${suffix}`] ?? parsed.data[`bodyImageUrl${suffix}`] ?? "",
+        bodyImageUrl: translatedImageUrl("body", suffix),
         bodyImageAlt: parsed.data[`bodyImageAlt${suffix}`] ?? "",
         bodyImageFirst: false,
         ...(body2 ? { body2 } : {}),
-        body2ImageUrl: uploaded[`body2Image${suffix}`] ?? parsed.data[`body2ImageUrl${suffix}`] ?? "",
+        body2ImageUrl: translatedImageUrl("body2", suffix),
         body2ImageAlt: parsed.data[`body2ImageAlt${suffix}`] ?? "",
         layoutConfig: { ...layoutConfig, shortIntroFr: parsed.data.shortIntroFr ?? layoutConfig.shortIntroFr ?? "", shortIntroEn: parsed.data.shortIntroEn ?? layoutConfig.shortIntroEn ?? "", customItems: customItemsForSave, customText: customText(suffix) },
       } },
@@ -445,6 +448,13 @@ function AutomaticAdviceTranslation({ formId }: { formId: string }) {
     }));
     values.customTextFr = JSON.stringify(Object.fromEntries(Array.from(form.querySelectorAll<HTMLInputElement>('input[name^="customTextFr-"]'), (field) => [field.name.slice("customTextFr-".length), field.value])));
     values.customImageAltFr = JSON.stringify(Object.fromEntries(Array.from(form.querySelectorAll<HTMLInputElement>('input[name^="customImageAltFr-"]'), (field) => [field.name.slice("customImageAltFr-".length), field.value])));
+    for (const fieldName of ["introImageUrl", "bodyImageUrl", "body2ImageUrl"]) {
+      const frenchField = form.querySelector<HTMLInputElement>(`[name="${fieldName}Fr"]`);
+      const englishField = form.querySelector<HTMLInputElement>(`[name="${fieldName}En"]`);
+      if (!frenchField || !englishField) continue;
+      englishField.value = frenchField.value;
+      englishField.dispatchEvent(new Event("input", { bubbles: true }));
+    }
     fetcher.submit({ intent: "translate_advice", ...values }, { method: "post" });
   };
   return <div className="admin-editor__translation-action"><button className="ui-button ui-button--ghost" type="button" onClick={translate} disabled={fetcher.state !== "idle"}>{fetcher.state === "idle" ? "Traduire en anglais" : "Traduction en cours…"}</button>{fetcher.data?.ok === false ? <small className="form-error" aria-live="polite">{fetcher.data.message}</small> : null}</div>;
