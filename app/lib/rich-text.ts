@@ -85,7 +85,11 @@ export function richTextPlainText(document: RichTextDocument): string {
   const read = (node: RichTextNode): string => {
     if (node.type === "text") return node.text ?? "";
     if (node.type === "hardBreak") return "\n";
-    if (node.type === "contentAccordion") return `${typeof node.attrs?.title === "string" ? node.attrs.title : ""} ${typeof node.attrs?.body === "string" ? node.attrs.body : ""}\n`;
+    if (node.type === "contentAccordion") {
+      const sections = Array.isArray(node.attrs?.sections) ? node.attrs.sections : [];
+      const sectionText = sections.flatMap((section) => isRecord(section) ? [typeof section.subtitle === "string" ? section.subtitle : "", typeof section.body === "string" ? section.body : ""] : []).join(" ");
+      return `${typeof node.attrs?.title === "string" ? node.attrs.title : ""} ${sectionText || (typeof node.attrs?.body === "string" ? node.attrs.body : "")}\n`;
+    }
     if (node.type === "contentTable") return (Array.isArray(node.attrs?.rows) ? node.attrs.rows : []).flatMap((row) => Array.isArray(row) ? row : []).filter((cell): cell is string => typeof cell === "string").join(" ") + "\n";
     const text = (node.content ?? []).map(read).join("");
     return ["paragraph", "heading", "blockquote", "listItem", "codeBlock"].includes(node.type)
@@ -103,7 +107,7 @@ export function synchronizeRichTextLayout(source: RichTextDocument, target: Rich
   const nextText = (fallback: string) => targetText[textIndex++] ?? fallback;
   const clone = (sourceNode: RichTextNode, targetNode?: RichTextNode): RichTextNode => {
     if (sourceNode.type === "text") {
-      return { ...sourceNode, text: nextText(sourceNode.text ?? ""), marks: targetNode?.type === "text" ? targetNode.marks : sourceNode.marks };
+      return { ...sourceNode, text: nextText(sourceNode.text ?? ""), marks: sourceNode.marks };
     }
     if (sourceNode.type === "contentTable") {
       const matchingTarget = targetSpecial[specialIndex++];
@@ -123,12 +127,28 @@ export function synchronizeRichTextLayout(source: RichTextDocument, target: Rich
     if (sourceNode.type === "contentAccordion") {
       const matchingTarget = targetSpecial[specialIndex++];
       const targetAttrs = matchingTarget?.type === "contentAccordion" ? matchingTarget.attrs : targetNode?.type === "contentAccordion" ? targetNode.attrs : undefined;
+      const sourceSections = Array.isArray(sourceNode.attrs?.sections) ? sourceNode.attrs.sections : [];
+      const targetSections = Array.isArray(targetAttrs?.sections) ? targetAttrs.sections : [];
+      const translatedSections = sourceSections.length
+        ? sourceSections.map((sourceSection, sectionIndex) => {
+          const sourceValue = isRecord(sourceSection) ? sourceSection : {};
+          const targetValue = isRecord(targetSections[sectionIndex]) ? targetSections[sectionIndex] : {};
+          return {
+            subtitle: typeof targetValue.subtitle === "string" ? targetValue.subtitle : typeof sourceValue.subtitle === "string" ? sourceValue.subtitle : "",
+            body: typeof targetValue.body === "string" ? targetValue.body : typeof sourceValue.body === "string" ? sourceValue.body : "",
+            bodyDocument: typeof targetValue.bodyDocument === "string" ? targetValue.bodyDocument : typeof sourceValue.bodyDocument === "string" ? sourceValue.bodyDocument : null,
+          };
+        })
+        : null;
+      const firstSection = translatedSections?.[0];
       return {
         type: "contentAccordion",
         attrs: {
-          title: typeof targetAttrs?.title === "string" ? targetAttrs.title : "Read more",
-          body: typeof targetAttrs?.body === "string" ? targetAttrs.body : targetNode ? richTextPlainText({ type: "doc", content: [targetNode] }).trim() : nextText(""),
-          bodyDocument: typeof targetAttrs?.bodyDocument === "string" ? targetAttrs.bodyDocument : null,
+          title: typeof targetAttrs?.title === "string" ? targetAttrs.title : typeof sourceNode.attrs?.title === "string" ? sourceNode.attrs.title : "Read more",
+          subtitle: firstSection?.subtitle ?? (typeof targetAttrs?.subtitle === "string" ? targetAttrs.subtitle : typeof sourceNode.attrs?.subtitle === "string" ? sourceNode.attrs.subtitle : ""),
+          body: firstSection?.body ?? (typeof targetAttrs?.body === "string" ? targetAttrs.body : typeof sourceNode.attrs?.body === "string" ? sourceNode.attrs.body : targetNode ? richTextPlainText({ type: "doc", content: [targetNode] }).trim() : nextText("")),
+          bodyDocument: firstSection?.bodyDocument ?? (typeof targetAttrs?.bodyDocument === "string" ? targetAttrs.bodyDocument : typeof sourceNode.attrs?.bodyDocument === "string" ? sourceNode.attrs.bodyDocument : null),
+          sections: translatedSections ?? (Array.isArray(targetAttrs?.sections) ? targetAttrs.sections : null),
         },
       } satisfies RichTextNode;
     }
@@ -185,10 +205,22 @@ function normalizeNode(value: unknown, depth: number, budget: { nodes: number })
     const attrs = isRecord(value.attrs) ? value.attrs : {};
     const rawBody = typeof attrs.body === "string" ? attrs.body.slice(0, 10_000) : "";
     const embeddedBody = rawBody.trim().startsWith("{") ? parseRichTextInput(rawBody, 0) : null;
+    const sections = Array.isArray(attrs.sections) ? attrs.sections.slice(0, 30).flatMap((section) => {
+      if (!isRecord(section)) return [];
+      const sectionBody = typeof section.body === "string" ? section.body.slice(0, 10_000) : "";
+      const embeddedSectionBody = sectionBody.trim().startsWith("{") ? parseRichTextInput(sectionBody, 0) : null;
+      return [{
+        subtitle: typeof section.subtitle === "string" ? section.subtitle.slice(0, 300) : "",
+        body: embeddedSectionBody ? richTextPlainText(embeddedSectionBody).trim() : sectionBody,
+        bodyDocument: typeof section.bodyDocument === "string" ? section.bodyDocument.slice(0, 50_000) : embeddedSectionBody ? JSON.stringify(embeddedSectionBody) : null,
+      }];
+    }) : [];
     node.attrs = {
       title: typeof attrs.title === "string" ? attrs.title.slice(0, 300) : "",
+      subtitle: typeof attrs.subtitle === "string" ? attrs.subtitle.slice(0, 300) : "",
       body: embeddedBody ? richTextPlainText(embeddedBody).trim() : rawBody,
       bodyDocument: typeof attrs.bodyDocument === "string" ? attrs.bodyDocument.slice(0, 50_000) : embeddedBody ? JSON.stringify(embeddedBody) : null,
+      sections: sections.length ? sections : null,
     };
   }
   if (Array.isArray(value.content)) {

@@ -8,14 +8,15 @@ export function RichTextContent({ content }: { content: RichTextDocument | reado
     : content as RichTextDocument;
   const firstAccordionIndex = document.content.findIndex((node) => node.type === "contentAccordion");
   const [openAccordion, setOpenAccordion] = useState<string | null>(firstAccordionIndex >= 0 ? `contentAccordion-${firstAccordionIndex}` : null);
-  const accordionState = { openAccordion, setOpenAccordion };
+  const [openAccordionSection, setOpenAccordionSection] = useState<string | null>(null);
+  const accordionState = { openAccordion, setOpenAccordion, openAccordionSection, setOpenAccordionSection };
   const contentRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const root = contentRef.current;
     if (!root) return;
     root.style.removeProperty("min-height");
   }, [document, openAccordion]);
-  const accordionBodies = document.content.filter((node) => node.type === "contentAccordion").map((node) => accordionBodyDocument(String(node.attrs?.bodyDocument ?? node.attrs?.body ?? "")));
+  const accordionBodies = document.content.filter((node) => node.type === "contentAccordion").flatMap((node) => accordionSections(node).map((section) => accordionBodyDocument(section.bodyDocument ?? section.body)));
   return <div ref={contentRef} className="rich-text-content">{document.content.map((node, index) => renderNode(node, index, accordionState))}{accordionBodies.map((body, index) => <div className="rich-text-accordion-measure" data-rich-accordion-measure key={`accordion-measure-${index}`}>{body.content.map((node, nodeIndex) => renderNode(node, nodeIndex, accordionState))}</div>)}</div>;
 }
 
@@ -23,7 +24,22 @@ function accordionBodyDocument(body: string): RichTextDocument {
   return parseRichTextInput(body, 0) ?? paragraphsToRichTextDocument([body]);
 }
 
-type AccordionState = { openAccordion: string | null; setOpenAccordion: (key: string | null) => void };
+function accordionSections(node: RichTextNode) {
+  const rawSections = Array.isArray(node.attrs?.sections) && node.attrs.sections.length
+    ? node.attrs.sections
+    : [{ subtitle: node.attrs?.subtitle, body: node.attrs?.body, bodyDocument: node.attrs?.bodyDocument }];
+  return rawSections.flatMap((section) => {
+    if (!section || typeof section !== "object") return [];
+    const value = section as Record<string, unknown>;
+    return [{
+      subtitle: typeof value.subtitle === "string" ? value.subtitle : "",
+      body: typeof value.body === "string" ? value.body : "",
+      bodyDocument: typeof value.bodyDocument === "string" ? value.bodyDocument : null,
+    }];
+  });
+}
+
+type AccordionState = { openAccordion: string | null; setOpenAccordion: (key: string | null) => void; openAccordionSection: string | null; setOpenAccordionSection: (key: string | null) => void };
 
 function renderNode(node: RichTextNode, index: number, accordionState?: AccordionState): ReactNode {
   const key = `${node.type}-${index}`;
@@ -45,8 +61,14 @@ function renderNode(node: RichTextNode, index: number, accordionState?: Accordio
     }
     case "contentAccordion": {
       const open = accordionState?.openAccordion === key;
-      const body = accordionBodyDocument(String(node.attrs?.bodyDocument ?? node.attrs?.body ?? ""));
-      return <details className={`rich-text-accordion${open ? " is-open" : ""}`} key={key} open={open}><summary className="rich-text-accordion__trigger" onClick={(event) => { event.preventDefault(); event.stopPropagation(); accordionState?.setOpenAccordion(open ? null : key); }}>{String(node.attrs?.title ?? "")}</summary>{open ? <div className="rich-text-accordion__body">{body.content.map((child, childIndex) => renderNode(child, childIndex, accordionState))}</div> : null}</details>;
+      const sections = accordionSections(node);
+      const hasMultipleSections = sections.length > 1;
+      const accordionOpen = hasMultipleSections || open;
+      const title = <span className="rich-text-accordion__title">{String(node.attrs?.title ?? "")}</span>;
+      const titleHeader = hasMultipleSections
+        ? <summary className="rich-text-accordion__trigger" onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}>{title}</summary>
+        : <summary className="rich-text-accordion__trigger" onClick={(event) => { event.preventDefault(); event.stopPropagation(); accordionState?.setOpenAccordion(open ? null : key); }}>{title}</summary>;
+      return <details className={`rich-text-accordion${accordionOpen ? " is-open" : ""}${hasMultipleSections ? " has-multiple-sections" : ""}`} key={key} open={accordionOpen}>{titleHeader}{accordionOpen ? <div className="rich-text-accordion__body">{sections.map((section, sectionIndex) => { const body = accordionBodyDocument(section.bodyDocument ?? section.body); const sectionKey = `${key}-section-${sectionIndex}`; const sectionOpen = accordionState?.openAccordionSection === sectionKey; return <details className={`rich-text-accordion__section${sectionOpen ? " is-open" : ""}`} key={sectionKey} open={sectionOpen}><summary className="rich-text-accordion__subtitle" onClick={(event) => { event.preventDefault(); event.stopPropagation(); accordionState?.setOpenAccordionSection(sectionOpen ? null : sectionKey); }}>{section.subtitle || `Sous-titre ${sectionIndex + 1}`}</summary>{sectionOpen ? <div className="rich-text-accordion__section-body">{body.content.map((child, childIndex) => renderNode(child, childIndex, accordionState))}</div> : null}</details>; })}</div> : null}</details>;
     }
     default: return null;
   }

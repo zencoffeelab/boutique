@@ -13,7 +13,7 @@ import type {
 } from "~/domain/types";
 import { env, hasSupabaseConfig } from "./env.server";
 import { mapPublicMediaUrls, publicMediaDeliveryUrl } from "./public-media";
-import { createServiceSupabase } from "./supabase.server";
+import { createPublicSupabase, createServiceSupabase } from "./supabase.server";
 import { paragraphsToRichTextDocument, parseRichTextInput, richTextPlainText, storedBlocksToRichTextDocument, synchronizeRichTextLayout } from "./rich-text";
 
 function mapDatabaseProduct(row: any): Product {
@@ -92,7 +92,7 @@ function mapDatabaseProduct(row: any): Product {
 }
 
 async function databaseProducts(includeDrafts = false): Promise<Product[]> {
-  const client = createServiceSupabase();
+  const client = includeDrafts ? createServiceSupabase() : (createPublicSupabase() ?? createServiceSupabase());
   if (!client) throw new Error("Supabase service configuration is incomplete.");
   const statuses = includeDrafts
     ? ["draft", "published", "archived"]
@@ -292,7 +292,7 @@ export async function getPackagingPresets(): Promise<PackagingPreset[]> {
 
 export async function getArticles(options: { includeUnpublished?: boolean } = {}): Promise<AdviceArticle[]> {
   if (!hasSupabaseConfig()) return demoArticles;
-  const client = createServiceSupabase();
+  const client = options.includeUnpublished ? createServiceSupabase() : (createPublicSupabase() ?? createServiceSupabase());
   if (!client) throw new Error("Supabase service configuration is incomplete.");
   let query = client
     .from("advice_articles")

@@ -58,3 +58,11 @@ export function createServiceSupabase() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
+
+export function createPublicSupabase() {
+  const config = env();
+  if (!config.VITE_SUPABASE_URL || !config.VITE_SUPABASE_ANON_KEY) return null;
+  return createClient(config.VITE_SUPABASE_URL, config.VITE_SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}

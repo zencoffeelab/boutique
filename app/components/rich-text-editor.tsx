@@ -18,7 +18,7 @@ import {
   Table2,
   ChevronsUpDown,
 } from "lucide-react";
-import { Node } from "@tiptap/core";
+import { Node, type Editor } from "@tiptap/core";
 import Link from "@tiptap/extension-link";
 import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -33,32 +33,81 @@ type RichTextEditorProps = {
   label: string;
 };
 
-function EditableTable({ node, updateAttributes, deleteNode, editor }: { node: { attrs: { rows?: unknown } }; updateAttributes: (attrs: Record<string, unknown>) => void; deleteNode: () => void; editor: { isEditable: boolean } }) {
+type RichTextBlockClipboard = {
+  type: "contentTable" | "contentAccordion";
+  attrs: Record<string, unknown>;
+};
+
+const richTextClipboardPrefix = "zen-coffee-lab:rich-text-block:";
+let lastCopiedRichTextBlock: RichTextBlockClipboard | null = null;
+
+function copyRichTextBlock(block: RichTextBlockClipboard) {
+  lastCopiedRichTextBlock = block;
+  const serialized = `${richTextClipboardPrefix}${JSON.stringify(block)}`;
+  if (navigator.clipboard?.writeText) void navigator.clipboard.writeText(serialized).catch(() => undefined);
+}
+
+function readRichTextBlock(value: string): RichTextBlockClipboard | null {
+  if (!value.startsWith(richTextClipboardPrefix)) return null;
+  try {
+    const parsed = JSON.parse(value.slice(richTextClipboardPrefix.length)) as Partial<RichTextBlockClipboard>;
+    if ((parsed.type !== "contentTable" && parsed.type !== "contentAccordion") || !parsed.attrs || typeof parsed.attrs !== "object") return null;
+    return { type: parsed.type, attrs: parsed.attrs as Record<string, unknown> };
+  } catch {
+    return null;
+  }
+}
+
+function EditableTable({ node, updateAttributes, deleteNode, editor }: { node: { attrs: { rows?: unknown } }; updateAttributes: (attrs: Record<string, unknown>) => void; deleteNode: () => void; editor: Editor }) {
   const rows = Array.isArray(node.attrs.rows) ? node.attrs.rows.map((row) => Array.isArray(row) ? row.map((cell) => String(cell ?? "")) : []) : [["Colonne 1"]];
   const updateCell = (rowIndex: number, columnIndex: number, value: string) => updateAttributes({ rows: rows.map((row, currentRow) => row.map((cell, currentColumn) => currentRow === rowIndex && currentColumn === columnIndex ? value : cell)) });
   const addRow = () => updateAttributes({ rows: [...rows, Array.from({ length: Math.max(1, rows[0]?.length ?? 1) }, () => "")] });
   const removeRow = () => rows.length > 1 && updateAttributes({ rows: rows.slice(0, -1) });
   const addColumn = () => updateAttributes({ rows: rows.map((row) => [...row, ""]) });
   const removeColumn = () => (rows[0]?.length ?? 1) > 1 && updateAttributes({ rows: rows.map((row) => row.slice(0, -1)) });
-  return <NodeViewWrapper className="rich-text-editor__table-node"><div className="rich-text-editor__table-actions"><button type="button" onClick={addRow} disabled={!editor.isEditable}>+ ligne</button><button type="button" onClick={removeRow} disabled={!editor.isEditable || rows.length <= 1}>− ligne</button><button type="button" onClick={addColumn} disabled={!editor.isEditable}>+ colonne</button><button type="button" onClick={removeColumn} disabled={!editor.isEditable || (rows[0]?.length ?? 1) <= 1}>− colonne</button><button type="button" className="rich-text-editor__table-delete" onClick={() => { if (editor.isEditable && window.confirm("Supprimer ce tableau ?")) deleteNode(); }} disabled={!editor.isEditable}>Supprimer le tableau</button></div><table><tbody>{rows.map((row, rowIndex) => <tr key={`row-${rowIndex}`}>{row.map((cell, columnIndex) => { const Cell = rowIndex === 0 ? "th" : "td"; return <Cell key={`cell-${rowIndex}-${columnIndex}`}><input value={cell} disabled={!editor.isEditable} onChange={(event) => updateCell(rowIndex, columnIndex, event.currentTarget.value)} /></Cell>; })}</tr>)}</tbody></table></NodeViewWrapper>;
+  const copyTable = () => { if (!editor.isEditable) return; copyRichTextBlock({ type: "contentTable", attrs: { rows: rows.map((row) => [...row]) } }); };
+  return <NodeViewWrapper className="rich-text-editor__table-node"><div className="rich-text-editor__table-actions"><button type="button" onClick={addRow} disabled={!editor.isEditable}>+ ligne</button><button type="button" onClick={removeRow} disabled={!editor.isEditable || rows.length <= 1}>− ligne</button><button type="button" onClick={addColumn} disabled={!editor.isEditable}>+ colonne</button><button type="button" onClick={removeColumn} disabled={!editor.isEditable || (rows[0]?.length ?? 1) <= 1}>− colonne</button><span className="rich-text-editor__delete-group"><button type="button" className="rich-text-editor__block-copy" onMouseDown={(event) => event.preventDefault()} onClick={copyTable} disabled={!editor.isEditable}>Copier le tableau</button><button type="button" className="rich-text-editor__table-delete" onClick={() => { if (editor.isEditable && window.confirm("Supprimer ce tableau ?")) deleteNode(); }} disabled={!editor.isEditable}>Supprimer le tableau</button></span></div><table><tbody>{rows.map((row, rowIndex) => <tr key={`row-${rowIndex}`}>{row.map((cell, columnIndex) => { const Cell = rowIndex === 0 ? "th" : "td"; return <Cell key={`cell-${rowIndex}-${columnIndex}`}><input value={cell} disabled={!editor.isEditable} onChange={(event) => updateCell(rowIndex, columnIndex, event.currentTarget.value)} /></Cell>; })}</tr>)}</tbody></table></NodeViewWrapper>;
 }
 
-function EditableAccordion({ node, updateAttributes, deleteNode, editor }: { node: { attrs: { title?: unknown; body?: unknown; bodyDocument?: unknown } }; updateAttributes: (attrs: Record<string, unknown>) => void; deleteNode: () => void; editor: { isEditable: boolean } }) {
+type AccordionSection = { subtitle: string; body: string; bodyDocument: string | null };
+
+function accordionSectionDocument(value: string) {
+  return JSON.stringify({ type: "doc" as const, content: value.split(/\r?\n/).map((line) => ({ type: "paragraph" as const, content: line ? [{ type: "text" as const, text: line }] : [] })) });
+}
+
+function EditableAccordion({ node, updateAttributes, deleteNode, editor }: { node: { attrs: { title?: unknown; subtitle?: unknown; body?: unknown; bodyDocument?: unknown; sections?: unknown } }; updateAttributes: (attrs: Record<string, unknown>) => void; deleteNode: () => void; editor: Editor }) {
   const title = String(node.attrs.title ?? "");
-  const body = String(node.attrs.body ?? "");
   const titleInput = useRef<HTMLInputElement>(null);
-  const bodyInput = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (titleInput.current && document.activeElement !== titleInput.current && titleInput.current.value !== title) titleInput.current.value = title;
-    if (bodyInput.current && document.activeElement !== bodyInput.current && bodyInput.current.value !== body) bodyInput.current.value = body;
-  }, [title, body]);
-  const updateBody = (value: string) => {
-    const bodyDocument = { type: "doc" as const, content: value.split(/\r?\n/).map((line) => ({ type: "paragraph" as const, content: line ? [{ type: "text" as const, text: line }] : [] })) };
-    updateAttributes({ body: value, bodyDocument: JSON.stringify(bodyDocument) });
+  const legacySection = { subtitle: String(node.attrs.subtitle ?? ""), body: String(node.attrs.body ?? ""), bodyDocument: typeof node.attrs.bodyDocument === "string" ? node.attrs.bodyDocument : null };
+  const sections: AccordionSection[] = Array.isArray(node.attrs.sections) && node.attrs.sections.length
+    ? node.attrs.sections.flatMap((section): AccordionSection[] => {
+      if (!section || typeof section !== "object") return [];
+      const value = section as Record<string, unknown>;
+      return [{ subtitle: typeof value.subtitle === "string" ? value.subtitle : "", body: typeof value.body === "string" ? value.body : "", bodyDocument: typeof value.bodyDocument === "string" ? value.bodyDocument : null }];
+    })
+    : [legacySection];
+  const updateSections = (next: AccordionSection[]) => {
+    const first = next[0] ?? { subtitle: "", body: "", bodyDocument: null };
+    updateAttributes({ sections: next, subtitle: first.subtitle, body: first.body, bodyDocument: first.bodyDocument });
   };
+  const updateSection = (index: number, field: "subtitle" | "body", value: string) => {
+    const next = sections.map((section, sectionIndex) => sectionIndex === index
+      ? { ...section, [field]: value, ...(field === "body" ? { bodyDocument: accordionSectionDocument(value) } : {}) }
+      : section);
+    updateSections(next);
+  };
+  const addSection = () => updateSections([...sections, { subtitle: "", body: "", bodyDocument: accordionSectionDocument("") }]);
+  const removeSection = (index: number) => sections.length > 1 && updateSections(sections.filter((_, sectionIndex) => sectionIndex !== index));
+  const copyAccordion = () => { if (!editor.isEditable) return; copyRichTextBlock({ type: "contentAccordion", attrs: { title, sections, subtitle: sections[0]?.subtitle ?? "", body: sections[0]?.body ?? "", bodyDocument: sections[0]?.bodyDocument ?? null } }); };
   return <NodeViewWrapper className="rich-text-editor__accordion-node">
-    <label>Titre<input ref={titleInput} defaultValue={title} disabled={!editor.isEditable} onInput={(event) => updateAttributes({ title: event.currentTarget.value })} /></label>
-    <label>Contenu<textarea ref={bodyInput} defaultValue={body} disabled={!editor.isEditable} rows={4} onInput={(event) => updateBody(event.currentTarget.value)} /></label>
+    <label className="rich-text-editor__accordion-title"><span className="sr-only">Titre</span><input ref={titleInput} defaultValue={title} disabled={!editor.isEditable} onInput={(event) => updateAttributes({ title: event.currentTarget.value })} /></label>
+    {sections.map((section, index) => <div className="rich-text-editor__accordion-section" key={`section-${index}`}>
+      <label className="rich-text-editor__accordion-subtitle"><span>Sous-titre {index + 1}</span><input value={section.subtitle} disabled={!editor.isEditable} onChange={(event) => updateSection(index, "subtitle", event.currentTarget.value)} /></label>
+      <label>Contenu<textarea defaultValue={section.body} disabled={!editor.isEditable} rows={4} onChange={(event) => updateSection(index, "body", event.currentTarget.value)} /></label>
+      {sections.length > 1 ? <button type="button" className="rich-text-editor__accordion-section-delete" disabled={!editor.isEditable} onClick={() => removeSection(index)}>Supprimer ce sous-titre</button> : null}
+    </div>)}
+    <button type="button" className="rich-text-editor__accordion-section-add" disabled={!editor.isEditable} onClick={addSection}>Ajouter un sous-titre</button>
+    <button type="button" className="rich-text-editor__block-copy" onMouseDown={(event) => event.preventDefault()} disabled={!editor.isEditable} onClick={copyAccordion}>Copier l’accordéon</button>
     <button type="button" className="rich-text-editor__accordion-delete" disabled={!editor.isEditable} onClick={() => { if (window.confirm("Supprimer cet accordéon ?")) deleteNode(); }}>Supprimer l’accordéon</button>
   </NodeViewWrapper>;
 }
@@ -77,7 +126,7 @@ const contentAccordion = Node.create({
   name: "contentAccordion",
   group: "block",
   atom: true,
-  addAttributes: () => ({ title: { default: "Titre de l’accordéon" }, body: { default: "Contenu à afficher" }, bodyDocument: { default: null } }),
+  addAttributes: () => ({ title: { default: "Titre de l’accordéon" }, subtitle: { default: "" }, body: { default: "Contenu à afficher" }, bodyDocument: { default: null }, sections: { default: null } }),
   parseHTML: () => [{ tag: "details[data-rich-accordion]" }],
   renderHTML: ({ node }) => ["details", { "data-rich-accordion": "true" }, ["summary", {}, String(node.attrs.title ?? "")], ["p", {}, String(node.attrs.body ?? "")]],
   addNodeView: () => ReactNodeViewRenderer(EditableAccordion),
@@ -90,6 +139,7 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
   const [tableRows, setTableRows] = useState(2);
   const [tableColumns, setTableColumns] = useState(2);
   const [accordionTitle, setAccordionTitle] = useState("En savoir plus");
+  const [accordionSubtitle, setAccordionSubtitle] = useState("");
   const [accordionBody, setAccordionBody] = useState("Détails à afficher au clic");
   const editor = useEditor({
     immediatelyRender: false,
@@ -111,6 +161,14 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
         role: "textbox",
         "aria-multiline": "true",
         "aria-labelledby": labelId,
+      },
+      handlePaste: (view, event) => {
+        const clipboardText = event.clipboardData?.getData("text/plain") ?? "";
+        const block = readRichTextBlock(clipboardText) ?? (!clipboardText ? lastCopiedRichTextBlock : null);
+        if (!block) return false;
+        const node = view.state.schema.nodeFromJSON(block);
+        view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView());
+        return true;
       },
     },
     onUpdate: ({ editor: currentEditor }) => {
@@ -194,11 +252,11 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
     setInsertMode(null);
   };
 
-  const insertAccordion = (title: string, body: string) => {
+  const insertAccordion = (title: string, subtitle: string, body: string) => {
     if (!editor) return;
     if (!title.trim() || !body.trim()) return;
     const bodyDocument = { type: "doc" as const, content: body.split(/\r?\n/).map((line) => ({ type: "paragraph" as const, content: line.trim() ? [{ type: "text" as const, text: line.trim() }] : [] })) };
-    editor.chain().focus().insertContent({ type: "contentAccordion", attrs: { title: title.trim(), body: body.trim(), bodyDocument: JSON.stringify(bodyDocument) } }).run();
+    editor.chain().focus().insertContent({ type: "contentAccordion", attrs: { title: title.trim(), subtitle: subtitle.trim(), body: body.trim(), bodyDocument: JSON.stringify(bodyDocument), sections: [{ subtitle: subtitle.trim(), body: body.trim(), bodyDocument: JSON.stringify(bodyDocument) }] } }).run();
     setInsertMode(null);
   };
 
@@ -231,7 +289,7 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
         <ToolbarButton label="Rétablir" disabled={disabled || !editor || !state?.canRedo} onClick={() => editor?.chain().focus().redo().run()}><Redo2 /></ToolbarButton>
       </div>
       {insertMode === "table" ? <div className="rich-text-insert-panel"><div className="rich-text-insert-panel__dimensions"><label>Lignes<input type="number" min={1} max={30} value={tableRows} onChange={(event) => setTableRows(Number(event.currentTarget.value) || 1)} /></label><label>Colonnes<input type="number" min={1} max={12} value={tableColumns} onChange={(event) => setTableColumns(Number(event.currentTarget.value) || 1)} /></label></div><small>La première ligne est créée comme en-tête.</small><div><button type="button" className="rich-text-insert-panel__action" onClick={() => insertTable(tableRows, tableColumns)}>Insérer le tableau</button><button type="button" className="rich-text-insert-panel__cancel" onClick={() => setInsertMode(null)}>Annuler</button></div></div> : null}
-      {insertMode === "accordion" ? <div className="rich-text-insert-panel"><label>Titre<input value={accordionTitle} onChange={(event) => setAccordionTitle(event.currentTarget.value)} /></label><label>Contenu<textarea value={accordionBody} onChange={(event) => setAccordionBody(event.currentTarget.value)} rows={3} /></label><div><button type="button" className="rich-text-insert-panel__action" onClick={() => insertAccordion(accordionTitle, accordionBody)}>Insérer l’accordéon</button><button type="button" className="rich-text-insert-panel__cancel" onClick={() => setInsertMode(null)}>Annuler</button></div></div> : null}
+      {insertMode === "accordion" ? <div className="rich-text-insert-panel"><label>Titre<input value={accordionTitle} onChange={(event) => setAccordionTitle(event.currentTarget.value)} /></label><label>Sous-titre<input value={accordionSubtitle} onChange={(event) => setAccordionSubtitle(event.currentTarget.value)} /></label><label>Contenu<textarea value={accordionBody} onChange={(event) => setAccordionBody(event.currentTarget.value)} rows={3} /></label><div><button type="button" className="rich-text-insert-panel__action" onClick={() => insertAccordion(accordionTitle, accordionSubtitle, accordionBody)}>Insérer l’accordéon</button><button type="button" className="rich-text-insert-panel__cancel" onClick={() => setInsertMode(null)}>Annuler</button></div></div> : null}
       <EditorContent editor={editor} className="rich-text-editor__content" />
     </div>
     <small>Styles disponibles : titres, emphases, listes, liens, citations et séparateurs.</small>

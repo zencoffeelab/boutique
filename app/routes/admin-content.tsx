@@ -485,7 +485,7 @@ export default function AdminContent() {
             <summary><strong>Blog</strong><span className="ui-badge">Blog</span></summary>
             <div className="admin-content-page__journal">
               <p>Gérez la page Blog et les articles déjà publiés.</p>
-              <div className="admin-content-page__actions"><Link className="ui-button ui-button--ghost" to="/conseils">Voir le journal</Link><Link className="ui-button ui-button--default" to="/admin/conseils?new=1">Nouveau blog</Link></div>
+              <div className="admin-content-page__actions"><Link className="ui-button ui-button--ghost" to="/admin/conseils">Gérer le blog</Link><Link className="ui-button ui-button--default" to="/admin/conseils?new=1">Nouveau blog</Link></div>
               {adviceArticles.length ? <ul>{adviceArticles.map((article) => <li key={article.id}><Link to={`/admin/conseils?article=${article.id}`}>{article.advice_translations.find((translation) => translation.locale === "fr-FR")?.title ?? article.slug}</Link><span>{article.status} · {new Date(article.published_at).toLocaleDateString("fr-FR")}</span></li>)}</ul> : <p className="admin-muted">Aucun article n’est encore enregistré.</p>}
             </div>
           </details>;

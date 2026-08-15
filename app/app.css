@@ -1826,6 +1826,12 @@ button:disabled {
 .advice-detail__back {
   margin-top: 0.75rem;
 }
+.advice-detail-page .advice-detail__back {
+  margin-top: 0;
+}
+.advice-detail-page .advice-detail__action {
+  padding-top: 0;
+}
 .page-hero:has(+ .product-story + .product-story) + .product-story .product-story-block__copy {
   order: 2;
 }
@@ -1895,8 +1901,13 @@ button:disabled {
   font-size: clamp(2rem, 4vw, 3.5rem);
 }
 .product-story-block__copy .rich-text-content h2 { max-width: 13ch; margin: 0 0 clamp(1.5rem, 4vw, 3.5rem); font-size: clamp(2.2rem, 3.75vw, 4.6rem); }
-.product-story-block__copy .rich-text-content p { max-width: 42rem; color: var(--green); font-size: clamp(0.9rem, 1vw, 1.08rem); line-height: 1.65; }
-.product-story-block__copy .rich-text-content p + p { margin-top: 1rem; }
+.product-story-block__copy .rich-text-content p { max-width: 42rem; color: var(--green); font: 400 1rem/1.65 var(--serif); }
+.product-story-block__copy .rich-text-content p + p {
+  margin-top: 0;
+}
+.product-story-block__copy .rich-text-content p:empty {
+  min-height: 1.65em;
+}
 .legal-document p,
 .legal-document ul {
   font: 400 1.08rem/1.65 var(--serif);
@@ -2048,6 +2059,24 @@ button:disabled {
   margin-left: auto;
   color: var(--red, #9d3b2f);
 }
+.rich-text-editor__block-copy {
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--line);
+  background: var(--cream-dark);
+  cursor: pointer;
+}
+.rich-text-editor__delete-group {
+  display: grid;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+.rich-text-editor__delete-group .rich-text-editor__table-delete {
+  margin-left: 0;
+}
+.rich-text-editor__accordion-node .rich-text-editor__block-copy,
+.rich-text-editor__accordion-node .rich-text-editor__accordion-delete {
+  width: 100%;
+}
 .advice-story .product-story-block__copy {
   padding: var(--advice-inner-space);
 }
@@ -2093,9 +2122,10 @@ button:disabled {
   display: grid;
   gap: 0.65rem;
   margin: 1rem 0;
-  padding: 0.85rem;
-  border: 1px solid var(--line);
-  background: var(--cream-dark);
+  padding: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: transparent;
 }
 .rich-text-editor__accordion-node label {
   display: grid;
@@ -2111,6 +2141,71 @@ button:disabled {
   font: inherit;
   resize: vertical;
 }
+.rich-text-editor__accordion-node .rich-text-editor__accordion-title {
+  position: relative;
+  display: block;
+  padding: 1.5rem 3rem 1.5rem 0;
+  font: 500 clamp(1.2rem, 2vw, 1.65rem) / 1.2 var(--serif);
+}
+.rich-text-editor__accordion-node .rich-text-editor__accordion-title::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--ink);
+  content: "−";
+  font: 400 1.35rem/1 var(--sans);
+  transform: translateY(-50%);
+}
+.rich-text-editor__accordion-node .rich-text-editor__accordion-title input {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+.rich-text-editor__accordion-node .rich-text-editor__accordion-title input:focus {
+  outline: 3px solid var(--orange);
+  outline-offset: 3px;
+}
+.rich-text-editor__accordion-node .rich-text-editor__accordion-subtitle {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0 0.1rem;
+  color: var(--muted);
+  font: 400 0.9rem/1.35 var(--sans);
+}
+.rich-text-editor__accordion-node .rich-text-editor__accordion-subtitle input {
+  margin: 0;
+  font: 400 1rem/1.5 var(--sans);
+}
+.rich-text-editor__accordion-section {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.25rem 0.1rem 0.75rem;
+  border-top: 1px solid var(--line);
+}
+.rich-text-editor__accordion-section-add,
+.rich-text-editor__accordion-section-delete {
+  justify-self: start;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--line);
+  background: var(--cream-dark);
+  cursor: pointer;
+}
+.rich-text-editor__accordion-section-delete {
+  color: var(--red, #9d3b2f);
+}
+.rich-text-editor__accordion-node > label:not(.rich-text-editor__accordion-title) {
+  margin: 0 0.1rem;
+}
 .rich-text-editor__accordion-delete {
   justify-self: start;
   padding: 0.45rem 0.7rem;
@@ -2122,7 +2217,7 @@ button:disabled {
 .advice-detail-page {
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 html.advice-detail-overflow-hidden,
 body.advice-detail-overflow-hidden {
@@ -2279,9 +2374,9 @@ body.advice-detail-overflow-hidden {
 }
 .rich-text-accordion {
   margin: 2rem 0;
-  border: 1px solid var(--green);
+  border: 1px solid var(--line);
   border-radius: 0.35rem;
-  background: #fff;
+  background: var(--cream-dark);
   color: var(--ink);
 }
 .rich-text-accordion__trigger {
@@ -2296,96 +2391,58 @@ body.advice-detail-overflow-hidden {
   text-align: left;
   font-weight: 700;
 }
-.rich-text-accordion__body {
+.rich-text-accordion__title {
   display: block;
+}
+.rich-text-accordion__title {
+  font: inherit;
+}
+.rich-text-accordion__subtitle {
+  margin: 0 0 0.5rem;
+  color: var(--green);
+  font: 500 1.05rem/1.25 var(--serif);
+}
+.rich-text-accordion__section + .rich-text-accordion__section {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+.rich-text-accordion__body {
   margin: 0;
   padding: 0 1.25rem 1.25rem;
   color: var(--ink);
 }
-.rich-text-accordion__body > * {
-  width: 100%;
-  max-width: none;
-  min-width: 0;
-  margin: 0;
-  color: inherit;
-  overflow-wrap: anywhere;
+.rich-text-accordion__body p:first-child { margin-top: 0; }
+.rich-text-accordion__body p:last-child { margin-bottom: 0; }
+.advice-story .product-story-block__copy .rich-text-content .rich-text-accordion__body p {
+  max-width: 42rem;
+  color: var(--green);
+  font: 400 clamp(0.9rem, 1vw, 1.08rem) / 1.65 var(--sans);
 }
-.rich-text-accordion__body > * + * {
-  margin-top: 0.75rem;
-}
-.rich-text-accordion__body p,
-.advice-story .product-story-block__copy .rich-text-accordion__body p {
-  max-width: none;
-  margin: 0;
-  color: inherit;
-  font-size: 1rem;
-  line-height: 1.65;
-  white-space: pre-line;
-}
-.rich-text-accordion__body p:empty {
-  min-height: 1.65em;
-}
-.rich-text-accordion__body p + p,
-.advice-story .product-story-block__copy .rich-text-accordion__body p + p {
+.advice-story .product-story-block__copy .rich-text-content .rich-text-accordion__body p + p {
   margin-top: 1rem;
 }
-.rich-text-accordion__body h2,
-.rich-text-accordion__body h3,
-.advice-story .product-story-block__copy .rich-text-accordion__body h2,
-.advice-story .product-story-block__copy .rich-text-accordion__body h3 {
-  max-width: none;
-  margin: 0;
-  color: inherit;
-}
-.rich-text-accordion__body h2,
-.advice-story .product-story-block__copy .rich-text-accordion__body h2 { font-size: 1.35rem; }
-.rich-text-accordion__body h3,
-.advice-story .product-story-block__copy .rich-text-accordion__body h3 { font-size: 1.15rem; }
-.rich-text-accordion__body ul,
-.rich-text-accordion__body ol {
-  margin: 0;
-  padding-left: 1.5rem;
-  color: inherit;
-  font: inherit;
-}
-.rich-text-accordion__body blockquote {
-  margin: 0;
-  color: inherit;
-}
-.rich-text-accordion__body a { color: inherit; }
-
-/* Les accordéons éditoriaux reprennent exactement le langage visuel de la FAQ. */
-.rich-text-accordion {
-  margin: 0;
+/* Les accordéons du Blog reprennent exactement les repères visuels de la FAQ. */
+.rich-text-content .rich-text-accordion {
+  margin: 0.75rem 0;
   border: 0;
   border-top: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
   color: var(--ink);
 }
-.rich-text-content > p + .rich-text-accordion {
-  margin-top: 1.5rem;
-}
-.rich-text-accordion:not(:has(~ .rich-text-accordion)) {
-  border-bottom: 1px solid var(--line);
-}
-.rich-text-accordion__trigger {
+.rich-text-content .rich-text-accordion__trigger {
   position: relative;
-  display: block;
-  width: 100%;
   padding: 1.5rem 3rem 1.5rem 0;
-  border: 0;
-  background: transparent;
   color: var(--ink);
   font: 500 clamp(1.2rem, 2vw, 1.65rem) / 1.2 var(--serif);
   cursor: pointer;
   list-style: none;
-  text-align: left;
 }
-.rich-text-accordion__trigger::-webkit-details-marker {
+.rich-text-content .rich-text-accordion__trigger::-webkit-details-marker {
   display: none;
 }
-.rich-text-accordion__trigger::after {
+.rich-text-content .rich-text-accordion__trigger::after {
   position: absolute;
   top: 50%;
   right: 0;
@@ -2400,32 +2457,76 @@ body.advice-detail-overflow-hidden {
   font: 400 1.35rem/1 var(--sans);
   transform: translateY(-50%);
 }
-.rich-text-accordion.is-open .rich-text-accordion__trigger::after {
-  background: var(--ink);
+.rich-text-content .rich-text-accordion.has-multiple-sections .rich-text-accordion__trigger::after {
+  display: none;
+}
+.rich-text-content .rich-text-accordion.has-multiple-sections .rich-text-accordion__trigger {
+  padding-right: 0;
+  cursor: default;
+}
+.rich-text-content .rich-text-accordion.is-open .rich-text-accordion__trigger::after {
   color: var(--paper);
+  background: var(--ink);
   content: "−";
 }
-.rich-text-accordion__body {
-  display: block;
+.rich-text-content .rich-text-accordion__body {
   max-width: 44rem;
-  padding: 0 0 1.5rem;
-  color: var(--ink);
+  padding: 0 3rem 1.5rem 0;
+  color: var(--muted);
   animation: faq-answer-reveal 180ms ease-out;
 }
-.rich-text-accordion__body > * {
-  color: inherit;
+.rich-text-content .rich-text-accordion__body p {
+  max-width: 44rem;
+  color: var(--muted);
+  font: inherit;
 }
-.rich-text-accordion__body p,
-.advice-story .product-story-block__copy .rich-text-accordion__body p {
-  max-width: 42rem;
-  margin: 0;
-  color: inherit;
-  font: 400 clamp(0.9rem, 1vw, 1.08rem) / 1.65 var(--sans);
-  white-space: pre-line;
-}
-.rich-text-accordion__body p + p,
-.advice-story .product-story-block__copy .rich-text-accordion__body p + p {
+.rich-text-content .rich-text-accordion__body p:first-child {
   margin-top: 0;
+}
+.rich-text-content .rich-text-accordion__body p:last-child {
+  margin-bottom: 0;
+}
+.rich-text-content .rich-text-accordion__section {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.rich-text-content .rich-text-accordion__section:first-child {
+  border-top: 0;
+}
+.rich-text-content .rich-text-accordion__subtitle {
+  position: relative;
+  padding: 1rem 2.5rem 1rem 0;
+  color: var(--ink);
+  font: 500 1.1rem/1.2 var(--serif);
+  cursor: pointer;
+  list-style: none;
+}
+.rich-text-content .rich-text-accordion__subtitle::-webkit-details-marker {
+  display: none;
+}
+.rich-text-content .rich-text-accordion__subtitle::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--ink);
+  content: "+";
+  font: 400 1.1rem/1 var(--sans);
+  transform: translateY(-50%);
+}
+.rich-text-content .rich-text-accordion__section.is-open .rich-text-accordion__subtitle::after {
+  color: var(--paper);
+  background: var(--ink);
+  content: "−";
+}
+.rich-text-content .rich-text-accordion__section-body {
+  padding: 0 2.5rem 1rem 0;
 }
 .rich-text-insert-panel {
   display: grid;
