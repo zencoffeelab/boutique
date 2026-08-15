@@ -14,7 +14,7 @@ import type {
 import { env, hasSupabaseConfig } from "./env.server";
 import { mapPublicMediaUrls, publicMediaDeliveryUrl } from "./public-media";
 import { createPublicSupabase, createServiceSupabase } from "./supabase.server";
-import { paragraphsToRichTextDocument, parseRichTextInput, richTextPlainText, storedBlocksToRichTextDocument, synchronizeRichTextLayout } from "./rich-text";
+import { paragraphsToRichTextDocument, parseRichTextInput, richTextPlainText, storedBlocksToRichTextDocument } from "./rich-text";
 
 function mapDatabaseProduct(row: any): Product {
   const translations = Object.fromEntries(
@@ -313,9 +313,9 @@ export async function getArticles(options: { includeUnpublished?: boolean } = {}
     const body = (translation: any) => storedBlocksToRichTextDocument(translation.blocks ?? []);
     const excerptBody = (translation: any) => parseRichTextInput(String(translation.excerpt ?? ""), 1) ?? paragraphsToRichTextDocument([String(translation.excerpt ?? "")]);
     const frenchExcerptBody = excerptBody(fr);
-    const englishExcerptBody = synchronizeRichTextLayout(frenchExcerptBody, excerptBody(en));
+    const englishExcerptBody = excerptBody(en);
     const frenchBody = body(fr);
-    const englishBody = synchronizeRichTextLayout(frenchBody, body(en));
+    const englishBody = body(en);
     const body2 = (translation: any) => {
       const layout = translation.blocks?.find((block: any) => block.type === "storyLayout")?.content ?? {};
       return layout.body2 ? storedBlocksToRichTextDocument([{ type: "richText", content: layout.body2 }]) : null;
@@ -332,7 +332,7 @@ export async function getArticles(options: { includeUnpublished?: boolean } = {}
         excerpt: { "fr-FR": richTextPlainText(frenchExcerptBody), "en-GB": richTextPlainText(englishExcerptBody) },
         excerptBody: { "fr-FR": frenchExcerptBody, "en-GB": englishExcerptBody },
         body: { "fr-FR": frenchBody, "en-GB": englishBody },
-        ...(body2(fr) && body2(en) ? { body2: { "fr-FR": body2(fr)!, "en-GB": synchronizeRichTextLayout(body2(fr)!, body2(en)!) } } : {}),
+        ...(body2(fr) && body2(en) ? { body2: { "fr-FR": body2(fr)!, "en-GB": body2(en)! } } : {}),
         story: { "fr-FR": story(fr), "en-GB": story(en) },
       },
     ];
