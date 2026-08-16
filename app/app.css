@@ -2023,11 +2023,11 @@ button:disabled {
 }
 .advice-detail__intro .rich-text-content {
   text-align: center;
-  font: 400 1rem/1.65 var(--serif);
+  font: inherit;
 }
 .advice-detail__intro .rich-text-content p {
   max-width: none;
-  margin: 0 0 1rem;
+  margin: 0;
   font: inherit;
   line-height: inherit;
 }
@@ -6141,7 +6141,7 @@ body.advice-detail-overflow-hidden {
 	margin-top: 0;
 }
 .admin-advice-editor__separated-intro .admin-image-input + .field + .rich-text-field {
-	margin-top: -2.5rem;
+	margin-top: 1.25rem;
 }
 .admin-advice-editor__top {
   order: 1;

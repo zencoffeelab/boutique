@@ -534,7 +534,7 @@ function AutomaticAdviceTranslation({ formId, onBusyChange }: { formId: string; 
       const field = fields.item(fields.length - 1);
       if (!field) continue;
       field.value = String(value);
-      if (["excerptEn", "bodyEn", "body2En"].includes(name)) field.dispatchEvent(new Event("rich-text-translation", { bubbles: true }));
+      if (["excerptEn", "bodyEn", "body2En", "shortIntroEn"].includes(name)) field.dispatchEvent(new Event("rich-text-translation", { bubbles: true }));
       else field.dispatchEvent(new Event("input", { bubbles: true }));
     }
     for (const [prefix, value] of [["customTextEn-", translation.customTextEn], ["customImageAltEn-", translation.customImageAltEn]] as const) {
