@@ -18,7 +18,14 @@ export function optionalMfaSatisfied(verifiedFactorCount: number, currentLevel?:
 export async function getSessionStatus(request: Request) {
   const supabase = createRequestSupabase(request);
   if (!supabase) return { signedIn: false, professional: false, professionalUserId: null, accountInitials: null, admin: false, passwordSetupRequired: false, responseHeaders: new Headers() };
-  const { data, error } = await supabase.client.auth.getUser();
+  let data: Awaited<ReturnType<typeof supabase.client.auth.getUser>>["data"];
+  let error: Awaited<ReturnType<typeof supabase.client.auth.getUser>>["error"];
+  try {
+    ({ data, error } = await supabase.client.auth.getUser());
+  } catch {
+    // A temporary auth/network outage must not turn every public page into a 500.
+    return { signedIn: false, professional: false, professionalUserId: null, accountInitials: null, admin: false, passwordSetupRequired: false, responseHeaders: supabase.responseHeaders };
+  }
   let profile: { role?: string | null; professional_status?: string | null; password_setup_required?: boolean; first_name?: string | null; last_name?: string | null } | null = null;
   if (!error && data.user) {
     const result = await supabase.client.from("profiles").select("role,professional_status,password_setup_required,first_name,last_name").eq("id", data.user.id).maybeSingle();

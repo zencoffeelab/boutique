@@ -209,14 +209,16 @@ function applyDemoStockModel(product: Product): Product {
 }
 
 async function getRawProducts(): Promise<Product[]> {
-  const products = hasSupabaseConfig()
-    ? await databaseProducts()
-    : env().ALLOW_DEMO_DATA
-      ? demoProducts.map(applyDemoStockModel)
-      : (() => {
-          throw new Error("Catalog database is not configured.");
-        })();
-  return products;
+  if (!hasSupabaseConfig()) {
+    if (env().ALLOW_DEMO_DATA) return demoProducts.map(applyDemoStockModel);
+    throw new Error("Catalog database is not configured.");
+  }
+  try {
+    return await databaseProducts();
+  } catch (error) {
+    if (env().ALLOW_DEMO_DATA) return demoProducts.map(applyDemoStockModel);
+    throw error;
+  }
 }
 
 export function hasPurchasableVariant(
@@ -329,7 +331,10 @@ export async function getArticles(options: { includeUnpublished?: boolean } = {}
     );
   if (!options.includeUnpublished) query = query.eq("status", "published");
   const { data, error } = await query.order("published_at", { ascending: false });
-  if (error) throw new Error(`Unable to load advice: ${error.message}`);
+  if (error) {
+    if (env().ALLOW_DEMO_DATA) return demoArticles;
+    throw new Error(`Unable to load advice: ${error.message}`);
+  }
   return (data ?? []).flatMap((article: any) => {
     const fr = article.advice_translations?.find(
       (item: any) => item.locale === "fr-FR",
