@@ -38,6 +38,14 @@ type RichTextBlockClipboard = {
   attrs: Record<string, unknown>;
 };
 
+type PendingLink = {
+  href: string;
+  selection: { from: number; to: number };
+  field: HTMLInputElement | HTMLTextAreaElement | null;
+  fieldStart: number;
+  fieldEnd: number;
+};
+
 const richTextClipboardPrefix = "zen-coffee-lab:rich-text-block:";
 let lastCopiedRichTextBlock: RichTextBlockClipboard | null = null;
 
@@ -136,6 +144,7 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
   const labelId = useId();
   const hiddenInput = useRef<HTMLInputElement>(null);
   const [insertMode, setInsertMode] = useState<"table" | "accordion" | null>(null);
+  const [pendingLink, setPendingLink] = useState<PendingLink | null>(null);
   const [tableRows, setTableRows] = useState(2);
   const [tableColumns, setTableColumns] = useState(2);
   const [accordionTitle, setAccordionTitle] = useState("En savoir plus");
@@ -236,13 +245,58 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
     }),
   });
 
-  const setLink = () => {
+  const openLinkEditor = () => {
     if (!editor) return;
+    const selection = { from: editor.state.selection.from, to: editor.state.selection.to };
+    const activeField = document.activeElement;
+    const editableField = activeField instanceof HTMLInputElement || activeField instanceof HTMLTextAreaElement ? activeField : null;
     const current = editor.getAttributes("link").href as string | undefined;
-    const href = window.prompt("Adresse du lien", current ?? "https://");
-    if (href === null) return;
-    if (!href.trim()) editor.chain().focus().unsetLink().run();
-    else editor.chain().focus().extendMarkRange("link").setLink({ href: href.trim() }).run();
+    setPendingLink({ href: current ?? "https://", selection, field: editableField, fieldStart: editableField?.selectionStart ?? 0, fieldEnd: editableField?.selectionEnd ?? 0 });
+  };
+
+  const applyLink = () => {
+    if (!editor || !pendingLink) return;
+    const value = pendingLink.href.trim();
+    const current = editor.getAttributes("link").href as string | undefined;
+    const normalizedHref = /^(?:https?:|mailto:|tel:|\/|#)/i.test(value) ? value : `https://${value}`;
+    const { field, fieldStart, fieldEnd, selection } = pendingLink;
+    const fieldValue = field?.isConnected ? field.value : null;
+    if (field && fieldValue !== null && fieldEnd > fieldStart && value) {
+      const selectedText = fieldValue.slice(fieldStart, fieldEnd);
+      const nextValue = `${fieldValue.slice(0, fieldStart)}[${selectedText}](${normalizedHref})${fieldValue.slice(fieldEnd)}`;
+      const nativeSetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value")?.set;
+      nativeSetter?.call(field, nextValue);
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      const nextCursor = fieldStart + selectedText.length + normalizedHref.length + 4;
+      field.focus();
+      field.setSelectionRange(nextCursor, nextCursor);
+      setPendingLink(null);
+      return;
+    }
+    if (selection.from < selection.to && value) {
+      const linkMark = editor.schema.marks.link;
+      if (!linkMark) {
+        setPendingLink(null);
+        return;
+      }
+      editor.view.dispatch(editor.state.tr.addMark(selection.from, selection.to, linkMark.create({ href: normalizedHref })));
+      editor.view.focus();
+      setPendingLink(null);
+      return;
+    }
+    const chain = editor.chain().setTextSelection(selection).focus();
+    if (!value) {
+      chain.extendMarkRange("link").unsetLink().run();
+      setPendingLink(null);
+      return;
+    }
+    if (selection.from === selection.to && !current) {
+      chain.insertContent({ type: "text", text: value, marks: [{ type: "link", attrs: { href: normalizedHref } }] }).run();
+      setPendingLink(null);
+      return;
+    }
+    chain.extendMarkRange("link").setLink({ href: normalizedHref }).run();
+    setPendingLink(null);
   };
 
   const insertTable = (rowCount: number, columnCount: number) => {
@@ -280,7 +334,7 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
         <ToolbarButton label="Citation" active={state?.blockquote} disabled={disabled || !editor} onClick={() => editor?.chain().focus().toggleBlockquote().run()}><Quote /></ToolbarButton>
         <ToolbarButton label="Séparateur" disabled={disabled || !editor} onClick={() => editor?.chain().focus().setHorizontalRule().run()}><Minus /></ToolbarButton>
         <span className="rich-text-editor__separator" aria-hidden="true" />
-        <ToolbarButton label="Ajouter ou modifier un lien" active={state?.link} disabled={disabled || !editor} onClick={setLink}><Link2 /></ToolbarButton>
+        <ToolbarButton label="Ajouter ou modifier un lien" active={state?.link} disabled={disabled || !editor} onClick={openLinkEditor}><Link2 /></ToolbarButton>
         <ToolbarButton label="Retirer le lien" disabled={disabled || !editor || !state?.link} onClick={() => editor?.chain().focus().unsetLink().run()}><Unlink /></ToolbarButton>
         <ToolbarButton label="Insérer un tableau" disabled={disabled || !editor} onClick={() => setInsertMode("table")}><Table2 /></ToolbarButton>
         <ToolbarButton label="Insérer un accordéon" disabled={disabled || !editor} onClick={() => setInsertMode("accordion")}><ChevronsUpDown /></ToolbarButton>
@@ -288,6 +342,7 @@ export function RichTextEditor({ name, initialContent, disabled = false, label }
         <ToolbarButton label="Annuler" disabled={disabled || !editor || !state?.canUndo} onClick={() => editor?.chain().focus().undo().run()}><Undo2 /></ToolbarButton>
         <ToolbarButton label="Rétablir" disabled={disabled || !editor || !state?.canRedo} onClick={() => editor?.chain().focus().redo().run()}><Redo2 /></ToolbarButton>
       </div>
+      {pendingLink ? <div className="rich-text-link-panel"><label>Adresse du lien<input autoFocus value={pendingLink.href} onChange={(event) => { const value = event.currentTarget.value; setPendingLink((current) => current ? { ...current, href: value } : current); }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); applyLink(); } if (event.key === "Escape") setPendingLink(null); }} /></label><button type="button" className="rich-text-link-panel__apply" onClick={applyLink}>Appliquer</button><button type="button" className="rich-text-link-panel__cancel" onClick={() => setPendingLink(null)}>Annuler</button></div> : null}
       {insertMode === "table" ? <div className="rich-text-insert-panel"><div className="rich-text-insert-panel__dimensions"><label>Lignes<input type="number" min={1} max={30} value={tableRows} onChange={(event) => setTableRows(Number(event.currentTarget.value) || 1)} /></label><label>Colonnes<input type="number" min={1} max={12} value={tableColumns} onChange={(event) => setTableColumns(Number(event.currentTarget.value) || 1)} /></label></div><small>La première ligne est créée comme en-tête.</small><div><button type="button" className="rich-text-insert-panel__action" onClick={() => insertTable(tableRows, tableColumns)}>Insérer le tableau</button><button type="button" className="rich-text-insert-panel__cancel" onClick={() => setInsertMode(null)}>Annuler</button></div></div> : null}
       {insertMode === "accordion" ? <div className="rich-text-insert-panel"><label>Titre<input value={accordionTitle} onChange={(event) => setAccordionTitle(event.currentTarget.value)} /></label><label>Sous-titre<input value={accordionSubtitle} onChange={(event) => setAccordionSubtitle(event.currentTarget.value)} /></label><label>Contenu<textarea value={accordionBody} onChange={(event) => setAccordionBody(event.currentTarget.value)} rows={3} /></label><div><button type="button" className="rich-text-insert-panel__action" onClick={() => insertAccordion(accordionTitle, accordionSubtitle, accordionBody)}>Insérer l’accordéon</button><button type="button" className="rich-text-insert-panel__cancel" onClick={() => setInsertMode(null)}>Annuler</button></div></div> : null}
       <EditorContent editor={editor} className="rich-text-editor__content" />

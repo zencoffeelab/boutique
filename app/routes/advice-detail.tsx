@@ -64,7 +64,7 @@ function AdviceStory({ article, locale, storyImages }: { article: Awaited<Return
     if (item.compartment === "title") return null;
     const customItem = item.customId ? layout.customItems.find((custom) => custom.id === item.customId) : undefined;
     if (item.compartment === "text" && item.customId && customItem) return <div className="advice-story__text advice-story__custom-text" key={item.id}><RichTextContent content={customTextContent(customTextValue(layout.customText?.[customItem.id], locale === "fr-FR" ? customItem.textFr : customItem.textEn) ?? "")} /></div>;
-    if (item.compartment === "image" && item.customId && customItem?.imageUrl) return <figure className="advice-story__image" key={item.id}><img src={customItem.imageUrl} alt={locale === "fr-FR" ? customItem.imageAltFr ?? "" : customItem.imageAltEn ?? ""} /></figure>;
+    if (item.compartment === "image" && item.customId && customItem?.imageUrl) return <figure className="advice-story__image advice-story__custom-image" key={item.id}><img src={customItem.imageUrl} alt={locale === "fr-FR" ? customItem.imageAltFr ?? "" : customItem.imageAltEn ?? ""} /></figure>;
     if (item.compartment === "text" && item.element && texts[item.element]) return <div className="advice-story__text" key={item.id}><RichTextContent content={texts[item.element]!} /></div>;
     if (item.compartment === "image" && item.element && images[item.element]) return <figure className="advice-story__image" key={item.id}><img src={images[item.element]!.src} alt={images[item.element]!.alt} /></figure>;
     if (item.compartment === "textImage") return <EditorialStory key={item.id} content={texts.bodyText ?? []} images={[images.bodyImage ?? { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" }]} splitSections={false} />;
@@ -72,7 +72,7 @@ function AdviceStory({ article, locale, storyImages }: { article: Awaited<Return
     return null;
   };
   const placedCustomIds = new Set(layout.items.map((item) => item.customId).filter(Boolean));
-  return <div className="advice-story">{layout.items.map(renderItem)}{layout.customItems.filter((item) => !placedCustomIds.has(item.id)).map((item) => item.type === "text" ? <div className="advice-story__text advice-story__custom-text" key={item.id}><RichTextContent content={customTextContent(customTextValue(layout.customText?.[item.id], locale === "fr-FR" ? item.textFr : item.textEn) ?? "")} /></div> : item.imageUrl ? <figure className="advice-story__image" key={item.id}><img src={item.imageUrl} alt={locale === "fr-FR" ? item.imageAltFr ?? "" : item.imageAltEn ?? ""} /></figure> : null)}</div>;
+  return <div className="advice-story">{layout.items.map(renderItem)}{layout.customItems.filter((item) => !placedCustomIds.has(item.id)).map((item) => item.type === "text" ? <div className="advice-story__text advice-story__custom-text" key={item.id}><RichTextContent content={customTextContent(customTextValue(layout.customText?.[item.id], locale === "fr-FR" ? item.textFr : item.textEn) ?? "")} /></div> : item.imageUrl ? <figure className="advice-story__image advice-story__custom-image" key={item.id}><img src={item.imageUrl} alt={locale === "fr-FR" ? item.imageAltFr ?? "" : item.imageAltEn ?? ""} /></figure> : null)}</div>;
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -101,7 +101,7 @@ export default function AdviceDetail() {
     };
   }, []);
   return <article className="advice-detail-page">
-    <header className="page-hero advice-detail__top"><p className="eyebrow">{new Date(article.publishedAt).toLocaleDateString(english ? "en-GB" : "fr-FR")}</p><h1>{article.title[locale]}</h1><p className="lede advice-detail__intro">{(() => { const value = adviceLayout((article.story[locale] as typeof article.story["fr-FR"] & { layoutConfig?: unknown }).layoutConfig)[english ? "shortIntroEn" : "shortIntroFr"] || article.excerpt[locale]; return typeof value === "string" && value.trim().startsWith("{") ? <RichTextContent content={parseRichTextInput(value, 0) ?? [value]} /> : value; })()}</p></header>
+    <header className="page-hero advice-detail__top"><p className="eyebrow">{new Date(article.publishedAt).toLocaleDateString(english ? "en-GB" : "fr-FR")}</p><h1>{article.title[locale]}</h1><div className="lede advice-detail__intro">{(() => { const value = adviceLayout((article.story[locale] as typeof article.story["fr-FR"] & { layoutConfig?: unknown }).layoutConfig)[english ? "shortIntroEn" : "shortIntroFr"] || article.excerpt[locale]; return typeof value === "string" && value.trim().startsWith("{") ? <RichTextContent content={parseRichTextInput(value, 0) ?? [value]} /> : <p>{value}</p>; })()}</div></header>
     <AdviceStory article={article} locale={locale} storyImages={storyImages} />
     <div className="article-body advice-detail__body advice-detail__action"><Link className="button button--ghost advice-detail__back" to={shopPath}>{english ? "Visit the shop" : "Visiter la boutique"}<ArrowRight aria-hidden="true" /></Link></div>
     {relatedArticles.length ? <section className="advice-related" aria-labelledby="advice-related-title">

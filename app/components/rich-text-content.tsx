@@ -43,7 +43,7 @@ type AccordionState = { openAccordion: string | null; setOpenAccordion: (key: st
 
 function renderNode(node: RichTextNode, index: number, accordionState?: AccordionState): ReactNode {
   const key = `${node.type}-${index}`;
-  if (node.type === "text") return <Fragment key={key}>{renderMarks(node.text ?? "", node.marks ?? [], key)}</Fragment>;
+  if (node.type === "text") return <Fragment key={key}>{node.marks?.length ? renderMarks(node.text ?? "", node.marks, key) : renderInlineLinks(node.text ?? "", key)}</Fragment>;
   const children = node.content?.map((child, childIndex) => renderNode(child, childIndex, accordionState)) ?? null;
   switch (node.type) {
     case "paragraph": return <p key={key}>{children}</p>;
@@ -57,21 +57,39 @@ function renderNode(node: RichTextNode, index: number, accordionState?: Accordio
     case "hardBreak": return <br key={key} />;
     case "contentTable": {
       const rows = Array.isArray(node.attrs?.rows) ? node.attrs.rows : [];
-      return <table className="rich-text-table" key={key}><tbody>{rows.map((row, rowIndex) => <tr key={`${key}-row-${rowIndex}`}>{(Array.isArray(row) ? row : []).map((cell, cellIndex) => rowIndex === 0 ? <th key={`${key}-${rowIndex}-${cellIndex}`}>{String(cell ?? "")}</th> : <td key={`${key}-${rowIndex}-${cellIndex}`}>{String(cell ?? "")}</td>)}</tr>)}</tbody></table>;
+      return <table className="rich-text-table" key={key}><tbody>{rows.map((row, rowIndex) => <tr key={`${key}-row-${rowIndex}`}>{(Array.isArray(row) ? row : []).map((cell, cellIndex) => rowIndex === 0 ? <th key={`${key}-${rowIndex}-${cellIndex}`}>{renderInlineLinks(String(cell ?? ""), `${key}-${rowIndex}-${cellIndex}`)}</th> : <td key={`${key}-${rowIndex}-${cellIndex}`}>{renderInlineLinks(String(cell ?? ""), `${key}-${rowIndex}-${cellIndex}`)}</td>)}</tr>)}</tbody></table>;
     }
     case "contentAccordion": {
       const open = accordionState?.openAccordion === key;
       const sections = accordionSections(node);
       const hasMultipleSections = sections.length > 1;
       const accordionOpen = hasMultipleSections || open;
-      const title = <span className="rich-text-accordion__title">{String(node.attrs?.title ?? "")}</span>;
+      const title = <span className="rich-text-accordion__title">{renderInlineLinks(String(node.attrs?.title ?? ""), `${key}-title`)}</span>;
       const titleHeader = hasMultipleSections
         ? <summary className="rich-text-accordion__trigger" onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}>{title}</summary>
         : <summary className="rich-text-accordion__trigger" onClick={(event) => { event.preventDefault(); event.stopPropagation(); accordionState?.setOpenAccordion(open ? null : key); }}>{title}</summary>;
-      return <details className={`rich-text-accordion${accordionOpen ? " is-open" : ""}${hasMultipleSections ? " has-multiple-sections" : ""}`} key={key} open={accordionOpen}>{titleHeader}{accordionOpen ? <div className="rich-text-accordion__body">{sections.map((section, sectionIndex) => { const body = accordionBodyDocument(section.bodyDocument ?? section.body); const sectionKey = `${key}-section-${sectionIndex}`; const sectionOpen = accordionState?.openAccordionSection === sectionKey; return <details className={`rich-text-accordion__section${sectionOpen ? " is-open" : ""}`} key={sectionKey} open={sectionOpen}><summary className="rich-text-accordion__subtitle" onClick={(event) => { event.preventDefault(); event.stopPropagation(); accordionState?.setOpenAccordionSection(sectionOpen ? null : sectionKey); }}>{section.subtitle || `Sous-titre ${sectionIndex + 1}`}</summary>{sectionOpen ? <div className="rich-text-accordion__section-body">{body.content.map((child, childIndex) => renderNode(child, childIndex, accordionState))}</div> : null}</details>; })}</div> : null}</details>;
+      return <details className={`rich-text-accordion${accordionOpen ? " is-open" : ""}${hasMultipleSections ? " has-multiple-sections" : ""}`} key={key} open={accordionOpen}>{titleHeader}{accordionOpen ? <div className="rich-text-accordion__body">{sections.map((section, sectionIndex) => { const body = accordionBodyDocument(section.bodyDocument ?? section.body); const sectionKey = `${key}-section-${sectionIndex}`; const sectionOpen = accordionState?.openAccordionSection === sectionKey; return <details className={`rich-text-accordion__section${sectionOpen ? " is-open" : ""}`} key={sectionKey} open={sectionOpen}><summary className="rich-text-accordion__subtitle" onClick={(event) => { event.preventDefault(); event.stopPropagation(); accordionState?.setOpenAccordionSection(sectionOpen ? null : sectionKey); }}>{section.subtitle ? renderInlineLinks(section.subtitle, `${sectionKey}-subtitle`) : `Sous-titre ${sectionIndex + 1}`}</summary>{sectionOpen ? <div className="rich-text-accordion__section-body">{body.content.map((child, childIndex) => renderNode(child, childIndex, accordionState))}</div> : null}</details>; })}</div> : null}</details>;
     }
     default: return null;
   }
+}
+
+function renderInlineLinks(text: string, key: string): ReactNode {
+  const pattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  let index = 0;
+  while ((match = pattern.exec(text))) {
+    if (match.index > cursor) parts.push(text.slice(cursor, match.index));
+    const href = safeHref(match[2]);
+    parts.push(href ? <a key={`${key}-link-${index}`} href={href} rel="noopener noreferrer">{match[1]}</a> : match[0]);
+    cursor = match.index + match[0].length;
+    index += 1;
+  }
+  if (!parts.length) return text;
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts;
 }
 
 function renderMarks(text: string, marks: RichTextMark[], key: string): ReactNode {
