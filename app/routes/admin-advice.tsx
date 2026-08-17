@@ -13,7 +13,7 @@ import { PUBLIC_MEDIA_CACHE_SECONDS, PUBLIC_MEDIA_MAX_UPLOAD_BYTES } from "~/lib
 import { createServiceSupabase } from "~/lib/supabase.server";
 
 type Translation = { locale: "fr-FR" | "en-GB"; title: string; excerpt: string; blocks: Array<{ type?: string; content: unknown }>; seo_title: string; seo_description: string; focus_keyphrase?: string };
-type Article = { id: string; slug: string; status: "draft" | "published" | "archived"; published_at: string; advice_translations: Translation[] };
+type Article = { id: string; slug: string; status: "draft" | "published" | "archived"; pinned: boolean; published_at: string; advice_translations: Translation[] };
 type AdviceElement = "introText" | "introImage" | "bodyText" | "bodyImage" | "body2Text" | "body2Image";
 type AdviceCompartment = "title" | "text" | "image" | "textImage" | "imageText";
 type AdviceLayoutItem = { id: string; compartment: AdviceCompartment; element?: AdviceElement; customId?: string; label?: string };
@@ -55,6 +55,7 @@ const schema = z.object({
   id: z.preprocess((value) => value === "" ? undefined : value, z.uuid().optional()),
   slug: z.preprocess((value) => typeof value === "string" ? normalizeSlug(value) : value, z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)),
   status: z.enum(["draft", "published", "archived"]),
+  pinned: z.enum(["true", "false"]).optional().default("false"),
   publishedAt: z.string().min(10),
   titleFr: z.string().trim().min(3), titleEn: z.string().trim().min(3),
   excerptFr: z.string().trim().min(10), excerptEn: z.string().trim().min(10),
@@ -405,7 +406,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (typeof parsed.data.layoutConfig === "string" && parsed.data.layoutConfig.trim()) {
     try { layoutConfig = parseAdviceLayoutWithCustomItems(JSON.parse(parsed.data.layoutConfig)); } catch { layoutConfig = defaultAdviceLayout; }
   }
-  const values = { slug: parsed.data.slug, status: parsed.data.status, published_at: new Date(parsed.data.publishedAt).toISOString() };
+  const values = { slug: parsed.data.slug, status: parsed.data.status, pinned: parsed.data.pinned === "true", published_at: new Date(parsed.data.publishedAt).toISOString() };
   const mutation = parsed.data.id
     ? await client.from("advice_articles").update(values).eq("id", parsed.data.id).select("id").single()
     : await client.from("advice_articles").insert(values).select("id").single();
@@ -741,11 +742,11 @@ function LegacyArticleForm({ article, demo }: { article?: Article; demo: boolean
   };
   return <Form method="post" encType="multipart/form-data" className="admin-advice-editor">
     <input type="hidden" name="intent" value="save_advice" /><input type="hidden" name="id" value={article?.id ?? ""} />
-    <section className="admin-advice-editor__settings"><div><p className="eyebrow">Publication</p><h2>{article ? "Éditer l’article" : "Nouvel article"}</h2></div><div className="form-grid"><label>Slug<input name="slug" defaultValue={article?.slug ?? ""} required /></label><label>Statut<select name="status" defaultValue={article?.status ?? "draft"}><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label><label>Date de publication<input name="publishedAt" type="datetime-local" defaultValue={(article?.published_at ?? new Date().toISOString()).slice(0, 16)} required /></label></div></section>
+    <section className="admin-advice-editor__settings"><div><p className="eyebrow">Publication</p><h2>{article ? "Éditer l’article" : "Nouvel article"}</h2></div><div className="form-grid"><label>Slug<input name="slug" defaultValue={article?.slug ?? ""} required /></label><label>Statut<select name="status" defaultValue={article?.status ?? "draft"}><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label><label>Date de publication<input name="publishedAt" type="datetime-local" defaultValue={(article?.published_at ?? new Date().toISOString()).slice(0, 16)} required /></label><label className="admin-advice-pin-field"><input name="pinned" type="checkbox" value="true" defaultChecked={article?.pinned ?? false} /><span>Épingler cet article en tête du Blog</span></label></div></section>
     <section className="admin-editorial-block admin-advice-editor__block admin-advice-editor__block--copy-first"><header className="admin-editorial-block__heading"><div><p className="eyebrow">En-tête et introduction</p><h3>Texte à gauche · image à droite</h3></div></header><div className="admin-editorial-block__layout"><div className="admin-editorial-block__image"><StoryImage url={String(frLayout?.introImageUrl ?? "")} alt={String(frLayout?.introImageAlt ?? "")} /></div><div className="admin-editorial-block__content"><LanguageTabs label="Langue de l’en-tête et de l’introduction" french={introductionFields("Fr", fr, frLayout)} english={introductionFields("En", en, enLayout)} /></div></div></section>
     <section className="admin-editorial-block admin-advice-editor__block"><header className="admin-editorial-block__heading"><div><p className="eyebrow">Corps de l’article</p><h3>Image à gauche · texte à droite</h3></div></header><div className="admin-editorial-block__layout"><div className="admin-editorial-block__image"><StoryImage url={String(frLayout?.bodyImageUrl ?? "")} alt={String(frLayout?.bodyImageAlt ?? "")} /></div><div className="admin-editorial-block__content"><LanguageTabs label="Langue du corps de l’article" french={bodyFields("Fr", fr, frLayout)} english={bodyFields("En", en, enLayout)} /></div></div></section>
     <section className="admin-advice-editor__seo"><h3>Référencement</h3><LanguageTabs label="Langue du référencement" french={<fieldset className="admin-editorial-block__language"><legend>Français</legend><div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? ""} required /></label></div><div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? ""} required /></label></div></fieldset>} english={<fieldset className="admin-editorial-block__language"><legend>English</legend><div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? ""} required /></label></div><div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? ""} required /></label></div></fieldset>} /></section>
-    <div className="admin-editor__actions"><button className="ui-button ui-button--default" disabled={demo}>{article ? "Enregistrer" : <><Plus /> Nouveau blog</>}</button>{article ? <Link className="ui-button ui-button--ghost" to={`/conseils/${article.slug}`}>Lire l’article</Link> : null}</div>
+    <div className="admin-editor__actions"><button className="ui-button ui-button--default" disabled={demo}>{article ? "Enregistrer" : <><Plus /> Nouveau blog</>}</button>{article ? <Link className="ui-button ui-button--ghost" to={`/blog/${article.slug}`}>Lire l’article</Link> : null}</div>
   </Form>;
 }
 
@@ -808,14 +809,14 @@ function ArticleForm({ article, demo }: { article?: Article; demo: boolean }) {
     <input type="hidden" name="intent" value="save_advice" />
     <input type="hidden" name="id" value={article?.id ?? ""} />
     <section className="admin-advice-editor__top">
-      <div className="admin-advice-editor__settings"><p className="eyebrow">Publication</p><div className="form-grid"><label>Slug<input name="slug" defaultValue={article?.slug ?? ""} required /></label><label>Statut<select name="status" defaultValue={article?.status ?? "draft"}><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label><label>Date de publication<input name="publishedAt" type="datetime-local" defaultValue={(article?.published_at ?? new Date().toISOString()).slice(0, 16)} required /></label></div></div>
+      <div className="admin-advice-editor__settings"><p className="eyebrow">Publication</p><div className="form-grid"><label>Slug<input name="slug" defaultValue={article?.slug ?? ""} required /></label><label>Statut<select name="status" defaultValue={article?.status ?? "draft"}><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label><label>Date de publication<input name="publishedAt" type="datetime-local" defaultValue={(article?.published_at ?? new Date().toISOString()).slice(0, 16)} required /></label><label className="admin-advice-pin-field"><input name="pinned" type="checkbox" value="true" defaultChecked={article?.pinned ?? false} /><span>Épingler cet article en tête du Blog</span></label></div></div>
       <section className="admin-advice-editor__introduction"><h2>Titre et introduction</h2><LanguageTabs label="Langue du titre et de l’introduction" french={intro("Fr", fr)} english={intro("En", en)} /></section>
     </section>
     {layoutOrganizer}
     {editorial(1, false)}
     {editorial(2, true)}
     <section className="admin-advice-editor__seo"><h3>Référencement</h3><LanguageTabs label="Langue du référencement" french={seoFields("Fr", fr)} english={seoFields("En", en)} /></section>
-    <div className="admin-editor__actions"><button className="ui-button ui-button--default" disabled={demo}>{actionLabel ?? <><Plus /> Nouveau blog</>}</button>{article ? <Link className="ui-button ui-button--ghost" to={`/conseils/${article.slug}${article.status === "draft" ? `?preview=${article.id}` : ""}`}>{article.status === "draft" ? "Aperçu du brouillon" : "Lire l’article"}</Link> : null}<AutomaticAdviceTranslation formId={formId} /></div>
+    <div className="admin-editor__actions"><button className="ui-button ui-button--default" disabled={demo}>{actionLabel ?? <><Plus /> Nouveau blog</>}</button>{article ? <Link className="ui-button ui-button--ghost" to={`/blog/${article.slug}${article.status === "draft" ? `?preview=${article.id}` : ""}`}>{article.status === "draft" ? "Aperçu du brouillon" : "Lire l’article"}</Link> : null}<AutomaticAdviceTranslation formId={formId} /></div>
   </Form>;
 }
 

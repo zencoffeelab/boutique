@@ -7,7 +7,6 @@ import { getArticles, getProducts } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { JsonLd, pageMeta } from "~/lib/seo";
 import { getContentPage } from "~/lib/content.server";
-import { firstSentence } from "~/lib/utils";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request);
@@ -44,7 +43,9 @@ function getHomeContent(blocks: Array<{ type?: unknown; content?: unknown }> | u
     const card = cards[index];
     return card && typeof card === "object" ? [typeof (card as { title?: unknown }).title === "string" ? (card as { title: string }).title : fallbackTitle, typeof (card as { text?: unknown }).text === "string" ? (card as { text: string }).text : fallbackText] : [fallbackTitle, fallbackText];
   });
-  return { statement: legacyHomeStatements.has(statement) ? fallback.statement : statement, values };
+  const heroContent = blocks?.find((block) => block.type === "homeHeroImage")?.content;
+  const hero = heroContent && typeof heroContent === "object" ? heroContent as { url?: string; alt?: string } : {};
+  return { statement: legacyHomeStatements.has(statement) ? fallback.statement : statement, values, hero };
 }
 
 function StatementText({ text }: { text: string }) {
@@ -68,7 +69,7 @@ export default function Home() {
       }} />
       <section className="hero">
         <div className="hero__media">
-          <img src="/media/home-hero-coffee-cherries.webp" alt={english ? "Coffee cherries ripening on a coffee plant" : "Cerises de café mûrissant sur un caféier"} width="1672" height="941" fetchPriority="high" />
+          <img src={home.hero.url || "/media/home-hero-coffee-cherries.webp"} alt={home.hero.alt || (english ? "Coffee cherries ripening on a coffee plant" : "Cerises de café mûrissant sur un caféier")} width="1672" height="941" fetchPriority="high" />
           <div className="hero__copy">
             <p className="eyebrow">{english ? "Micro-roastery" : "micro-torréfacteur"} · Tours</p>
             <h1>{english ? <>A roast tailored to the <em>origin.</em></> : <>Une torréfaction pensée pour l’<em>origine.</em></>}</h1>
@@ -108,8 +109,8 @@ export default function Home() {
       </section>
 
       <section className="section page-shell">
-        <div className="section-header"><div><p className="eyebrow">Journal</p><h2>{english ? "Brew better" : "Mieux préparer"}</h2></div></div>
-        <div className="article-grid">{articles.map((article) => <article className="article-card" key={article.slug}><p className="eyebrow">{new Date(article.publishedAt).toLocaleDateString(english ? "en-GB" : "fr-FR")}</p><h2>{article.title[locale]}</h2><p>{firstSentence(article.excerpt[locale])}</p><Link className="text-link" to={`${english ? "/en/tips" : "/conseils"}/${article.slug}`}>{english ? "Read" : "Lire"}<ArrowRight aria-hidden="true" /></Link></article>)}</div>
+        <div className="section-header"><div><p className="eyebrow">Blog</p><h2>{english ? "Brew better" : "Mieux préparer"}</h2></div></div>
+        <div className="article-grid">{articles.map((article) => <article className={article.pinned ? "article-card article-card--pinned" : "article-card"} key={article.slug}>{article.pinned ? <span className="article-card__ribbon">{english ? "Pinned" : "Épinglé"}</span> : null}<p className="eyebrow">{new Date(article.publishedAt).toLocaleDateString(english ? "en-GB" : "fr-FR")}</p><h2>{article.title[locale]}</h2><p className="article-card__excerpt">{article.excerpt[locale]}</p><Link className="text-link" to={`${english ? "/en/blog" : "/blog"}/${article.slug}`}>{english ? "Read" : "Lire"}<ArrowRight aria-hidden="true" /></Link></article>)}</div>
       </section>
     </>
   );

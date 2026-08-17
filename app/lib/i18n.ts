@@ -35,7 +35,7 @@ export const dictionary = {
     shop: "Shop",
     professional: "Professionals",
     about: "About us",
-    advice: "Tips",
+    advice: "Blog",
     cart: "Cart",
     account: "Account",
     addToCart: "Add to cart",
@@ -59,8 +59,8 @@ export function alternatePath(pathname: string): string {
   if (pathname === "/en/shop") return "/boutique";
   if (pathname === "/en/about-us") return "/a-propos";
   if (pathname === "/en/professional") return "/professionnel";
-  if (pathname === "/en/tips") return "/conseils";
-  if (pathname.startsWith("/en/tips/")) return pathname.replace("/en/tips/", "/conseils/");
+  if (pathname === "/en/tips" || pathname === "/en/blog") return "/blog";
+  if (pathname.startsWith("/en/tips/") || pathname.startsWith("/en/blog/")) return pathname.replace(/^\/en\/(?:tips|blog)\//, "/blog/");
   if (pathname === "/en/cart") return "/panier";
   if (pathname === "/en/checkout") return "/commande";
   if (pathname === "/en/my-account") return "/mon-compte";
@@ -69,13 +69,13 @@ export function alternatePath(pathname: string): string {
   if (pathname === "/en/privacy-policy") return "/politique-de-confidentialite";
   if (pathname.startsWith("/en/")) return pathname.slice(3) || "/";
   if (pathname.startsWith("/boutique/")) return pathname.replace("/boutique/", "/en/shop/");
-  if (pathname.startsWith("/conseils/")) return pathname.replace("/conseils/", "/en/tips/");
+  if (pathname.startsWith("/blog/")) return pathname.replace("/blog/", "/en/blog/");
   const mappings: Record<string, string> = {
     "/": "/en",
     "/boutique": "/en/shop",
     "/a-propos": "/en/about-us",
     "/professionnel": "/en/professional",
-    "/conseils": "/en/tips",
+    "/blog": "/en/blog",
     "/panier": "/en/cart",
     "/commande": "/en/checkout",
     "/mon-compte": "/en/my-account",

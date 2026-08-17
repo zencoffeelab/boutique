@@ -41,7 +41,7 @@ export const siteNavigationItems: readonly SiteNavigationItem[] = [
   { key: "home", adminLabel: "Accueil", labels: { "fr-FR": "Accueil", "en-GB": "Home" }, paths: { "fr-FR": "/", "en-GB": "/en" } },
   { key: "shop", adminLabel: "Boutique", labels: { "fr-FR": "Boutique", "en-GB": "Shop" }, footerLabels: { "fr-FR": "Tous les cafés", "en-GB": "All coffees" }, paths: { "fr-FR": "/boutique", "en-GB": "/en/shop" } },
   { key: "professional", adminLabel: "Professionnels", labels: { "fr-FR": "Professionnels", "en-GB": "Professionals" }, paths: { "fr-FR": "/professionnel", "en-GB": "/en/professional" } },
-  { key: "advice", adminLabel: "Blog", labels: { "fr-FR": "Blog", "en-GB": "Blog" }, paths: { "fr-FR": "/conseils", "en-GB": "/en/tips" } },
+  { key: "advice", adminLabel: "Blog", labels: { "fr-FR": "Blog", "en-GB": "Blog" }, paths: { "fr-FR": "/blog", "en-GB": "/en/blog" } },
   { key: "about", adminLabel: "À propos", labels: { "fr-FR": "À propos", "en-GB": "About us" }, paths: { "fr-FR": "/a-propos", "en-GB": "/en/about-us" } },
   { key: "archives", adminLabel: "Archives", labels: { "fr-FR": "Archives", "en-GB": "Archives" }, paths: { "fr-FR": "/archives", "en-GB": "/en/archives" } },
   { key: "faq", adminLabel: "FAQ", labels: { "fr-FR": "FAQ", "en-GB": "FAQ" }, paths: { "fr-FR": "/faq", "en-GB": "/en/faq" } },

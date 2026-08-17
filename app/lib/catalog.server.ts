@@ -16,6 +16,17 @@ import { mapPublicMediaUrls, publicMediaDeliveryUrl } from "./public-media";
 import { createPublicSupabase, createServiceSupabase } from "./supabase.server";
 import { paragraphsToRichTextDocument, parseRichTextInput, richTextPlainText, storedBlocksToRichTextDocument } from "./rich-text";
 
+const editorialArticleSummaries: Record<string, Record<"fr-FR" | "en-GB", string>> = {
+  "recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france": {
+    "fr-FR": "Nous partageons avec vous deux recettes que nous utilisons au V60, avec nos repères de mouture, 12 g de café lavé ou 13,5 g de café nature, 200 ml d’eau à 91–93 °C et un versement en plusieurs étapes.",
+    "en-GB": "We use two V60 recipes ourselves and share them here, with our grind settings, 12 g of washed coffee or 13.5 g of natural coffee, 200 ml of water at 91–93°C and a staged pour.",
+  },
+  "de-l-importance-de-l-eau-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france": {
+    "fr-FR": "Nous parlons d’un élément souvent oublié : l’eau, qui compose 98 à 99 % de la tasse. Sa minéralité, sa dureté et son pH peuvent changer l’acidité et les arômes ; une eau agréable à boire n’est pas forcément la meilleure pour le café.",
+    "en-GB": "We look at something that is often overlooked: water, which makes up 98–99% of the cup. Its minerals, hardness and pH can change acidity and flavour, and water that tastes good on its own is not always best for coffee.",
+  },
+};
+
 function mapDatabaseProduct(row: any): Product {
   const stockOnHandGrams = Number(row.stock_on_hand_grams ?? (row.product_variants ?? []).reduce((total: number, variant: any) => total + Number(variant.stock_on_hand ?? 0) * Number(variant.weight_grams ?? 0), 0));
   const stockReservedGrams = Number(row.stock_reserved_grams ?? (row.product_variants ?? []).reduce((total: number, variant: any) => total + Number(variant.stock_reserved ?? 0) * Number(variant.weight_grams ?? 0), 0));
@@ -72,6 +83,17 @@ function mapDatabaseProduct(row: any): Product {
         title: { "fr-FR": block.title_fr, "en-GB": block.title_en },
         body: { "fr-FR": block.body_fr, "en-GB": block.body_en },
       })),
+    extractionGuide: {
+      title: {
+        "fr-FR": "Notre recette d'extraction pour filtre/v60",
+        "en-GB": "Our filter/V60 brewing recipe",
+      },
+      href: {
+        "fr-FR": "/blog/recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france",
+        "en-GB": "/en/blog/recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france",
+      },
+      label: { "fr-FR": "Lire le guide", "en-GB": "Read the guide" },
+    },
     variants: row.product_variants.map((variant: any) => ({
       id: variant.id,
       sku: variant.sku,
@@ -327,10 +349,10 @@ export async function getArticles(options: { includeUnpublished?: boolean } = {}
   let query = client
     .from("advice_articles")
     .select(
-      "slug,published_at,advice_translations(locale,title,excerpt,blocks)",
+      "slug,pinned,published_at,advice_translations(locale,title,excerpt,blocks)",
     );
   if (!options.includeUnpublished) query = query.eq("status", "published");
-  const { data, error } = await query.order("published_at", { ascending: false });
+  const { data, error } = await query.order("pinned", { ascending: false }).order("published_at", { ascending: false });
   if (error) {
     if (env().ALLOW_DEMO_DATA) return demoArticles;
     throw new Error(`Unable to load advice: ${error.message}`);
@@ -360,9 +382,11 @@ export async function getArticles(options: { includeUnpublished?: boolean } = {}
     return [
       {
         slug: article.slug,
+        pinned: Boolean(article.pinned),
         publishedAt: article.published_at ?? new Date(0).toISOString(),
         title: { "fr-FR": fr.title, "en-GB": en.title },
-        excerpt: { "fr-FR": richTextPlainText(frenchExcerptBody), "en-GB": richTextPlainText(englishExcerptBody) },
+        summary: editorialArticleSummaries[article.slug] ?? { "fr-FR": richTextPlainText(frenchExcerptBody), "en-GB": richTextPlainText(englishExcerptBody) },
+        excerpt: editorialArticleSummaries[article.slug] ?? { "fr-FR": richTextPlainText(frenchExcerptBody), "en-GB": richTextPlainText(englishExcerptBody) },
         excerptBody: { "fr-FR": frenchExcerptBody, "en-GB": englishExcerptBody },
         body: { "fr-FR": frenchBody, "en-GB": englishBody },
         ...(body2(fr) && body2(en) ? { body2: { "fr-FR": body2(fr)!, "en-GB": body2(en)! } } : {}),

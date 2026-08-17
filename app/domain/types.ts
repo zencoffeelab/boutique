@@ -67,6 +67,12 @@ export type ProductEditorialBlock = Readonly<{
   body: Record<Locale, string>;
 }>;
 
+export type ProductExtractionGuide = Readonly<{
+  title: Record<Locale, string>;
+  href: Record<Locale, string>;
+  label: Record<Locale, string>;
+}>;
+
 export type VariantOffer = Readonly<{
   id: string;
   audience: Audience;
@@ -104,6 +110,7 @@ export type Product = Readonly<{
   translations: Record<Locale, ProductTranslation>;
   media: readonly ProductMedia[];
   editorialBlocks: readonly ProductEditorialBlock[];
+  extractionGuide: ProductExtractionGuide;
   variants: readonly ProductVariant[];
   stockOnHandGrams: number;
   stockReservedGrams: number;
@@ -211,8 +218,10 @@ export type ShippingRate = Readonly<{
 
 export type AdviceArticle = Readonly<{
   slug: string;
+  pinned: boolean;
   publishedAt: string;
   title: Record<Locale, string>;
+  summary: Record<Locale, string>;
   excerpt: Record<Locale, string>;
   excerptBody?: Record<Locale, import("~/lib/rich-text").RichTextDocument>;
   body: Record<Locale, import("~/lib/rich-text").RichTextDocument | readonly string[]>;

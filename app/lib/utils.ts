@@ -22,3 +22,9 @@ export function firstSentence(value: string): string {
   const text = value.trim();
   return text.match(/^.*?[.!?](?:\s|$)/s)?.[0].trim() ?? text;
 }
+
+export function firstTwoSentences(value: string): string {
+  const text = value.trim();
+  const sentences = text.match(/.*?[.!?](?:\s|$)/gs) ?? [];
+  return (sentences.length >= 2 ? sentences.slice(0, 2).join(" ") : sentences[0] ?? text).trim();
+}

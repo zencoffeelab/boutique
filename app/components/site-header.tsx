@@ -109,8 +109,8 @@ export function SiteHeader({ signedIn, professional, accountInitials, announceme
   const { itemCount, drawerOpen, openDrawer, closeDrawer } = useCart();
   const quoteCart = useQuoteCart();
   const paths = locale === "fr-FR"
-    ? { home: "/", shop: "/boutique", professional: "/professionnel", advice: "/conseils", about: "/a-propos", cart: "/panier", account: "/mon-compte" }
-    : { home: "/en", shop: "/en/shop", professional: "/en/professional", advice: "/en/tips", about: "/en/about-us", cart: "/en/cart", account: "/en/my-account" };
+    ? { home: "/", shop: "/boutique", professional: "/professionnel", advice: "/blog", about: "/a-propos", cart: "/panier", account: "/mon-compte" }
+    : { home: "/en", shop: "/en/shop", professional: "/en/professional", advice: "/en/blog", about: "/en/about-us", cart: "/en/cart", account: "/en/my-account" };
   const closeMenu = () => setMenuOpen(false);
   const openAccountDrawer = () => {
     closeMenu();

@@ -1417,6 +1417,25 @@ function EditorialBlocksSection({
   </section>;
 }
 
+function ProductExtractionGuideEditor() {
+  return <section id="product-extraction-guide" className="ui-card admin-editor admin-extraction-guide admin-product-anchor-target">
+    <h2>Guide d'extraction</h2>
+    <p>Ce bloc apparaît automatiquement sous le dernier bloc éditorial de chaque fiche café publiée, archivée ou à venir.</p>
+    <div className="admin-extraction-guide__previews">
+      <div>
+        <p className="eyebrow">Français</p>
+        <h3>Notre recette d'extraction pour filtre/v60</h3>
+        <a className="text-link" href="/blog/recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france" target="_blank" rel="noreferrer">Lire le guide →</a>
+      </div>
+      <div>
+        <p className="eyebrow">English</p>
+        <h3>Our filter/V60 brewing recipe</h3>
+        <a className="text-link" href="/en/blog/recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france" target="_blank" rel="noreferrer">Read the guide →</a>
+      </div>
+    </div>
+  </section>;
+}
+
 function VariantList({
   productId,
   variants,
@@ -1997,6 +2016,7 @@ export default function AdminProduct() {
         {!isNew ? (
           <EditorialBlocksSection blocks={product.editorialBlocks} />
         ) : null}
+        <ProductExtractionGuideEditor />
       </Form>
       {!isNew ? (
         <>

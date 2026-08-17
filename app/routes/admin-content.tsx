@@ -60,6 +60,10 @@ const pageSchema = z.object({
   homeValue1TitleEn: z.string().trim().max(120).optional(), homeValue1TextEn: z.string().trim().max(500).optional(),
   homeValue2TitleEn: z.string().trim().max(120).optional(), homeValue2TextEn: z.string().trim().max(500).optional(),
   homeValue3TitleEn: z.string().trim().max(120).optional(), homeValue3TextEn: z.string().trim().max(500).optional(),
+  homeHeroImageUrl: z.string().max(1_000).optional(),
+  homeHeroImagePath: z.string().max(500).optional(),
+  homeHeroImageAltFr: z.string().trim().max(240).optional(),
+  homeHeroImageAltEn: z.string().trim().max(240).optional(),
   aboutLedeFr: z.string().trim().max(600).optional(), aboutLedeEn: z.string().trim().max(600).optional(),
   aboutParagraph1Fr: z.string().trim().min(10).optional(), aboutParagraph1En: z.string().trim().min(10).optional(),
   aboutParagraph2Fr: z.string().trim().min(10).optional(), aboutParagraph2En: z.string().trim().min(10).optional(),
@@ -96,6 +100,16 @@ async function uploadAboutImage(client: any, file: FormDataEntryValue | null, lo
   if (!isUploadFile(file) || file.size === 0) return { path: previousPath, url: "" };
   if (file.size > PUBLIC_MEDIA_MAX_UPLOAD_BYTES || !aboutImageExtensions[file.type]) throw new Error("Les images doivent être optimisées en JPEG, PNG ou WebP et peser au maximum 1,5 Mo.");
   const path = `pages/a-propos/${locale}/${slot}-${crypto.randomUUID()}.${aboutImageExtensions[file.type]}`;
+  const { error } = await client.storage.from("product-media").upload(path, await file.arrayBuffer(), { contentType: file.type, cacheControl: String(PUBLIC_MEDIA_CACHE_SECONDS) });
+  if (error) throw new Error(error.message);
+  if (previousPath) await client.storage.from("product-media").remove([previousPath]);
+  return { path, url: client.storage.from("product-media").getPublicUrl(path).data.publicUrl };
+}
+
+async function uploadHomeHeroImage(client: any, file: FormDataEntryValue | null, previousPath = "") {
+  if (!isUploadFile(file) || file.size === 0) return { path: previousPath, url: "" };
+  if (file.size > PUBLIC_MEDIA_MAX_UPLOAD_BYTES || !aboutImageExtensions[file.type]) throw new Error("Les images doivent être optimisées en JPEG, PNG ou WebP et peser au maximum 1,5 Mo.");
+  const path = `pages/accueil/hero-${crypto.randomUUID()}.${aboutImageExtensions[file.type]}`;
   const { error } = await client.storage.from("product-media").upload(path, await file.arrayBuffer(), { contentType: file.type, cacheControl: String(PUBLIC_MEDIA_CACHE_SECONDS) });
   if (error) throw new Error(error.message);
   if (previousPath) await client.storage.from("product-media").remove([previousPath]);
@@ -229,8 +243,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const rawContentFr = parsed.data.pageKey === "a-propos" ? (fields.aboutParagraph1Fr ?? parsed.data.contentFr) : parsed.data.contentFr;
   const rawContentEn = parsed.data.pageKey === "a-propos" ? (fields.aboutParagraph1En ?? parsed.data.contentEn) : parsed.data.contentEn;
-  const contentFr = parseRichTextInput(String(rawContentFr ?? ""), 10);
-  const contentEn = parseRichTextInput(String(rawContentEn ?? ""), 10);
+  const contentFr = parseRichTextInput(String(rawContentFr ?? ""), 10)
+    ?? (homeContent ? paragraphsToRichTextDocument([homeContent[0].statement]) : null);
+  const contentEn = parseRichTextInput(String(rawContentEn ?? ""), 10)
+    ?? (homeContent ? paragraphsToRichTextDocument([homeContent[1].statement]) : null);
   if (!contentFr || !contentEn)
     return { ok: false, message: "Le contenu de chaque langue doit comporter au moins 10 caractères." };
 
@@ -248,6 +264,15 @@ export async function action({ request }: ActionFunctionArgs) {
     .select("id")
     .single();
   if (error || !page) return { ok: false, message: error?.message ?? "Page non créée." };
+
+  let homeHeroImage: { path: string; url: string } | null = null;
+  if (parsed.data.pageKey === "accueil") {
+    try {
+      homeHeroImage = await uploadHomeHeroImage(client, uploadedFile(formData, "homeHeroImage"), String(fields.homeHeroImagePath ?? ""));
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? `L’image du hero n’a pas pu être enregistrée : ${error.message}` : "L’image du hero n’a pas pu être enregistrée." };
+    }
+  }
 
   const aboutConfigured = parsed.data.pageKey === "a-propos" && Object.keys(fields).some((key) => key.startsWith("about"));
   const sharedStoryImages = aboutConfigured
@@ -279,6 +304,7 @@ export async function action({ request }: ActionFunctionArgs) {
         { type: "richText", content: contentFr },
         ...(aboutTranslations ? [{ type: "aboutHero", content: { lede: aboutTranslations[0].lede } }, { type: "aboutStoryImages", content: { images: aboutTranslations[0].storyImages } }, { type: "aboutParagraph2", content: aboutTranslations[0].paragraph2 }] : []),
         ...(homeContent ? [{ type: "homeStatement", content: { text: homeContent[0].statement } }, { type: "homeValues", content: { cards: homeContent[0].cards } }] : []),
+        ...(homeContent ? [{ type: "homeHeroImage", content: { url: homeHeroImage?.url || String(fields.homeHeroImageUrl ?? ""), path: homeHeroImage?.path ?? String(fields.homeHeroImagePath ?? ""), alt: String(fields.homeHeroImageAltFr ?? "") } }] : []),
       ],
     },
     {
@@ -291,6 +317,7 @@ export async function action({ request }: ActionFunctionArgs) {
         { type: "richText", content: contentEn },
         ...(aboutTranslations ? [{ type: "aboutHero", content: { lede: aboutTranslations[1].lede } }, { type: "aboutStoryImages", content: { images: aboutTranslations[1].storyImages } }, { type: "aboutParagraph2", content: aboutTranslations[1].paragraph2 }] : []),
         ...(homeContent ? [{ type: "homeStatement", content: { text: homeContent[1].statement } }, { type: "homeValues", content: { cards: homeContent[1].cards } }] : []),
+        ...(homeContent ? [{ type: "homeHeroImage", content: { url: homeHeroImage?.url || String(fields.homeHeroImageUrl ?? ""), path: homeHeroImage?.path ?? String(fields.homeHeroImagePath ?? ""), alt: String(fields.homeHeroImageAltEn ?? "") } }] : []),
       ],
     },
   ].map((translation) => ({ ...translation, page_id: page.id }));
@@ -384,11 +411,18 @@ function homeSettings(translation: ContentTranslation | undefined, locale: "fr-F
   return { statement, values };
 }
 
+function homeHeroImage(translation: ContentTranslation | undefined) {
+  const content = translation?.blocks.find((block) => block.type === "homeHeroImage")?.content;
+  return content && typeof content === "object" ? content as { url?: string; path?: string; alt?: string } : {};
+}
+
 function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: ContentPage; demo: boolean }) {
   const fr = page?.content_page_translations.find((translation) => translation.locale === "fr-FR");
   const en = page?.content_page_translations.find((translation) => translation.locale === "en-GB");
   const homeFr = homeSettings(fr, "fr-FR");
   const homeEn = homeSettings(en, "en-GB");
+  const heroImage = homeHeroImage(fr);
+  const heroImageEn = homeHeroImage(en);
   const formId = `content-page-form-${pageKey}`;
   const seoContentFields = (suffix: "Fr" | "En") => [
     `content${suffix}`,
@@ -420,7 +454,7 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
         <AdminSeoAnalysis formId={formId} locale="fr-FR" focusKeyphraseName="focusKeyphraseFr" defaultFocusKeyphrase={fr?.focus_keyphrase ?? ""} titleFieldName="titleFr" seoTitleFieldName="seoTitleFr" seoDescriptionFieldName="seoDescriptionFr" slugValue={pageKey} contentFieldNames={seoContentFields("Fr")} imageAltFieldNames={["aboutStoryAlt1Fr", "aboutStoryAlt2Fr"]} disabled={demo} />
         {pageKey === "a-propos" ? null : <RichTextEditor name="contentFr" label="Paragraphes" initialContent={initialContent(fr, placeholderFr)} disabled={demo} />}
         {pageKey === "a-propos" ? <AboutPageFields translation={fr} language="fr-FR" shared /> : null}
-        {pageKey === "accueil" ? <HomeFields language="Français" statement={homeFr.statement} values={homeFr.values} /> : null}
+        {pageKey === "accueil" ? <HomeFields language="Français" statement={homeFr.statement} values={homeFr.values} heroImage={heroImage} /> : null}
       </fieldset>
       <fieldset>
         <legend>English</legend>
@@ -430,17 +464,18 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
         <AdminSeoAnalysis formId={formId} locale="en-GB" focusKeyphraseName="focusKeyphraseEn" defaultFocusKeyphrase={en?.focus_keyphrase ?? ""} titleFieldName="titleEn" seoTitleFieldName="seoTitleEn" seoDescriptionFieldName="seoDescriptionEn" slugValue={pageKey} contentFieldNames={seoContentFields("En")} imageAltFieldNames={["aboutStoryAlt1En", "aboutStoryAlt2En"]} disabled={demo} />
         {pageKey === "a-propos" ? null : <RichTextEditor name="contentEn" label="Paragraphs" initialContent={initialContent(en, placeholderEn)} disabled={demo} />}
         {pageKey === "a-propos" ? <AboutPageFields translation={en} language="en-GB" shared={false} /> : null}
-        {pageKey === "accueil" ? <HomeFields language="English" statement={homeEn.statement} values={homeEn.values} /> : null}
+        {pageKey === "accueil" ? <HomeFields language="English" statement={homeEn.statement} values={homeEn.values} heroImage={heroImageEn.url ? heroImageEn : heroImage} /> : null}
       </fieldset>
     </div>
-    <button className="ui-button ui-button--default" type="submit" disabled={demo}>Enregistrer</button>
+    <button className="ui-button ui-button--default" type="submit" formNoValidate disabled={demo}>Enregistrer</button>
   </Form>;
 }
 
-function HomeFields({ language, statement, values }: { language: "Français" | "English"; statement: string; values: readonly (readonly [string, string])[] }) {
+function HomeFields({ language, statement, values, heroImage }: { language: "Français" | "English"; statement: string; values: readonly (readonly [string, string])[]; heroImage: { url?: string; path?: string; alt?: string } }) {
   const suffix = language === "Français" ? "Fr" : "En";
   return <fieldset className="admin-home-fields">
     <legend>{language === "Français" ? "Blocs spécifiques à l’accueil" : "Home-specific blocks"}</legend>
+    {language === "Français" ? <div className="field"><AdminImageEditorInput name="homeHeroImage" label={heroImage.url ? "Remplacer l’image du hero" : "Importer l’image du hero"} help="Image affichée derrière « Une torréfaction pensée pour l’origine. » · JPEG, PNG ou WebP · recadrage libre" currentPreviewUrl={heroImage.url || "/media/home-hero-coffee-cherries.webp"} defaultAspect="16:9" defaultOutputWidth={1672} /><input type="hidden" name="homeHeroImageUrl" value={String(heroImage.url ?? "")} /><input type="hidden" name="homeHeroImagePath" value={String(heroImage.path ?? "")} /><label>Texte alternatif de l’image<input name="homeHeroImageAltFr" defaultValue={String(heroImage.alt ?? "Cerises de café mûrissant sur un caféier")} maxLength={240} /></label></div> : <div className="field"><label>Texte alternatif de l’image<input name="homeHeroImageAltEn" defaultValue={String(heroImage.alt ?? "Coffee cherries ripening on a coffee plant")} maxLength={240} /></label></div>}
     <div className="field"><label>{language === "Français" ? "Phrase sur fond vert" : "Green-background statement"}<textarea name={`homeStatement${suffix}`} defaultValue={statement} required /><small>Utilisez des astérisques pour mettre un passage en italique, par exemple *intention.*</small></label></div>
     <p>{language === "Français" ? "Tableau des engagements" : "Commitments grid"}</p>
     {values.map(([title, text], index) => <div className="form-grid" key={index}>

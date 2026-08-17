@@ -269,6 +269,17 @@ export const demoProducts: Product[] = inputs.map((input) => {
         },
       },
     ],
+    extractionGuide: {
+      title: {
+        "fr-FR": "Notre recette d'extraction pour filtre/v60",
+        "en-GB": "Our filter/V60 brewing recipe",
+      },
+      href: {
+        "fr-FR": "/blog/recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france",
+        "en-GB": "/en/blog/recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france",
+      },
+      label: { "fr-FR": "Lire le guide", "en-GB": "Read the guide" },
+    },
     variants: [
       {
         id: `${input.id}-200g`,
@@ -358,8 +369,13 @@ export const demoPackagingPresets: PackagingPreset[] = [
 
 export const demoArticles: AdviceArticle[] = [
   {
-    slug: "recette-extraction-v60",
+    slug: "recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france",
+    pinned: false,
     publishedAt: "2026-03-20",
+    summary: {
+      "fr-FR": "Nous partageons avec vous deux recettes que nous utilisons au V60, avec nos repères de mouture, 12 g de café lavé ou 13,5 g de café nature, 200 ml d’eau à 91–93 °C et un versement en plusieurs étapes.",
+      "en-GB": "We use two V60 recipes ourselves and share them here, with our grind settings, 12 g of washed coffee or 13.5 g of natural coffee, 200 ml of water at 91–93°C and a staged pour.",
+    },
     title: {
       "fr-FR": "Recette d’extraction pour V60",
       "en-GB": "A V60 brewing recipe",
@@ -384,7 +400,12 @@ export const demoArticles: AdviceArticle[] = [
   },
   {
     slug: "importance-de-leau",
+    pinned: false,
     publishedAt: "2026-03-12",
+    summary: {
+      "fr-FR": "Nous parlons d’un élément souvent oublié : l’eau, qui compose 98 à 99 % de la tasse. Sa minéralité, sa dureté et son pH peuvent changer l’acidité et les arômes ; une eau agréable à boire n’est pas forcément la meilleure pour le café.",
+      "en-GB": "We look at something that is often overlooked: water, which makes up 98–99% of the cup. Its minerals, hardness and pH can change acidity and flavour, and water that tastes good on its own is not always best for coffee.",
+    },
     title: {
       "fr-FR": "De l’importance de l’eau",
       "en-GB": "Why water matters",

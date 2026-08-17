@@ -9,7 +9,6 @@ import { requireAdmin } from "~/lib/auth.server";
 import { getLocale } from "~/lib/i18n";
 import { parseRichTextInput, richTextPlainText } from "~/lib/rich-text";
 import { pageMeta } from "~/lib/seo";
-import { firstSentence } from "~/lib/utils";
 
 type AdviceElement = "introText" | "introImage" | "bodyText" | "bodyImage" | "body2Text" | "body2Image";
 type AdviceCompartment = "title" | "text" | "image" | "textImage" | "imageText";
@@ -86,11 +85,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return { locale, article, relatedArticles, storyImages: products.flatMap((product) => product.media.slice(0, 1).map((media) => ({ src: media.url, alt: media.alt[locale] }))) };
 }
 export function headers() { return { "Cache-Control": "no-store" }; }
-export const meta: MetaFunction<typeof loader> = ({ data }) => data ? pageMeta(`${data.article.title[data.locale]} | Blog Zen Coffee Lab`, data.article.excerpt[data.locale], `${data.locale === "en-GB" ? "/en/tips" : "/conseils"}/${data.article.slug}`) : [];
+export const meta: MetaFunction<typeof loader> = ({ data }) => data ? pageMeta(`${data.article.title[data.locale]} | Blog Zen Coffee Lab`, data.article.excerpt[data.locale], `${data.locale === "en-GB" ? "/en/blog" : "/blog"}/${data.article.slug}`) : [];
 export default function AdviceDetail() {
   const { locale, article, relatedArticles, storyImages } = useLoaderData<typeof loader>();
   const english = locale === "en-GB";
-  const advicePath = english ? "/en/tips" : "/conseils";
+  const advicePath = english ? "/en/blog" : "/blog";
   const shopPath = english ? "/en/shop" : "/boutique";
   useEffect(() => {
     document.documentElement.classList.add("advice-detail-overflow-hidden");
@@ -111,10 +110,11 @@ export default function AdviceDetail() {
           <Link className="button button--ghost" to={advicePath}>{english ? "All blog articles" : "Tout le blog"}<ArrowRight aria-hidden="true" /></Link>
         </div>
         <div className="advice-related__grid">
-          {relatedArticles.map((relatedArticle) => <article className="article-card" key={relatedArticle.slug}>
+          {relatedArticles.map((relatedArticle) => <article className={relatedArticle.pinned ? "article-card article-card--pinned" : "article-card"} key={relatedArticle.slug}>
+            {relatedArticle.pinned ? <span className="article-card__ribbon">{english ? "Pinned" : "Épinglé"}</span> : null}
             <p className="eyebrow">{new Date(relatedArticle.publishedAt).toLocaleDateString(english ? "en-GB" : "fr-FR")}</p>
             <h2>{relatedArticle.title[locale]}</h2>
-            <p>{firstSentence(relatedArticle.excerpt[locale])}</p>
+            <p className="article-card__excerpt">{relatedArticle.excerpt[locale]}</p>
             <Link className="text-link" to={`${advicePath}/${relatedArticle.slug}`}>{english ? "Read the guide" : "Lire le guide"}<ArrowRight aria-hidden="true" /></Link>
           </article>)}
         </div>

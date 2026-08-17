@@ -140,6 +140,18 @@ function ProductStory({
   );
 }
 
+function ProductExtractionGuide({ product, locale }: { product: Product; locale: Locale }) {
+  const guide = product.extractionGuide;
+  return (
+    <section className="product-extraction-guide" aria-labelledby="product-extraction-guide-title">
+      <h2 id="product-extraction-guide-title">{guide.title[locale]}</h2>
+      <Link className="button button--ghost" to={guide.href[locale]}>
+        {guide.label[locale]} <ArrowRight aria-hidden="true" />
+      </Link>
+    </section>
+  );
+}
+
 export function ProductGallery({ product, locale }: { product: Product; locale: Locale }) {
   const labelUrl = product.thumbnailLabelUrl;
   const translation = product.translations[locale];
@@ -243,6 +255,7 @@ export default function ProductDetail() {
         </section>
       ) : null}
       <ProductStory blocks={product.editorialBlocks} locale={locale} />
+      <ProductExtractionGuide product={product} locale={locale} />
       {relatedProducts.length > 0 ? (
         <section
           className="related-products"
