@@ -27,15 +27,13 @@ function paths(request: Request) {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const routePaths = paths(request);
-  const requestedNext = safeInternalPath(new URL(request.url).searchParams.get("next"), routePaths.professional);
+  const requestUrl = new URL(request.url);
+  const requestedNext = safeInternalPath(requestUrl.searchParams.get("next"), routePaths.professional);
+  const authError = requestUrl.searchParams.get("auth_error");
+  const activationFlow = requestUrl.searchParams.get("activation") === "1";
   const viewer = await getViewer(request);
-  if (!viewer) throw redirect(`${routePaths.account}?next=${encodeURIComponent(`${routePaths.setup}?next=${encodeURIComponent(requestedNext)}`)}`);
-  const client = createServiceSupabase();
-  if (!client) throw new Response("Authentication database unavailable.", { status: 503 });
-  const { data: profile, error } = await client.from("profiles").select("password_setup_required").eq("id", viewer.user.id).maybeSingle();
-  if (error) throw new Response(error.message, { status: 500 });
-  if (!profile?.password_setup_required) throw redirect(requestedNext, { headers: viewer.responseHeaders });
-  return { locale: routePaths.locale, email: viewer.user.email ?? "", next: requestedNext };
+  if (viewer && !activationFlow) throw redirect(requestedNext, { headers: viewer.responseHeaders });
+  return { locale: routePaths.locale, email: "", next: requestedNext, authError };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -72,7 +70,7 @@ export const meta: MetaFunction = () => [
 ];
 
 export default function PasswordSetup() {
-  const { locale, email, next } = useLoaderData<typeof loader>();
+  const { locale, email, next, authError } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const english = locale === "en-GB";
   return <section className="password-setup-page">
@@ -82,6 +80,7 @@ export default function PasswordSetup() {
       <div className="password-setup-card__identity"><ShieldCheck aria-hidden="true" /><span><small>{english ? "Account to activate" : "Compte à activer"}</small><strong>{email}</strong></span></div>
       <Form method="post" className="password-setup-form">
         <input type="hidden" name="next" value={next} />
+        {authError ? <p className="form-message form-error" role="alert">{authError}</p> : null}
         {result?.message ? <p className="form-message form-error" role="alert">{result.message}</p> : null}
         <div className="field"><label htmlFor="new-member-password">{english ? "New password" : "Nouveau mot de passe"}<input id="new-member-password" name="password" type="password" minLength={10} maxLength={200} required autoComplete="new-password" autoFocus /><small>{english ? "At least 10 characters." : "10 caractères minimum."}</small></label></div>
         <div className="field"><label htmlFor="new-member-password-confirmation">{english ? "Confirm password" : "Confirmez le mot de passe"}<input id="new-member-password-confirmation" name="passwordConfirmation" type="password" minLength={10} maxLength={200} required autoComplete="new-password" /></label></div>

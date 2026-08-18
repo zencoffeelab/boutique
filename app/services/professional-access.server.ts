@@ -76,7 +76,7 @@ export async function generateProfessionalAccessLink(
 
   const tokenHash = generated.data.properties?.hashed_token;
   if (!tokenHash) throw new ProfessionalAccessError("Supabase n’a pas renvoyé de lien d’accès professionnel complet.");
-  const next = `${paths.passwordSetup}?next=${encodeURIComponent(paths.professional)}`;
+  const next = `${paths.passwordSetup}?activation=1&next=${encodeURIComponent(paths.professional)}`;
   const confirmation = new URL("/auth/confirm", input.siteUrl);
   confirmation.searchParams.set("token_hash", tokenHash);
   confirmation.searchParams.set("type", type);

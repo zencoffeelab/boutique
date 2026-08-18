@@ -19,7 +19,7 @@ describe("professional account activation", () => {
     expect(result).toMatchObject({ userId: "user-new", type: "invite", existingUser: false, requiresPasswordSetup: true });
     expect(url.pathname).toBe("/auth/confirm");
     expect(url.searchParams.get("type")).toBe("invite");
-    expect(url.searchParams.get("next")).toBe("/activation/mot-de-passe?next=%2Fprofessionnel");
+    expect(url.searchParams.get("next")).toBe("/activation/mot-de-passe?activation=1&next=%2Fprofessionnel");
   });
 
   it("sends an existing customer to the shared account login", async () => {
@@ -41,7 +41,7 @@ describe("professional account activation", () => {
     const result = await generateProfessionalAccessLink(clientWith(generateLink), { email: "pending@example.com", locale: "fr-FR", siteUrl: "https://coffee.example", forcePasswordSetup: true });
     expect(result.requiresPasswordSetup).toBe(true);
     expect(new URL(result.url).pathname).toBe("/auth/confirm");
-    expect(new URL(result.url).searchParams.get("next")).toBe("/activation/mot-de-passe?next=%2Fprofessionnel");
+    expect(new URL(result.url).searchParams.get("next")).toBe("/activation/mot-de-passe?activation=1&next=%2Fprofessionnel");
   });
 
   it("does not hide unrelated Supabase errors", async () => {
