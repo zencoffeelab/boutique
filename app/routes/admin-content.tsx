@@ -20,6 +20,7 @@ import {
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { parseSiteNavigationConfiguration } from "~/lib/site-navigation";
 import { getSiteNavigation } from "~/lib/site-navigation.server";
+import { getProfessionalConnectedPageContent, getProfessionalPageContent, professionalPageDefaults, type ProfessionalPageContent, type ProfessionalConnectedPageContent } from "~/lib/professional-content";
 
 type ContentTranslation = {
   locale: "fr-FR" | "en-GB";
@@ -73,7 +74,7 @@ const pageSchema = z.object({
     [`aboutStoryAlt${index}Fr`, z.string().trim().max(240).optional()],
     [`aboutStoryAlt${index}En`, z.string().trim().max(240).optional()],
   ])),
-});
+}).passthrough();
 const navigationSchema = z.object({
   intent: z.literal("save_navigation"),
   configuration: z.string().min(2).max(20_000),
@@ -87,7 +88,8 @@ const comingSoonSchema = z.object({
   messageEn: z.string().trim().min(2).max(500),
 });
 
-const defaults = ["accueil", "a-propos", "professionnel", "conseils", "faq", "contact", "cgv", "mentions-legales", "politique-de-confidentialite"];
+const defaults = ["accueil", "a-propos", "professionnel", "professionnel-connecte", "conseils", "faq", "contact", "cgv", "mentions-legales", "politique-de-confidentialite"];
+const pageLabels: Record<string, string> = { "professionnel-connecte": "Professionnel (connecté)" };
 const placeholderFr = "Contenu à compléter avant publication.";
 const placeholderEn = "Content to complete before publication.";
 const aboutImageExtensions: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -292,6 +294,12 @@ export async function action({ request }: ActionFunctionArgs) {
         };
       }))
     : null;
+  const professionalConfigured = parsed.data.pageKey === "professionnel";
+  const professionalFr = professionalConfigured ? professionalContentFromFields(fields, "Fr", professionalBlock(undefined)) : null;
+  const professionalEn = professionalConfigured ? professionalContentFromFields(fields, "En", professionalPageDefaults["en-GB"]) : null;
+  const connectedConfigured = parsed.data.pageKey === "professionnel-connecte";
+  const connectedFr = connectedConfigured ? professionalConnectedContentFromFields(fields, "Fr", getProfessionalConnectedPageContent("fr-FR")) : null;
+  const connectedEn = connectedConfigured ? professionalConnectedContentFromFields(fields, "En", getProfessionalConnectedPageContent("en-GB")) : null;
 
   const translations = [
     {
@@ -305,6 +313,8 @@ export async function action({ request }: ActionFunctionArgs) {
         ...(aboutTranslations ? [{ type: "aboutHero", content: { lede: aboutTranslations[0].lede } }, { type: "aboutStoryImages", content: { images: aboutTranslations[0].storyImages } }, { type: "aboutParagraph2", content: aboutTranslations[0].paragraph2 }] : []),
         ...(homeContent ? [{ type: "homeStatement", content: { text: homeContent[0].statement } }, { type: "homeValues", content: { cards: homeContent[0].cards } }] : []),
         ...(homeContent ? [{ type: "homeHeroImage", content: { url: homeHeroImage?.url || String(fields.homeHeroImageUrl ?? ""), path: homeHeroImage?.path ?? String(fields.homeHeroImagePath ?? ""), alt: String(fields.homeHeroImageAltFr ?? "") } }] : []),
+        ...(professionalFr ? [{ type: "professionalPage", content: professionalFr }] : []),
+        ...(connectedFr ? [{ type: "professionalConnectedPage", content: connectedFr }] : []),
       ],
     },
     {
@@ -318,6 +328,8 @@ export async function action({ request }: ActionFunctionArgs) {
         ...(aboutTranslations ? [{ type: "aboutHero", content: { lede: aboutTranslations[1].lede } }, { type: "aboutStoryImages", content: { images: aboutTranslations[1].storyImages } }, { type: "aboutParagraph2", content: aboutTranslations[1].paragraph2 }] : []),
         ...(homeContent ? [{ type: "homeStatement", content: { text: homeContent[1].statement } }, { type: "homeValues", content: { cards: homeContent[1].cards } }] : []),
         ...(homeContent ? [{ type: "homeHeroImage", content: { url: homeHeroImage?.url || String(fields.homeHeroImageUrl ?? ""), path: homeHeroImage?.path ?? String(fields.homeHeroImagePath ?? ""), alt: String(fields.homeHeroImageAltEn ?? "") } }] : []),
+        ...(professionalEn ? [{ type: "professionalPage", content: professionalEn }] : []),
+        ...(connectedEn ? [{ type: "professionalConnectedPage", content: connectedEn }] : []),
       ],
     },
   ].map((translation) => ({ ...translation, page_id: page.id }));
@@ -411,9 +423,55 @@ function homeSettings(translation: ContentTranslation | undefined, locale: "fr-F
   return { statement, values };
 }
 
+function professionalBlock(translation: ContentTranslation | undefined) {
+  return getProfessionalPageContent(translation?.locale ?? "fr-FR", translation?.blocks);
+}
+
+function professionalContentFromFields(fields: Record<string, FormDataEntryValue>, suffix: "Fr" | "En", fallback: ProfessionalPageContent) {
+  const text = (name: string, defaultValue: string) => String(fields[`professional${name}${suffix}`] ?? defaultValue);
+  return {
+    eyebrow: text("Eyebrow", fallback.eyebrow), lede: text("Lede", fallback.lede), loginLabel: text("LoginLabel", fallback.loginLabel),
+    steps: [1, 2, 3].map((index) => ({ title: text(`Step${index}Title`, fallback.steps[index - 1].title), text: text(`Step${index}Text`, fallback.steps[index - 1].text) })),
+    applicationTitle: text("ApplicationTitle", fallback.applicationTitle), applicationIntro: text("ApplicationIntro", fallback.applicationIntro), submitLabel: text("SubmitLabel", fallback.submitLabel), sendingLabel: text("SendingLabel", fallback.sendingLabel),
+    fieldLabels: { company: text("CompanyLabel", fallback.fieldLabels.company), country: text("CountryLabel", fallback.fieldLabels.country), lastName: text("LastNameLabel", fallback.fieldLabels.lastName), firstName: text("FirstNameLabel", fallback.fieldLabels.firstName), email: text("EmailLabel", fallback.fieldLabels.email), phone: text("PhoneLabel", fallback.fieldLabels.phone), business: text("BusinessLabel", fallback.fieldLabels.business), volume: text("VolumeLabel", fallback.fieldLabels.volume), choose: text("ChooseLabel", fallback.fieldLabels.choose), privacy: text("PrivacyLabel", fallback.fieldLabels.privacy) },
+    banner: { eyebrow: text("BannerEyebrow", fallback.banner.eyebrow), title: text("BannerTitle", fallback.banner.title), text: text("BannerText", fallback.banner.text) },
+    success: { eyebrow: text("SuccessEyebrow", fallback.success.eyebrow), title: text("SuccessTitle", fallback.success.title), text: text("SuccessText", fallback.success.text), accountLabel: text("SuccessAccountLabel", fallback.success.accountLabel), shopLabel: text("SuccessShopLabel", fallback.success.shopLabel) },
+    catalog: { eyebrow: text("CatalogEyebrow", fallback.catalog.eyebrow), title: text("CatalogTitle", fallback.catalog.title), lede: text("CatalogLede", fallback.catalog.lede), empty: text("CatalogEmpty", fallback.catalog.empty) },
+  } satisfies ProfessionalPageContent;
+}
+
+function professionalConnectedContentFromFields(fields: Record<string, FormDataEntryValue>, suffix: "Fr" | "En", fallback: ProfessionalConnectedPageContent) {
+  const text = (name: string, defaultValue: string) => String(fields[`professionalConnected${name}${suffix}`] ?? defaultValue);
+  return { eyebrow: text("Eyebrow", fallback.eyebrow), title: text("Title", fallback.title), lede: text("Lede", fallback.lede), steps: [1, 2, 3].map((index) => ({ title: text(`Step${index}Title`, fallback.steps[index - 1].title), text: text(`Step${index}Text`, fallback.steps[index - 1].text) })), shopText: text("ShopText", fallback.shopText), shopButton: text("ShopButton", fallback.shopButton), contactText: text("ContactText", fallback.contactText), contactButton: text("ContactButton", fallback.contactButton), sampleText: text("SampleText", fallback.sampleText), sampleButton: text("SampleButton", fallback.sampleButton), bannerEyebrow: text("BannerEyebrow", fallback.bannerEyebrow), bannerTitle: text("BannerTitle", fallback.bannerTitle), bannerText: text("BannerText", fallback.bannerText) } satisfies ProfessionalConnectedPageContent;
+}
+
 function homeHeroImage(translation: ContentTranslation | undefined) {
   const content = translation?.blocks.find((block) => block.type === "homeHeroImage")?.content;
   return content && typeof content === "object" ? content as { url?: string; path?: string; alt?: string } : {};
+}
+
+function ProfessionalPageFields({ translation, language }: { translation: ContentTranslation | undefined; language: "fr-FR" | "en-GB" }) {
+  const suffix = language === "fr-FR" ? "Fr" : "En";
+  const content = professionalBlock(translation);
+  const input = (name: string, value: string, label: string, multiline = false) => <div className="field"><label>{label}{multiline ? <textarea name={`professional${name}${suffix}`} defaultValue={value} required /> : <input name={`professional${name}${suffix}`} defaultValue={value} required />}</label></div>;
+  return <fieldset className="admin-professional-fields">
+    <legend>{language === "fr-FR" ? "Tous les contenus de la page Professionnels" : "All Professional page content"}</legend>
+    <p className="admin-muted">{language === "fr-FR" ? "Chaque texte visible de la page publique est modifiable ici." : "Every visible text on the public page can be edited here."}</p>
+    {input("Eyebrow", content.eyebrow, "Sur-titre")}{input("Lede", content.lede, "Introduction", true)}{input("LoginLabel", content.loginLabel, "Bouton de connexion")}
+    <p>{language === "fr-FR" ? "Étapes" : "Steps"}</p>{content.steps.map((step, index) => <div className="form-grid" key={index}>{input(`Step${index + 1}Title`, step.title, `${index + 1}. Titre`)}{input(`Step${index + 1}Text`, step.text, `${index + 1}. Texte`, true)}</div>)}
+    {input("ApplicationTitle", content.applicationTitle, "Titre du formulaire")}{input("ApplicationIntro", content.applicationIntro, "Introduction du formulaire")}{input("SubmitLabel", content.submitLabel, "Bouton d’envoi")}{input("SendingLabel", content.sendingLabel, "État d’envoi")}
+    <p>{language === "fr-FR" ? "Libellés des champs" : "Field labels"}</p><div className="form-grid">{input("CompanyLabel", content.fieldLabels.company, "Raison sociale")}{input("CountryLabel", content.fieldLabels.country, "Pays")}{input("LastNameLabel", content.fieldLabels.lastName, "Nom")}{input("FirstNameLabel", content.fieldLabels.firstName, "Prénom")}{input("EmailLabel", content.fieldLabels.email, "E-mail")}{input("PhoneLabel", content.fieldLabels.phone, "Téléphone")}{input("BusinessLabel", content.fieldLabels.business, "Activité")}{input("VolumeLabel", content.fieldLabels.volume, "Volume")}{input("ChooseLabel", content.fieldLabels.choose, "Choix par défaut")}{input("PrivacyLabel", content.fieldLabels.privacy, "Consentement", true)}</div>
+    <p>{language === "fr-FR" ? "Bandeau final" : "Closing banner"}</p>{input("BannerEyebrow", content.banner.eyebrow, "Sur-titre")}{input("BannerTitle", content.banner.title, "Titre")}{input("BannerText", content.banner.text, "Texte", true)}
+    <p>{language === "fr-FR" ? "Confirmation après envoi" : "Post-submission confirmation"}</p>{input("SuccessEyebrow", content.success.eyebrow, "Sur-titre")}{input("SuccessTitle", content.success.title, "Titre", true)}{input("SuccessText", content.success.text, "Texte", true)}{input("SuccessAccountLabel", content.success.accountLabel, "Bouton compte")}{input("SuccessShopLabel", content.success.shopLabel, "Bouton boutique")}
+    <p>{language === "fr-FR" ? "Boutique professionnelle" : "Professional shop"}</p>{input("CatalogEyebrow", content.catalog.eyebrow, "Sur-titre")}{input("CatalogTitle", content.catalog.title, "Titre")}{input("CatalogLede", content.catalog.lede, "Introduction", true)}{input("CatalogEmpty", content.catalog.empty, "Message sans produit", true)}
+  </fieldset>;
+}
+
+function ProfessionalConnectedPageFields({ translation, language }: { translation: ContentTranslation | undefined; language: "fr-FR" | "en-GB" }) {
+  const suffix = language === "fr-FR" ? "Fr" : "En";
+  const content = getProfessionalConnectedPageContent(language, translation?.blocks);
+  const input = (name: string, value: string, label: string, multiline = false) => <div className="field"><label>{label}{multiline ? <textarea name={`professionalConnected${name}${suffix}`} defaultValue={value} required /> : <input name={`professionalConnected${name}${suffix}`} defaultValue={value} required />}</label></div>;
+  return <fieldset className="admin-professional-fields"><legend>{language === "fr-FR" ? "Contenu de la page Professionnel (connecté)" : "Connected Professional page content"}</legend><p className="admin-muted">{language === "fr-FR" ? "Chaque élément visible de cette page est modifiable ici." : "Every visible element on this page can be edited here."}</p>{input("Eyebrow", content.eyebrow, "Sur-titre")}{input("Title", content.title, "Titre")}{input("Lede", content.lede, "Introduction", true)}<p>{language === "fr-FR" ? "Étapes 01/02/03" : "Steps 01/02/03"}</p>{content.steps.map((step, index) => <div className="form-grid" key={index}>{input(`Step${index + 1}Title`, step.title, `${index + 1}. Titre`)}{input(`Step${index + 1}Text`, step.text, `${index + 1}. Texte`, true)}</div>)}<p>{language === "fr-FR" ? "Orientation boutique" : "Shop direction"}</p>{input("ShopText", content.shopText, "Texte", true)}{input("ShopButton", content.shopButton, "Libellé du bouton")}<p>{language === "fr-FR" ? "Orientation contact" : "Contact direction"}</p>{input("ContactText", content.contactText, "Texte", true)}{input("ContactButton", content.contactButton, "Libellé du bouton")}<p>{language === "fr-FR" ? "Orientation échantillons / devis" : "Samples / quote direction"}</p>{input("SampleText", content.sampleText, "Texte", true)}{input("SampleButton", content.sampleButton, "Libellé du bouton")}<p>{language === "fr-FR" ? "Bandeau vert foncé" : "Dark green banner"}</p>{input("BannerEyebrow", content.bannerEyebrow, "Sur-titre")}{input("BannerTitle", content.bannerTitle, "Titre")}{input("BannerText", content.bannerText, "Texte", true)}</fieldset>;
 }
 
 function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: ContentPage; demo: boolean }) {
@@ -455,6 +513,8 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
         {pageKey === "a-propos" ? null : <RichTextEditor name="contentFr" label="Paragraphes" initialContent={initialContent(fr, placeholderFr)} disabled={demo} />}
         {pageKey === "a-propos" ? <AboutPageFields translation={fr} language="fr-FR" shared /> : null}
         {pageKey === "accueil" ? <HomeFields language="Français" statement={homeFr.statement} values={homeFr.values} heroImage={heroImage} /> : null}
+        {pageKey === "professionnel" ? <ProfessionalPageFields translation={fr} language="fr-FR" /> : null}
+        {pageKey === "professionnel-connecte" ? <ProfessionalConnectedPageFields translation={fr} language="fr-FR" /> : null}
       </fieldset>
       <fieldset>
         <legend>English</legend>
@@ -465,6 +525,8 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
         {pageKey === "a-propos" ? null : <RichTextEditor name="contentEn" label="Paragraphs" initialContent={initialContent(en, placeholderEn)} disabled={demo} />}
         {pageKey === "a-propos" ? <AboutPageFields translation={en} language="en-GB" shared={false} /> : null}
         {pageKey === "accueil" ? <HomeFields language="English" statement={homeEn.statement} values={homeEn.values} heroImage={heroImageEn.url ? heroImageEn : heroImage} /> : null}
+        {pageKey === "professionnel" ? <ProfessionalPageFields translation={en} language="en-GB" /> : null}
+        {pageKey === "professionnel-connecte" ? <ProfessionalConnectedPageFields translation={en} language="en-GB" /> : null}
       </fieldset>
     </div>
     <button className="ui-button ui-button--default" type="submit" formNoValidate disabled={demo}>Enregistrer</button>
@@ -525,7 +587,7 @@ export default function AdminContent() {
             </div>
           </details>;
           return <details className="ui-card admin-content-page" key={key}>
-            <summary><strong>{key}</strong><span className="ui-badge">{page?.status ?? "draft"}</span></summary>
+            <summary><strong>{pageLabels[key] ?? key}</strong><span className="ui-badge">{page?.status ?? "draft"}</span></summary>
             <ContentPageForm pageKey={key} page={page} demo={demo} />
           </details>;
         })}

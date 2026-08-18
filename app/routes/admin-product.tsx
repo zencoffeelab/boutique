@@ -714,7 +714,7 @@ export async function action({ request }: ActionFunctionArgs) {
       retailPriceCents: parsed.data.retailPriceCents,
       productProfessionalEnabled: false,
       professionalRequested,
-      professionalPriceCents: parsed.data.proPriceCents,
+      professionalPriceCents: parsed.data.proPriceCents ?? previousOffers.find((offer) => offer.audience === "professional")?.price_cents,
       professionalMinimumQuantity: parsed.data.proMinimumQuantity,
     });
     const { error: offerError } = await client
@@ -1467,7 +1467,6 @@ function VariantList({
             <th>Poids</th>
             <th>Stock</th>
             <th>Prix public</th>
-            <th>Prix pro</th>
             <th>Coût interne</th>
             <th>Action</th>
           </tr>
@@ -1499,11 +1498,6 @@ function VariantList({
                   <td>
                     {retailOffer
                       ? formatMoney(retailOffer.price.amount, "fr-FR")
-                      : "—"}
-                  </td>
-                  <td>
-                    {professionalOffer
-                      ? `${formatMoney(professionalOffer.price.amount, "fr-FR")} · min. ${professionalOffer.minimumQuantity}`
                       : "—"}
                   </td>
                   <td>{formatMoney(variant.internalCostCents, "fr-FR")}</td>
@@ -1689,19 +1683,6 @@ function VariantEditForm({
             {professionalRequired ? <small>Requise tant que le café est activé dans la boutique pro.</small> : null}
           </span>
         </label>
-        <div className="field">
-          <label>
-            Prix pro (¢)
-            <input
-              name="proPriceCents"
-              type="number"
-              min="0"
-              defaultValue={professionalOffer?.price.amount ?? retailOffer?.price.amount ?? 0}
-              disabled={!effectiveProfessionalEnabled}
-              required={effectiveProfessionalEnabled}
-            />
-          </label>
-        </div>
         <div className="field">
           <label>
             Minimum pro
@@ -2123,17 +2104,6 @@ export default function AdminProduct() {
                 <input name="professional" type="checkbox" /> Offre
                 professionnelle
               </label>
-              <div className="field">
-                <label>
-                  Prix pro (¢)
-                  <input
-                    name="proPriceCents"
-                    type="number"
-                    min="0"
-                    defaultValue="0"
-                  />
-                </label>
-              </div>
               <div className="field">
                 <label>
                   Minimum pro

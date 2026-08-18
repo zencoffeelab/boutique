@@ -1,4 +1,4 @@
-import { Clock3, ExternalLink, RefreshCw, Search, ShieldOff, ShieldCheck, Users } from "lucide-react";
+import { Clock3, ExternalLink, RefreshCw, Search, ShieldOff, ShieldCheck, Trash2, Users } from "lucide-react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction, ShouldRevalidateFunction } from "react-router";
 import { Form, Link, useFetcher, useLoaderData } from "react-router";
 import { z } from "zod";
@@ -15,14 +15,15 @@ import { dispatchNotificationQueue, enqueueNotification } from "~/services/notif
 import { generateProfessionalAccessLink, ProfessionalAccessError } from "~/services/professional-access.server";
 
 const memberActionSchema = z.object({
-  intent: z.enum(["suspend", "reactivate", "resend_access"]),
-  userId: z.uuid(),
+  intent: z.enum(["suspend", "reactivate", "resend_access", "delete_member", "delete_application"]),
+  userId: z.uuid().optional(),
+  applicationId: z.uuid().optional(),
   note: z.string().trim().max(1_000).optional().default(""),
 });
 
 type ActionResponse = { ok?: boolean; message?: string; activationUrl?: string };
 type ProfessionalApplication = {
-  id: string; company_name: string; first_name: string; last_name: string; email: string; phone: string;
+  id: string; company_name: string; first_name: string; last_name: string; email: string; phone: string; comment?: string | null;
   business_type: string; monthly_volume: string; locale: "fr-FR" | "en-GB"; status: "pending" | "approved" | "rejected" | "suspended";
   decision_note: string | null; decided_at: string | null; invited_user_id: string | null; created_at: string;
 };
@@ -75,7 +76,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const client = createServiceSupabase();
   if (!client) throw new Response("Base de données indisponible.", { status: 503 });
   const [applicationResult, profileResult, userResult] = await Promise.all([
-    client.from("professional_applications").select("id,company_name,first_name,last_name,email,phone,business_type,monthly_volume,locale,status,decision_note,decided_at,invited_user_id,created_at").order("created_at", { ascending: false }).limit(500),
+    client.from("professional_applications").select("id,company_name,first_name,last_name,email,phone,comment,business_type,monthly_volume,locale,status,decision_note,decided_at,invited_user_id,created_at").order("created_at", { ascending: false }).limit(500),
     client.from("profiles").select("id,role,professional_status,first_name,last_name,phone,created_at,updated_at").in("professional_status", ["approved", "suspended"]).limit(1_000),
     client.auth.admin.listUsers({ page: 1, perPage: 1_000 }),
   ]);
@@ -112,9 +113,42 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const client = createServiceSupabase();
   if (!client) return Response.json({ ok: false, message: "Base de données indisponible." }, { status: 503 });
 
-  const { data: profile, error: profileError } = await client.from("profiles").select("id,professional_status,first_name,last_name,password_setup_required").eq("id", parsed.data.userId).maybeSingle();
+  if (parsed.data.intent === "delete_application") {
+    if (!parsed.data.applicationId) return Response.json({ ok: false, message: "Demande invalide." }, { status: 422 });
+    const { data: application, error: applicationError } = await client.from("professional_applications").select("id,status,email").eq("id", parsed.data.applicationId).maybeSingle();
+    if (applicationError) return Response.json({ ok: false, message: applicationError.message }, { status: 500 });
+    if (!application || application.status !== "pending") return Response.json({ ok: false, message: "Cette demande n est plus en attente." }, { status: 409 });
+    const { error: deleteError } = await client.from("professional_applications").delete().eq("id", application.id).eq("status", "pending");
+    if (deleteError) return Response.json({ ok: false, message: deleteError.message }, { status: 500 });
+    await client.from("audit_log").insert({ actor_id: admin.id === "demo-admin" ? null : admin.id, action: "professional_application.deleted", entity_type: "professional_application", entity_id: application.id, before_data: { status: application.status, email: application.email } });
+    return Response.json({ ok: true, message: "La demande a ete supprimee. Une nouvelle demande peut utiliser cette adresse e-mail." });
+  }
+
+  if (!parsed.data.userId) return Response.json({ ok: false, message: "Membre invalide." }, { status: 422 });
+  const { data: profile, error: profileError } = await client.from("profiles").select("id,role,professional_status,first_name,last_name,password_setup_required").eq("id", parsed.data.userId).maybeSingle();
   if (profileError) return Response.json({ ok: false, message: profileError.message }, { status: 500 });
   if (!profile || !["approved", "suspended"].includes(profile.professional_status ?? "")) return Response.json({ ok: false, message: "Compte professionnel introuvable." }, { status: 404 });
+
+  if (parsed.data.intent === "delete_member") {
+    if (profile.role === "admin" || profile.id === admin.id) return Response.json({ ok: false, message: "Un compte administrateur ne peut pas etre supprime depuis cet espace." }, { status: 409 });
+    const { data: authUser, error: authUserError } = await client.auth.admin.getUserById(profile.id);
+    if (authUserError) return Response.json({ ok: false, message: authUserError.message }, { status: 500 });
+    const email = authUser.user?.email;
+    if (!email) return Response.json({ ok: false, message: "Aucune adresse e-mail n est associee a ce compte." }, { status: 409 });
+    const references = await Promise.all([
+      client.from("orders").update({ profile_id: null }).eq("profile_id", profile.id),
+      client.from("stock_movements").update({ actor_id: null }).eq("actor_id", profile.id),
+      client.from("audit_log").update({ actor_id: null }).eq("actor_id", profile.id),
+      client.from("professional_applications").delete().eq("invited_user_id", profile.id),
+      client.from("professional_applications").delete().eq("email", email),
+    ]);
+    const referenceError = references.find((result) => result.error)?.error;
+    if (referenceError) return Response.json({ ok: false, message: referenceError.message }, { status: 500 });
+    const { error: deleteError } = await client.auth.admin.deleteUser(profile.id);
+    if (deleteError) return Response.json({ ok: false, message: deleteError.message }, { status: 500 });
+    await client.from("audit_log").insert({ actor_id: admin.id === "demo-admin" ? null : admin.id, action: "professional_member.deleted", entity_type: "profile", entity_id: profile.id, before_data: { email, professional_status: profile.professional_status } });
+    return Response.json({ ok: true, message: "Le compte professionnel et ses demandes ont ete supprimes. Cette adresse e-mail peut etre reutilisee." });
+  }
 
   if (parsed.data.intent === "suspend" || parsed.data.intent === "reactivate") {
     const nextStatus = parsed.data.intent === "suspend" ? "suspended" : "approved";
@@ -193,15 +227,21 @@ function ActivationLink({ url }: { url: string }) {
 
 function ProfessionalDecision({ application }: { application: ProfessionalApplication }) {
   const fetcher = useFetcher<ActionResponse>();
+  const deleteFetcher = useFetcher<ActionResponse>();
   const handled = Boolean(fetcher.data?.ok);
   return <article className="admin-application admin-professional-request">
-    <div><strong>{application.company_name}</strong><p>{application.first_name} {application.last_name} · {application.business_type} · {application.monthly_volume}</p><p><a href={`mailto:${application.email}`}>{application.email}</a> · <a href={`tel:${application.phone}`}>{application.phone}</a></p><small>Demande reçue le {formatDate(application.created_at)}</small></div>
+    <div><strong>{application.company_name}</strong><p>{application.first_name} {application.last_name} · {application.business_type} · {application.monthly_volume}</p><p><a href={`mailto:${application.email}`}>{application.email}</a> · <a href={`tel:${application.phone}`}>{application.phone}</a></p>{application.comment ? <p><strong>Commentaire :</strong> {application.comment}</p> : null}<small>Demande reçue le {formatDate(application.created_at)}</small></div>
     <fetcher.Form method="post" action={`/api/admin/pro-applications/${application.id}/decision`}>
       <label className="admin-application__note">Note facultative<input name="note" maxLength={1_000} placeholder="Visible dans l’e-mail en cas de refus" /></label>
       <button className="ui-button ui-button--default ui-button--sm" name="decision" value="approved" disabled={fetcher.state !== "idle" || handled}>Approuver et créer l’accès</button>
       <button className="ui-button ui-button--ghost ui-button--sm" name="decision" value="rejected" disabled={fetcher.state !== "idle" || handled}>Refuser</button>
     </fetcher.Form>
+    <deleteFetcher.Form method="post" onSubmit={(event) => { if (!window.confirm("Supprimer cette demande définitivement ? L adresse e-mail pourra ensuite être réutilisée.")) event.preventDefault(); }}>
+      <input type="hidden" name="applicationId" value={application.id} />
+      <button className="ui-button ui-button--ghost ui-button--sm" name="intent" value="delete_application" disabled={deleteFetcher.state !== "idle"}><Trash2 aria-hidden="true" /> Supprimer</button>
+    </deleteFetcher.Form>
     {fetcher.data?.message ? <small className={fetcher.data.ok ? "form-message" : "form-message form-error"} role="status">{fetcher.data.message}</small> : null}
+    {deleteFetcher.data?.message ? <small className={deleteFetcher.data.ok ? "form-message" : "form-message form-error"} role="status">{deleteFetcher.data.message}</small> : null}
     {fetcher.data?.activationUrl ? <ActivationLink url={fetcher.data.activationUrl} /> : null}
   </article>;
 }
@@ -214,6 +254,7 @@ function MemberActions({ member }: { member: { id: string; email: string; status
       <input type="hidden" name="userId" value={member.id} />
       <button className={`ui-button ui-button--sm ${member.status === "approved" ? "ui-button--danger" : "ui-button--outline"}`} name="intent" value={member.status === "approved" ? "suspend" : "reactivate"} disabled={busy}>{member.status === "approved" ? <><ShieldOff aria-hidden="true" /> Suspendre</> : <><ShieldCheck aria-hidden="true" /> Réactiver</>}</button>
       {member.status === "approved" ? <button className="ui-button ui-button--ghost ui-button--sm" name="intent" value="resend_access" disabled={busy}><RefreshCw aria-hidden="true" /> Régénérer l’accès</button> : null}
+      <button className="ui-button ui-button--ghost ui-button--sm" name="intent" value="delete_member" disabled={busy} onClick={(event) => { if (!window.confirm("Supprimer définitivement ce compte professionnel et ses demandes ? L adresse e-mail pourra ensuite être réutilisée.")) event.preventDefault(); }}><Trash2 aria-hidden="true" /> Supprimer</button>
     </fetcher.Form>
     <Link className="text-link" to={`/admin/commandes?q=${encodeURIComponent(member.email)}`}>Voir les commandes</Link>
     {fetcher.data?.message ? <small className={fetcher.data.ok ? undefined : "form-error"} role="status">{fetcher.data.message}</small> : null}

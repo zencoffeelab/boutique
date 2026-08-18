@@ -101,9 +101,9 @@ export function professionalApplicationReceivedEmail(input: { locale: Locale; fi
   return { subject: title, html: emailLayout({ locale: input.locale, preheader: details, title, body: paragraph(details) }) };
 }
 
-export function professionalAdminAlertEmail(input: { company: string; name: string; businessType: string; monthlyVolume: string; adminUrl: string }): EmailContent {
+export function professionalAdminAlertEmail(input: { company: string; name: string; businessType: string; monthlyVolume: string; comment?: string; adminUrl: string }): EmailContent {
   const title = `Nouvelle demande pro · ${input.company}`;
-  const body = `${paragraph(`${input.name} · ${input.company}`)}${paragraph(`${input.businessType} · ${input.monthlyVolume}`)}${actionLink("Ouvrir le back-office", input.adminUrl)}`;
+  const body = `${paragraph(`${input.name} · ${input.company}`)}${paragraph(`${input.businessType} · ${input.monthlyVolume}`)}${input.comment ? paragraph(`Commentaire : ${input.comment}`) : ""}${actionLink("Ouvrir le back-office", input.adminUrl)}`;
   return { subject: title, html: emailLayout({ locale: "fr-FR", preheader: title, title: "Nouvelle demande professionnelle", body }) };
 }
 
@@ -111,7 +111,8 @@ export function professionalDecisionEmail(input: { locale: Locale; approved: boo
   const english = input.locale === "en-GB";
   const title = input.approved ? (english ? "Your professional access is ready" : "Votre accès professionnel est prêt") : (english ? "Your application has been reviewed" : "Votre demande a été étudiée");
   const intro = input.approved ? (english ? "Your application has been approved by our team." : "Votre demande a été validée par notre équipe.") : (input.note || (english ? "Our team has reviewed your professional application." : "Notre équipe a étudié votre demande professionnelle."));
-  const body = `${paragraph(intro)}${input.approved && input.activationUrl ? actionLink(input.accessLabel ?? title, input.activationUrl) : ""}${input.approved && input.temporaryAccessLink !== false ? paragraph(english ? "This secure link is temporary." : "Ce lien sécurisé est temporaire.") : ""}`;
+  const note = input.approved && input.note ? paragraph(english ? `Message from our team: ${input.note}` : `Message de notre équipe : ${input.note}`) : "";
+  const body = `${paragraph(intro)}${note}${input.approved && input.activationUrl ? actionLink(input.accessLabel ?? title, input.activationUrl) : ""}${input.approved && input.temporaryAccessLink !== false ? paragraph(english ? "This secure link is temporary." : "Ce lien sécurisé est temporaire.") : ""}`;
   return { subject: title, html: emailLayout({ locale: input.locale, preheader: intro, title: input.approved ? (english ? "Welcome to Zen Coffee Lab" : "Bienvenue chez Zen Coffee Lab") : title, body }) };
 }
 

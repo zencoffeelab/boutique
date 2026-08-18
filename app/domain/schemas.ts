@@ -52,6 +52,8 @@ export const checkoutSchema = shippingQuoteSchema.extend({
 
 export const professionalApplicationSchema = z.object({
   companyName: z.string().trim().min(2).max(160),
+  countryCode: z.enum(SHIPPING_COUNTRY_CODES),
+  comment: z.string().trim().max(2_000).optional().default(""),
   lastName: z.string().trim().min(1).max(80),
   firstName: z.string().trim().min(1).max(80),
   email: z.email(),

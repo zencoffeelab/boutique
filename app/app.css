@@ -231,7 +231,7 @@ button:disabled {
     margin-inline: 0;
     justify-content: flex-start;
     padding-inline: 0;
-    transform: translateX(-2.5rem);
+     transform: translateX(-3.5rem);
   }
 }
 .site-nav a,
@@ -3966,6 +3966,9 @@ body.advice-detail-overflow-hidden {
 .professional-hero .lede {
   margin-bottom: clamp(2.25rem, 4vw, 3rem);
 }
+.professional-hero {
+  padding-bottom: clamp(0.5rem, 1vw, 0.9rem);
+}
 .professional-login-link {
   margin-inline: auto;
 }
@@ -3974,6 +3977,7 @@ body.advice-detail-overflow-hidden {
   height: 1.1rem;
 }
 .professional-hero + .cms-content {
+  padding-top: 2rem;
   padding-bottom: clamp(1rem, 2vw, 1.5rem);
 }
 .professional-application-layout {
@@ -4015,7 +4019,21 @@ body.advice-detail-overflow-hidden {
   margin: 0;
 }
 .professional-application-form > .button {
+  display: block;
   margin-top: 1.5rem;
+  margin-right: auto;
+  margin-left: 0;
+}
+.professional-application-comment,
+.professional-application-privacy {
+  margin-top: 1.2rem;
+}
+.professional-application-form > h2 + p {
+  margin-bottom: 0.75rem;
+}
+.professional-application-comment small {
+  display: block;
+  margin-bottom: 0.75rem;
 }
 .professional-application-success {
   display: grid;
@@ -4035,6 +4053,55 @@ body.advice-detail-overflow-hidden {
   border-radius: 50%;
   background: var(--yellow);
   color: var(--green-deep);
+}
+.professional-hero--connected {
+  padding-bottom: clamp(1.5rem, 3vw, 2.5rem);
+}
+.professional-connected-layout {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.65fr) minmax(0, 1.35fr);
+  align-items: start;
+  gap: clamp(2rem, 6vw, 6rem);
+  padding-block: clamp(1.5rem, 3vw, 2.5rem) clamp(5rem, 9vw, 9rem);
+}
+.professional-connected-steps {
+  position: sticky;
+  top: calc(88px + 2rem);
+  display: grid;
+  grid-template-columns: 1fr;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+.professional-connected-steps article {
+  padding: 1.5rem 0;
+  border-top: 1px solid var(--ink);
+}
+.professional-connected-steps span {
+  color: var(--orange);
+  font: 500 3rem/1 var(--display);
+}
+.professional-connected-actions {
+  display: grid;
+  gap: 1.2rem;
+}
+.professional-connected-actions article {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.25rem;
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+.professional-connected-actions article p {
+  margin: 0;
+  font: 400 clamp(1.2rem, 2vw, 1.6rem)/1.35 var(--serif);
+}
+.professional-connected-content {
+  max-width: none;
+  margin: 0;
+  padding: 0 0 1.2rem !important;
 }
 .professional-application-success > span svg {
   width: 2rem;
@@ -7139,6 +7206,15 @@ body.advice-detail-overflow-hidden {
 }
 
 @media (max-width: 980px) {
+  .professional-connected-actions {
+    gap: 1rem;
+  }
+  .professional-connected-layout {
+    grid-template-columns: 1fr;
+  }
+  .professional-connected-steps {
+    position: static;
+  }
   .admin-navigation-palette {
     grid-template-columns: 1fr;
   }
