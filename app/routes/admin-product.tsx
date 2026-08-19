@@ -992,7 +992,8 @@ export async function action({ request }: ActionFunctionArgs) {
     professional_stock_kg: parsed.data.professionalStockKg + Number(before.data?.professional_stock_reserved_kg ?? 0),
     updated_at: new Date().toISOString(),
   };
-  const mutation = creating
+  const { ribbon_new: _ribbonNew, ribbon_back_soon: _ribbonBackSoon, ...legacyProductMutation } = productMutation;
+  let mutation = creating
     ? await client
         .from("products")
         .insert(productMutation)
@@ -1004,6 +1005,11 @@ export async function action({ request }: ActionFunctionArgs) {
         .eq("id", parsed.data.productId)
         .select("id")
         .single();
+  if (mutation.error?.code === "42703" && mutation.error.message.includes("ribbon_")) {
+    mutation = creating
+      ? await client.from("products").insert(legacyProductMutation).select("id").single()
+      : await client.from("products").update(legacyProductMutation).eq("id", parsed.data.productId).select("id").single();
+  }
   if (mutation.error || !mutation.data)
     return {
       ok: false,

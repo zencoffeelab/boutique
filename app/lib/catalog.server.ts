@@ -142,6 +142,23 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     .in("status", statuses)
     .order("display_order", { ascending: true })
     .order("created_at", { ascending: false });
+  if (error?.code === "42703" && error.message.includes("ribbon_")) {
+    const compatibleResult = await client
+      .from("products")
+      .select(`
+        id, slug, status, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+        thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
+        product_translations(*),
+        product_media(*),
+        product_editorial_blocks(*),
+        product_variants(*, variant_offers(*))
+      `)
+      .in("status", statuses)
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: false });
+    if (compatibleResult.error) throw new Error(`Unable to load catalog: ${compatibleResult.error.message}`);
+    return (compatibleResult.data ?? []).map(mapDatabaseProduct);
+  }
   if (error?.code === "42703" && error.message.includes("display_order")) {
     const compatibleResult = await client
       .from("products")
