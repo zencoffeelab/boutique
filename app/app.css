@@ -1126,9 +1126,9 @@ button:disabled {
   padding: 0.35rem 0.5rem;
   transform: rotate(-45deg);
   color: var(--cream);
-  font-size: 0.62rem;
+  font-size: 0.56rem;
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   line-height: 1.2;
   text-align: center;
   text-transform: uppercase;
