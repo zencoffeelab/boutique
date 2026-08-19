@@ -1134,7 +1134,7 @@ button:disabled {
   line-height: 1.1;
   text-align: center;
   white-space: normal;
-  text-transform: lowercase;
+  text-transform: uppercase;
   box-shadow: 0 0.25rem 0.75rem #10170d26;
 }
 .product-ribbon--new { background: transparent; color: #6f9f78; }
