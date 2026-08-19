@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-19-product-ribbon-lowercase-labels",
+    date: "2026-08-19",
+    kind: "Design",
+    title: "Libellés des rubans en minuscules",
+    description: "Les textes visibles de tous les rubans de statut sont désormais affichés entièrement en minuscules.",
+  },
+  {
     id: "2026-08-19-product-ribbon-tighter-side-spacing",
     date: "2026-08-19",
     kind: "Design",
