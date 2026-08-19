@@ -1122,11 +1122,11 @@ button:disabled {
 .product-ribbon {
   display: inline-flex;
   align-items: center;
-  min-height: 1.8rem;
+  min-height: 1.6rem;
   max-width: 100%;
-  padding: 0.35rem 0.65rem;
+  padding: 0.3rem 0.55rem;
   color: white;
-  font-size: 0.65rem;
+  font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   line-height: 1.1;
