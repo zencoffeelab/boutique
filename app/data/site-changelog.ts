@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-19-english-shop-hero-line-break",
+    date: "2026-08-19",
+    kind: "Design",
+    title: "Sous-titre anglais de la boutique aéré sur deux lignes",
+    description: "La phrase « Choose your origin, then your format. » est désormais séparée après « origin, » pour améliorer la composition du bandeau de boutique.",
+  },
+  {
     id: "2026-08-19-archived-ribbon-same-as-last-stock",
     date: "2026-08-19",
     kind: "Correction",
