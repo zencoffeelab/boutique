@@ -59,6 +59,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return { locale, product, audience, archived, preview, relatedProducts };
 }
 
+export function headers() {
+  return { "Cache-Control": "private, no-store" };
+}
+
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
   if (!data) return [{ title: "Café introuvable | Zen Coffee Lab" }];
   const metadata = pageMeta(

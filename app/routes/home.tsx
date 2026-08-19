@@ -14,6 +14,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return { locale, products: products.filter((product) => product.featured).slice(0, 6), articles: articles.slice(0, 2), content };
 }
 
+export function headers() {
+  return { "Cache-Control": "private, no-store" };
+}
+
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
   const english = data?.locale === "en-GB";
   return pageMeta(

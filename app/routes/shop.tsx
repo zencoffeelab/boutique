@@ -10,6 +10,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return { locale, products: await getProducts({ status: "published" }) };
 }
 
+export function headers() {
+  return { "Cache-Control": "private, no-store" };
+}
+
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
   const english = data?.locale === "en-GB";
   return pageMeta(english ? "Specialty coffee shop | Zen Coffee Lab" : "Boutique de cafés de spécialité | Zen Coffee Lab", english ? "Explore our seasonal coffees, roasted fresh in Tours." : "Découvrez nos cafés de saison, torréfiés frais à Tours.", english ? "/en/shop" : "/boutique");

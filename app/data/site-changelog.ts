@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-19-admin-catalog-sync-prices-stock",
+    date: "2026-08-19",
+    kind: "Correction",
+    title: "Prix et stocks du catalogue alignes entre backoffice et boutique",
+    description: "Les modifications de prix public sont bien reprises par les offres vendues en boutique et les stocks saisis dans les fiches variantes alimentent desormais le stock canonique en grammes utilise par la boutique, le panier et le backoffice.",
+  },
+  {
     id: "2026-08-19-admin-products-remove-professional-price-quick-edit",
     date: "2026-08-19",
     kind: "Correction",

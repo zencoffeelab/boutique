@@ -632,7 +632,7 @@ export async function action({ request }: ActionFunctionArgs) {
       return { ok: false, message: "Variante introuvable pour ce produit." };
     const { data: parentProduct, error: parentProductError } = await client
       .from("products")
-      .select("professional_enabled")
+      .select("professional_enabled,stock_on_hand_grams,stock_reserved_grams,low_stock_threshold_grams")
       .eq("id", parsed.data.productId)
       .maybeSingle();
     if (parentProductError) return { ok: false, message: parentProductError.message };
@@ -662,6 +662,11 @@ export async function action({ request }: ActionFunctionArgs) {
       hs_code: existing.hs_code,
       customs_origin_country: existing.customs_origin_country,
     };
+    const previousProductStock = {
+      stock_on_hand_grams: parentProduct.stock_on_hand_grams,
+      stock_reserved_grams: parentProduct.stock_reserved_grams,
+      low_stock_threshold_grams: parentProduct.low_stock_threshold_grams,
+    };
     const restorePreviousState = async () => {
       await client
         .from("product_variants")
@@ -687,6 +692,10 @@ export async function action({ request }: ActionFunctionArgs) {
             .eq("variant_id", existing.id)
             .eq("audience", audience);
       }
+      await client
+        .from("products")
+        .update({ ...previousProductStock, updated_at: new Date().toISOString() })
+        .eq("id", parsed.data.productId);
     };
 
     const variantMutation = {
@@ -706,6 +715,29 @@ export async function action({ request }: ActionFunctionArgs) {
       .eq("id", existing.id);
     if (variantError) return { ok: false, message: variantError.message };
 
+    // The product-level gram columns are the source of truth used by the
+    // public catalogue and checkout. Keep them aligned when an operator edits
+    // a variant from the product page (the legacy variant stock columns remain
+    // populated for backwards compatibility).
+    const productStockOnHandGrams = parsed.data.stockOnHand * parsed.data.weightGrams;
+    const productLowStockThresholdGrams = parsed.data.lowStockThreshold * parsed.data.weightGrams;
+    if (productStockOnHandGrams < Number(parentProduct.stock_reserved_grams ?? 0)) {
+      await restorePreviousState();
+      return { ok: false, message: "Le stock total ne peut pas être inférieur au stock réservé." };
+    }
+    const { error: productStockError } = await client
+      .from("products")
+      .update({
+        stock_on_hand_grams: productStockOnHandGrams,
+        low_stock_threshold_grams: productLowStockThresholdGrams,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", parsed.data.productId);
+    if (productStockError) {
+      await restorePreviousState();
+      return { ok: false, message: productStockError.message };
+    }
+
     const professionalRequested = Boolean(
       parentProduct.professional_enabled || parsed.data.professional,
     );
@@ -716,6 +748,9 @@ export async function action({ request }: ActionFunctionArgs) {
       professionalRequested,
       professionalPriceCents: parsed.data.proPriceCents ?? previousOffers.find((offer) => offer.audience === "professional")?.price_cents,
       professionalMinimumQuantity: parsed.data.proMinimumQuantity,
+    }).map((offer) => {
+      const previousOffer = previousOffers.find((candidate) => candidate.audience === offer.audience);
+      return previousOffer ? { ...offer, id: previousOffer.id } : offer;
     });
     const { error: offerError } = await client
       .from("variant_offers")
@@ -772,7 +807,7 @@ export async function action({ request }: ActionFunctionArgs) {
       };
     const { data: parentProduct, error: parentProductError } = await client
       .from("products")
-      .select("professional_enabled")
+      .select("professional_enabled,stock_on_hand_grams,low_stock_threshold_grams")
       .eq("id", parsed.data.productId)
       .single();
     if (parentProductError || !parentProduct)
@@ -811,6 +846,19 @@ export async function action({ request }: ActionFunctionArgs) {
     if (offerError) {
       await client.from("product_variants").delete().eq("id", variant.id);
       return { ok: false, message: offerError.message };
+    }
+    const { error: productStockError } = await client
+      .from("products")
+      .update({
+        stock_on_hand_grams: Number(parentProduct.stock_on_hand_grams ?? 0) + parsed.data.stockOnHand * parsed.data.weightGrams,
+        low_stock_threshold_grams: Number(parentProduct.low_stock_threshold_grams ?? 0) + parsed.data.lowStockThreshold * parsed.data.weightGrams,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", parsed.data.productId);
+    if (productStockError) {
+      await client.from("variant_offers").delete().eq("variant_id", variant.id);
+      await client.from("product_variants").delete().eq("id", variant.id);
+      return { ok: false, message: productStockError.message };
     }
     await client.from("stock_movements").insert({
       variant_id: variant.id,
