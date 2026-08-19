@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-19-swap-new-back-soon-ribbon-colors",
+    date: "2026-08-19",
+    kind: "Design",
+    title: "Couleurs inversées pour les rubans « Nouveau » et « De retour bientôt »",
+    description: "Le ruban « Nouveau » utilise désormais le bleu et « De retour bientôt » le vert, avec leurs fonds transparents conservés.",
+  },
+  {
     id: "2026-08-19-revert-product-ribbon-lowercase",
     date: "2026-08-19",
     kind: "Correction",
