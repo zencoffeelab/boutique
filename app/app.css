@@ -1141,7 +1141,7 @@ button:disabled {
   text-shadow: 0 1px 2px #ffffffaa;
 }
 .product-ribbon--sold-out { background: #9d2f35; }
-.product-ribbon--back-soon { background: #5c4a91; }
+.product-ribbon--back-soon { background: #8fc9ec; color: #12364d; }
 .product-card__image {
   position: relative;
   display: block;
@@ -1154,6 +1154,11 @@ button:disabled {
   height: 100%;
   object-fit: cover;
   transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.product-card__image--sold-out .product-card__original-image,
+.product-gallery__image--sold-out,
+.product-gallery__composed--sold-out {
+  filter: grayscale(1);
 }
 .product-card:hover .product-card__original-image,
 .product-card:focus-within .product-card__original-image {

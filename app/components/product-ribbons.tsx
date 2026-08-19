@@ -10,7 +10,7 @@ const labels: Record<ProductRibbonKind, { fr: string; en: string }> = {
 };
 
 export function ProductRibbons({ product, locale }: { product: Product; locale: "fr-FR" | "en-GB" }) {
-  const ribbons = getProductRibbons(product);
+  const ribbons = product.status === "archived" ? [] : getProductRibbons(product);
   if (ribbons.length === 0) return null;
   return <div className="product-ribbons" style={{ "--product-ribbon-color": product.thumbnailBackgroundColor } as CSSProperties} aria-label={locale === "fr-FR" ? "Statut du café" : "Coffee status"}>
     {ribbons.map((ribbon) => <span className={`product-ribbon product-ribbon--${ribbon}`} key={ribbon}>{labels[ribbon][locale === "fr-FR" ? "fr" : "en"]}</span>)}

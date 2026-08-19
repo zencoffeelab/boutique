@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-19-sold-out-coffee-visual-state",
+    date: "2026-08-19",
+    kind: "Design",
+    title: "État visuel renforcé pour les cafés en rupture",
+    description: "Les cafés publiés en rupture affichent désormais leur première image en noir et blanc et le ruban « De retour bientôt » en bleu clair. Les cafés archivés ne reçoivent plus ces rubans.",
+  },
+  {
     id: "2026-08-19-last-stock-ribbon-transparent",
     date: "2026-08-19",
     kind: "Design",

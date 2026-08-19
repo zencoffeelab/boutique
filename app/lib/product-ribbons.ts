@@ -1,5 +1,9 @@
 export type ProductRibbon = "new" | "last-stock" | "sold-out" | "back-soon";
 
+export function isProductSoldOut(stockOnHandGrams: number, status: "draft" | "published" | "archived") {
+  return status !== "archived" && stockOnHandGrams <= 0;
+}
+
 export function getProductRibbons({
   stockOnHandGrams,
   ribbonNew,

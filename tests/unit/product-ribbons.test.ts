@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getProductRibbons } from "~/lib/product-ribbons";
+import { getProductRibbons, isProductSoldOut } from "~/lib/product-ribbons";
 
 describe("product ribbons", () => {
   it("shows the last-stock ribbon below one kilogram", () => {
@@ -12,5 +12,9 @@ describe("product ribbons", () => {
 
   it("does not show back soon while stock remains", () => {
     expect(getProductRibbons({ stockOnHandGrams: 2_000, ribbonNew: true, ribbonBackSoon: true })).toEqual(["new"]);
+  });
+
+  it("does not mark archived coffees as sold out", () => {
+    expect(isProductSoldOut(0, "archived")).toBe(false);
   });
 });

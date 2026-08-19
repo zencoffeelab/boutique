@@ -12,6 +12,7 @@ import { getAudience, requireAdmin } from "~/lib/auth.server";
 import { getAdminProducts, getProducts, hasPurchasableVariant } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { getRelatedProducts } from "~/lib/product-recommendations";
+import { isProductSoldOut } from "~/lib/product-ribbons";
 import { JsonLd, pageMeta, productStructuredData } from "~/lib/seo";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -160,10 +161,11 @@ function ProductExtractionGuide({ product, locale }: { product: Product; locale:
 export function ProductGallery({ product, locale }: { product: Product; locale: Locale }) {
   const labelUrl = product.thumbnailLabelUrl;
   const translation = product.translations[locale];
+  const soldOut = isProductSoldOut(product.stockOnHandGrams, product.status);
   return <div className="product-gallery">
     <ProductRibbons product={product} locale={locale} />
     {labelUrl ? <div
-      className="product-gallery__composed"
+      className={`product-gallery__composed${soldOut ? " product-gallery__composed--sold-out" : ""}`}
       style={{ "--product-thumbnail-color": product.thumbnailBackgroundColor } as CSSProperties}
     >
       <ProductPackArtwork
@@ -175,6 +177,7 @@ export function ProductGallery({ product, locale }: { product: Product; locale: 
       />
     </div> : null}
     {product.media.map((media, index) => <img
+      className={soldOut && index === 0 ? "product-gallery__image--sold-out" : undefined}
       key={media.id}
       src={media.url}
       alt={media.alt[locale]}

@@ -9,6 +9,7 @@ import { buildProductCartLine } from "~/domain/cart";
 import type { Audience, Locale, Product } from "~/domain/types";
 import { formatMoney } from "~/domain/money";
 import { dictionary } from "~/lib/i18n";
+import { isProductSoldOut } from "~/lib/product-ribbons";
 
 function ProductCardQuickAdd({ product, locale, audience }: { product: Product; locale: Locale; audience: Audience }) {
   const menuId = useId();
@@ -86,11 +87,12 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
   const pack200 = product.variants.find((variant) => variant.weightGrams === 200);
   const pack200Offer = pack200?.offers.find((offer) => offer.audience === resolvedAudience && offer.active);
   const composedThumbnail = Boolean(product.thumbnailLabelUrl);
+  const soldOut = isProductSoldOut(product.stockOnHandGrams, product.status);
   return (
     <article className="product-card" onMouseEnter={() => setHoverImageRequested(true)} onFocus={() => setHoverImageRequested(true)}>
       <div className="product-card__media">
         <div
-          className={`product-card__image${composedThumbnail ? " product-card__image--composed" : ""}`}
+          className={`product-card__image${composedThumbnail ? " product-card__image--composed" : ""}${soldOut ? " product-card__image--sold-out" : ""}`}
           style={composedThumbnail ? { "--product-thumbnail-color": product.thumbnailBackgroundColor } as CSSProperties : undefined}
         >
           <ProductRibbons product={product} locale={locale} />
