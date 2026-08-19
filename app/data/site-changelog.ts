@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-19-last-stock-ribbon-product-color",
+    date: "2026-08-19",
+    kind: "Design",
+    title: "Ruban « Derniers stocks » accordé à chaque café",
+    description: "Le ruban « Derniers stocks » reprend désormais la couleur de fond configurée pour le café, sur les cartes de la boutique comme sur sa fiche produit.",
+  },
+  {
     id: "2026-08-19-product-ribbons-diagonal-blog-style",
     date: "2026-08-19",
     kind: "Design",

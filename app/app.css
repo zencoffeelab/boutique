@@ -1135,7 +1135,7 @@ button:disabled {
   box-shadow: 0 0.25rem 0.75rem #10170d26;
 }
 .product-ribbon--new { background: #285943; }
-.product-ribbon--last-stock { background: #b86d24; }
+.product-ribbon--last-stock { background: var(--product-ribbon-color, #b86d24); }
 .product-ribbon--sold-out { background: #9d2f35; }
 .product-ribbon--back-soon { background: #5c4a91; }
 .product-card__image {
