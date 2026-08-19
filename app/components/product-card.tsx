@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
 import { ProfessionalQuoteAdd } from "~/components/professional-quote/professional-quote-add";
 import { ProductPackArtwork } from "~/components/product-thumbnail-label";
+import { ProductRibbons } from "~/components/product-ribbons";
 import { buildProductCartLine } from "~/domain/cart";
 import type { Audience, Locale, Product } from "~/domain/types";
 import { formatMoney } from "~/domain/money";
@@ -92,6 +93,7 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
           className={`product-card__image${composedThumbnail ? " product-card__image--composed" : ""}`}
           style={composedThumbnail ? { "--product-thumbnail-color": product.thumbnailBackgroundColor } as CSSProperties : undefined}
         >
+          <ProductRibbons product={product} locale={locale} />
           {composedThumbnail ? <ProductPackArtwork
             packClassName="product-card__pack"
             labelClassName="product-card__label"

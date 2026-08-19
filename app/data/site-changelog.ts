@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-19-product-stock-and-editorial-ribbons",
+    date: "2026-08-19",
+    kind: "Fonctionnalité",
+    title: "Rubans de stock et de nouveauté sur les cafés",
+    description: "La boutique affiche automatiquement « Derniers stocks » sous 1 kg et « Rupture de stock » à stock disponible nul. Chaque café peut aussi recevoir les rubans « Nouveau » et « De retour bientôt » depuis son backoffice, avec une couleur dédiée.",
+  },
+  {
     id: "2026-08-19-admin-catalog-sync-prices-stock",
     date: "2026-08-19",
     kind: "Correction",

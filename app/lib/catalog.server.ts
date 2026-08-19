@@ -56,6 +56,8 @@ function mapDatabaseProduct(row: any): Product {
     status: row.status,
     altitudeMeters: row.altitude_meters,
     featured: row.featured,
+    ribbonNew: Boolean(row.ribbon_new),
+    ribbonBackSoon: Boolean(row.ribbon_back_soon),
     professionalEnabled: row.professional_enabled ?? false,
     professionalStockKg: Number(row.professional_stock_kg ?? 0),
     professionalStockReservedKg: Number(row.professional_stock_reserved_kg ?? 0),
@@ -129,7 +131,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     .from("products")
     .select(
       `
-      id, slug, status, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+      id, slug, status, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
       thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
       product_translations(*),
       product_media(*),
@@ -144,7 +146,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const compatibleResult = await client
       .from("products")
       .select(`
-        id, slug, status, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+        id, slug, status, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
         thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
         product_translations(*),
         product_media(*),
@@ -160,7 +162,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const compatibleResult = await client
       .from("products")
       .select(`
-        id, slug, status, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+        id, slug, status, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
         thumbnail_label_public_url, thumbnail_background_color,
         product_translations(*),
         product_media(*),
@@ -177,7 +179,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const compatibleResult = await client
       .from("products")
       .select(`
-        id, slug, status, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+        id, slug, status, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
         product_translations(*),
         product_media(*),
         product_editorial_blocks(*),
@@ -208,7 +210,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const legacyResult = await client
       .from("products")
       .select(`
-        id, slug, status, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
+        id, slug, status, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
         thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
         product_translations(*),
         product_media(*),

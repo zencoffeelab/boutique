@@ -184,6 +184,8 @@ export const demoProducts: Product[] = inputs.map((input) => {
     status: "published",
     altitudeMeters: input.altitude,
     featured: input.featured ?? false,
+    ribbonNew: false,
+    ribbonBackSoon: false,
     professionalEnabled: true,
     professionalStockKg: 60,
     professionalStockReservedKg: 0,

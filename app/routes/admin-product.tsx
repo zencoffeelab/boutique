@@ -37,6 +37,8 @@ const productSchema = z.object({
   status: z.enum(["draft", "published", "archived"]),
   altitudeMeters: z.coerce.number().int().min(0).max(10_000),
   featured: z.string().optional().transform(Boolean),
+  ribbonNew: z.string().optional().transform(Boolean),
+  ribbonBackSoon: z.string().optional().transform(Boolean),
   professionalEnabled: z.string().optional().transform(Boolean),
   professionalStockKg: z.coerce.number().min(0).max(1_000_000),
   nameFr: z.string().trim().min(2),
@@ -307,6 +309,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         status: "draft" as const,
         altitudeMeters: 0,
         featured: false,
+        ribbonNew: false,
+        ribbonBackSoon: false,
         professionalEnabled: false,
         professionalStockKg: 0,
         professionalStockReservedKg: 0,
@@ -982,6 +986,8 @@ export async function action({ request }: ActionFunctionArgs) {
     status: creating ? "draft" : parsed.data.status,
     altitude_meters: parsed.data.altitudeMeters,
     featured: parsed.data.featured,
+    ribbon_new: parsed.data.ribbonNew,
+    ribbon_back_soon: parsed.data.ribbonBackSoon,
     professional_enabled: parsed.data.professionalEnabled,
     professional_stock_kg: parsed.data.professionalStockKg + Number(before.data?.professional_stock_reserved_kg ?? 0),
     updated_at: new Date().toISOString(),
@@ -2033,6 +2039,14 @@ export default function AdminProduct() {
             Activer sur la boutique professionnelle
           </label>
           <input type="hidden" name="featured" value={product.featured ? "true" : ""} />
+          <label>
+            <input name="ribbonNew" type="checkbox" defaultChecked={product.ribbonNew} />{" "}
+            Afficher le ruban « Nouveau »
+          </label>
+          <label>
+            <input name="ribbonBackSoon" type="checkbox" defaultChecked={product.ribbonBackSoon} />{" "}
+            Afficher « De retour bientôt » sous « Rupture de stock »
+          </label>
               </div>
             </div>
             <LanguageTabs

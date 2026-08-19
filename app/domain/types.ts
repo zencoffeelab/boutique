@@ -101,6 +101,8 @@ export type Product = Readonly<{
   status: ProductStatus;
   altitudeMeters: number;
   featured: boolean;
+  ribbonNew: boolean;
+  ribbonBackSoon: boolean;
   professionalEnabled: boolean;
   professionalStockKg: number;
   professionalStockReservedKg: number;

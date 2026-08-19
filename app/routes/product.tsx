@@ -5,6 +5,7 @@ import { Link, useLoaderData } from "react-router";
 import { ProductCard } from "~/components/product-card";
 import { ProductPurchase } from "~/components/product-purchase";
 import { ProductPackArtwork } from "~/components/product-thumbnail-label";
+import { ProductRibbons } from "~/components/product-ribbons";
 import { ProfessionalQuoteAdd } from "~/components/professional-quote/professional-quote-add";
 import type { Audience, Locale, Product, ProductEditorialBlock } from "~/domain/types";
 import { getAudience, requireAdmin } from "~/lib/auth.server";
@@ -160,6 +161,7 @@ export function ProductGallery({ product, locale }: { product: Product; locale: 
   const labelUrl = product.thumbnailLabelUrl;
   const translation = product.translations[locale];
   return <div className="product-gallery">
+    <ProductRibbons product={product} locale={locale} />
     {labelUrl ? <div
       className="product-gallery__composed"
       style={{ "--product-thumbnail-color": product.thumbnailBackgroundColor } as CSSProperties}
