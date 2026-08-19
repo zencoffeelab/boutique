@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-19-product-ribbons-diagonal-blog-style",
+    date: "2026-08-19",
+    kind: "Design",
+    title: "Rubans produits alignés sur le style du Blog",
+    description: "Les rubans « Nouveau », « Derniers stocks », « Rupture de stock » et « De retour bientôt » reprennent désormais la forme diagonale des étiquettes « Épinglé » du Blog.",
+  },
+  {
     id: "2026-08-19-product-stock-and-editorial-ribbons",
     date: "2026-08-19",
     kind: "Fonctionnalité",

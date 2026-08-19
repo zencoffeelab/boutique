@@ -1110,25 +1110,27 @@ button:disabled {
 .product-ribbons {
   position: absolute;
   z-index: 4;
-  top: 1rem;
-  left: 1rem;
+  top: 0;
+  left: 0;
   display: flex;
-  max-width: min(78%, 16rem);
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.35rem;
+  gap: 1.2rem;
   pointer-events: none;
 }
 .product-ribbon {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.8rem;
-  padding: 0.35rem 0.65rem;
-  color: white;
-  font-size: 0.65rem;
+  position: relative;
+  top: 1.2rem;
+  left: -2.7rem;
+  width: 10rem;
+  padding: 0.35rem 0.5rem;
+  transform: rotate(-45deg);
+  color: var(--cream);
+  font-size: 0.62rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  line-height: 1.1;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-align: center;
   text-transform: uppercase;
   box-shadow: 0 0.25rem 0.75rem #10170d26;
 }
