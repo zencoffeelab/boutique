@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-19-archived-ribbon-same-as-last-stock",
+    date: "2026-08-19",
+    kind: "Correction",
+    title: "Ruban « Archivé » identique à « Derniers stocks »",
+    description: "Le ruban « Archivé » réutilise désormais exactement le même conteneur et le même style que « Derniers stocks », avec seul le texte qui change.",
+  },
+  {
     id: "2026-08-19-archived-ribbon-harmonized",
     date: "2026-08-19",
     kind: "Design",

@@ -1680,31 +1680,6 @@ button:disabled {
   margin: 0;
   font: 400 1rem/1.5 var(--serif);
 }
-.product-card__archive-label {
-  position: absolute;
-  z-index: 4;
-  top: 1rem;
-  left: 1rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 7.5rem;
-  min-height: 1.5rem;
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0.25rem 0.3rem;
-  border: 0;
-  background: transparent;
-  color: #111111;
-  font-size: 0.52rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  line-height: 1.1;
-  text-align: center;
-  white-space: normal;
-  text-transform: uppercase;
-  text-shadow: 0 1px 2px #ffffffaa;
-}
 .product-specifications {
   width: 100%;
   margin: 0 0 2.25rem;
