@@ -1123,10 +1123,10 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 9rem;
+  width: 7.5rem;
   min-height: 1.5rem;
   box-sizing: border-box;
-  padding: 0.25rem 0.4rem;
+  padding: 0.25rem 0.3rem;
   color: white;
   font-size: 0.52rem;
   font-weight: 800;

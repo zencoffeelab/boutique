@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-19-product-ribbon-tighter-side-spacing",
+    date: "2026-08-19",
+    kind: "Design",
+    title: "Bordures latérales rapprochées du texte des rubans",
+    description: "La largeur des rubans a été resserrée autour du texte le plus long pour limiter l’espace vide sur les côtés.",
+  },
+  {
     id: "2026-08-19-product-ribbon-smaller-dimensions",
     date: "2026-08-19",
     kind: "Design",
