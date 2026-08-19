@@ -177,7 +177,7 @@ export function ProductGallery({ product, locale }: { product: Product; locale: 
       />
     </div> : null}
     {product.media.map((media, index) => <img
-      className={soldOut && index === 0 ? "product-gallery__image--sold-out" : undefined}
+      className={soldOut && !labelUrl && index === 0 ? "product-gallery__image--sold-out" : undefined}
       key={media.id}
       src={media.url}
       alt={media.alt[locale]}

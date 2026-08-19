@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-19-transparent-ribbons-and-sold-out-first-image",
+    date: "2026-08-19",
+    kind: "Design",
+    title: "Rubans transparents et première image désaturée en rupture",
+    description: "Tous les rubans sont désormais transparents. Pour un café publié en rupture, seule la première représentation visuelle est passée en noir et blanc ; les images suivantes restent en couleur.",
+  },
+  {
     id: "2026-08-19-sold-out-coffee-visual-state",
     date: "2026-08-19",
     kind: "Design",
