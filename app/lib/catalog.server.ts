@@ -27,6 +27,10 @@ const editorialArticleSummaries: Record<string, Record<"fr-FR" | "en-GB", string
   },
 };
 
+function isMissingRibbonColumnError(error: { code?: string; message?: string } | null | undefined) {
+  return Boolean(error && (error.code === "42703" || error.code === "PGRST204") && /ribbon_(new|back_soon)/.test(error.message ?? ""));
+}
+
 function mapDatabaseProduct(row: any): Product {
   const stockOnHandGrams = Number(row.stock_on_hand_grams ?? (row.product_variants ?? []).reduce((total: number, variant: any) => total + Number(variant.stock_on_hand ?? 0) * Number(variant.weight_grams ?? 0), 0));
   const stockReservedGrams = Number(row.stock_reserved_grams ?? (row.product_variants ?? []).reduce((total: number, variant: any) => total + Number(variant.stock_reserved ?? 0) * Number(variant.weight_grams ?? 0), 0));
@@ -142,7 +146,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     .in("status", statuses)
     .order("display_order", { ascending: true })
     .order("created_at", { ascending: false });
-  if (error?.code === "42703" && error.message.includes("ribbon_")) {
+  if (isMissingRibbonColumnError(error)) {
     const compatibleResult = await client
       .from("products")
       .select(`

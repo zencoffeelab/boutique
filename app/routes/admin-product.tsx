@@ -137,6 +137,10 @@ const productImageExtensions: Record<string, string> = {
   "image/webp": "webp",
 };
 
+function isMissingRibbonColumnError(error: { code?: string; message?: string } | null | undefined) {
+  return Boolean(error && (error.code === "42703" || error.code === "PGRST204") && /ribbon_(new|back_soon)/.test(error.message ?? ""));
+}
+
 function isUploadFile(value: FormDataEntryValue | null): value is File {
   return Boolean(value && typeof value === "object" && typeof (value as File).size === "number" && typeof (value as File).type === "string" && typeof (value as File).arrayBuffer === "function");
 }
@@ -1005,7 +1009,7 @@ export async function action({ request }: ActionFunctionArgs) {
         .eq("id", parsed.data.productId)
         .select("id")
         .single();
-  if (mutation.error?.code === "42703" && mutation.error.message.includes("ribbon_")) {
+  if (isMissingRibbonColumnError(mutation.error)) {
     mutation = creating
       ? await client.from("products").insert(legacyProductMutation).select("id").single()
       : await client.from("products").update(legacyProductMutation).eq("id", parsed.data.productId).select("id").single();
