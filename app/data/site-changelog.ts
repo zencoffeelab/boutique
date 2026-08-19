@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-19-product-ribbon-smaller-dimensions",
+    date: "2026-08-19",
+    kind: "Design",
+    title: "Rubans produits réduits",
+    description: "Le gabarit harmonisé des rubans de statut a été réduit pour une présence plus discrète sur les images des cafés.",
+  },
+  {
     id: "2026-08-19-product-ribbon-uniform-dimensions",
     date: "2026-08-19",
     kind: "Design",
