@@ -176,6 +176,14 @@ export function ProductGallery({ product, locale }: { product: Product; locale: 
         loading="eager"
       />
     </div> : null}
+    {product.hoverImageUrl ? <img
+      className={soldOut ? "product-gallery__hover-image product-gallery__image--sold-out" : "product-gallery__hover-image"}
+      src={product.hoverImageUrl}
+      alt={translation.name}
+      width={900}
+      height={900}
+      loading="lazy"
+    /> : null}
     {product.media.map((media, index) => <img
       className={soldOut && !labelUrl && index === 0 ? "product-gallery__image--sold-out" : undefined}
       key={media.id}

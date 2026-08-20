@@ -25,9 +25,9 @@ describe("professional page modes", () => {
 
     const result = await loader({ request: new Request("https://example.test/professionnel"), params: {}, context: {} } as never);
 
-    expect(result).toMatchObject({ approved: true, signedIn: true, accountEmail: null, professionalStatus: "approved", products: [], content: null });
-    expect(getProducts).toHaveBeenCalledWith({ status: "published", audience: "professional" });
-    expect(getContentPage).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ approved: true, admin: false, signedIn: true, accountEmail: null, professionalStatus: "approved", content: null });
+    expect(getProducts).not.toHaveBeenCalled();
+    expect(getContentPage).toHaveBeenCalledWith("professionnel-connecte", "fr-FR");
   });
 
   it("loads the introduction and application content for a visitor", async () => {
@@ -36,7 +36,7 @@ describe("professional page modes", () => {
 
     const result = await loader({ request: new Request("https://example.test/professionnel"), params: {}, context: {} } as never);
 
-    expect(result).toMatchObject({ approved: false, signedIn: false, accountEmail: null, professionalStatus: null, products: [], content: { title: "Professionnels" } });
+    expect(result).toMatchObject({ approved: false, admin: false, signedIn: false, accountEmail: null, professionalStatus: null, content: { title: "Professionnels" }, connectedContent: null });
     expect(getProducts).not.toHaveBeenCalled();
     expect(getContentPage).toHaveBeenCalledWith("professionnel", "fr-FR");
   });

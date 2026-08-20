@@ -113,9 +113,9 @@ describe("product card", () => {
 
   it("places the archived badge inside the product image and hides the price", () => {
     const html = renderArchivedCard();
-    expect(html).toContain('<p class="product-card__archive-label">Archivé</p>');
-    expect(html.indexOf("product-card__archive-label")).toBeGreaterThan(html.indexOf("product-card__image"));
-    expect(html.indexOf("product-card__archive-label")).toBeLessThan(html.indexOf("product-card__body"));
+    expect(html).toContain('<span class="product-ribbon product-ribbon--last-stock">Archivé</span>');
+    expect(html.indexOf("product-ribbon--last-stock")).toBeGreaterThan(html.indexOf("product-card__image"));
+    expect(html.indexOf("product-ribbon--last-stock")).toBeLessThan(html.indexOf("product-card__body"));
     expect(html).not.toContain("À partir de");
   });
 });

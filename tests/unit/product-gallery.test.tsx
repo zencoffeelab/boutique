@@ -25,4 +25,16 @@ describe("product gallery", () => {
     expect(html.indexOf("product-gallery__composed")).toBeLessThan(html.indexOf("gallery-first.jpg"));
     expect(html.indexOf("gallery-first.jpg")).toBeLessThan(html.indexOf("gallery-second.jpg"));
   });
+
+  it("displays the hover image on the detailed product gallery", () => {
+    const product = {
+      ...demoProducts[0],
+      hoverImageUrl: "https://cdn.example.com/hover.webp",
+    };
+
+    const html = renderToStaticMarkup(<ProductGallery product={product} locale="fr-FR" />);
+
+    expect(html).toContain('class="product-gallery__hover-image"');
+    expect(html).toContain('src="https://cdn.example.com/hover.webp"');
+  });
 });

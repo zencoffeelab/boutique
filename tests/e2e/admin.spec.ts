@@ -143,7 +143,7 @@ test("product editor provides two editable editorial blocks", async ({
   await expect(variantEditor.locator('input[name="sku"]')).not.toHaveValue("");
   await expect(variantEditor.locator('input[name="weightGrams"]')).toHaveValue(/\d+/);
   await expect(variantEditor.locator('input[name="stockOnHand"]')).toHaveAttribute("min", /\d+/);
-  await expect(variantEditor.locator('input[name="retailPriceCents"]')).toHaveValue(/\d+/);
+  await expect(variantEditor.locator('input[name="internalCostCents"]')).toHaveValue(/\d+/);
   await expect(variantEditor.locator('input[name="hsCode"]')).not.toHaveValue("");
   await expect(variantEditor.getByRole("button", { name: "Enregistrer la variante" })).toBeVisible();
   await variantEditor.getByRole("button", { name: "Annuler" }).click();

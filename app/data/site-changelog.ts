@@ -12,6 +12,55 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-20-admin-product-english-translation-action",
+    date: "2026-08-20",
+    kind: "Correction",
+    title: "Traduction anglaise disponible sur chaque fiche produit",
+    description: "Le bouton Traduire en anglais est de nouveau visible dans l’onglet English des fiches produits existantes comme des nouvelles fiches.",
+  },
+  {
+    id: "2026-08-20-product-detail-hover-image",
+    date: "2026-08-20",
+    kind: "Correction",
+    title: "Image de survol affichée sur les fiches café",
+    description: "L’image de survol renseignée dans le backoffice apparaît désormais dans la galerie de la fiche détaillée, sans supprimer les autres visuels du produit.",
+  },
+  {
+    id: "2026-08-20-sync-kenya-peru-catalog-values",
+    date: "2026-08-20",
+    kind: "Correction",
+    title: "Prix et stocks corrigés pour Kenya Kaiguri AB et Pérou El Laurel",
+    description: "Les offres retail et les stocks en grammes de ces deux cafés sont resynchronisés avec les valeurs enregistrées dans leurs variantes du backoffice.",
+  },
+  {
+    id: "2026-08-20-admin-cost-drives-retail-price",
+    date: "2026-08-20",
+    kind: "Correction",
+    title: "Prix boutique synchronisé avec le coût en centimes",
+    description: "Le montant saisi pour chaque variante dans le champ Coût en centimes met désormais à jour l’offre retail réellement lue par la boutique ; le champ Prix public est retiré de l’éditeur.",
+  },
+  {
+    id: "2026-08-20-admin-catalog-cost-only",
+    date: "2026-08-20",
+    kind: "Correction",
+    title: "Catalogue produits recentré sur le coût des variantes",
+    description: "Les colonnes Prix public et Coût interne sont retirées de la liste du catalogue ; le seul montant géré rapidement reste le Coût en centimes de chaque variante.",
+  },
+  {
+    id: "2026-08-20-admin-product-stock-delta-sync",
+    date: "2026-08-20",
+    kind: "Correction",
+    title: "Stocks du backoffice conservés entre les formats",
+    description: "La modification d’une variante ajuste désormais le stock global du café uniquement selon l’écart de cette variante, sans écraser les stocks des autres formats. La liste Produits affiche également le tarif public de l’offre retail active.",
+  },
+  {
+    id: "2026-08-20-ci-tests-aligned-with-current-contracts",
+    date: "2026-08-20",
+    kind: "Correction",
+    title: "Tests CI alignés avec les parcours professionnels et les rubans produits",
+    description: "Les vérifications automatisées prennent désormais en compte le formulaire professionnel enrichi, la page professionnelle connectée et le nouveau ruban d’archivage.",
+  },
+  {
     id: "2026-08-19-english-shop-hero-line-break",
     date: "2026-08-19",
     kind: "Design",

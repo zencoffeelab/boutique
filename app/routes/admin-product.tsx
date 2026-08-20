@@ -91,7 +91,6 @@ const variantFieldsSchema = {
     .trim()
     .toUpperCase()
     .regex(/^[A-Z]{2}$/),
-  retailPriceCents: z.coerce.number().int().min(0),
   professional: z.string().optional().transform(Boolean),
   proPriceCents: z.coerce.number().int().min(0).optional(),
   proMinimumQuantity: z.coerce.number().int().min(1).optional(),
@@ -117,6 +116,31 @@ const deleteMediaSchema = z.object({
   productId: z.uuid(),
   mediaId: z.uuid(),
 });
+
+export function adjustProductStockGrams({
+  currentStockGrams,
+  currentThresholdGrams,
+  previousStock,
+  previousWeightGrams,
+  previousThreshold,
+  nextStock,
+  nextWeightGrams,
+  nextThreshold,
+}: {
+  currentStockGrams: number;
+  currentThresholdGrams: number;
+  previousStock: number;
+  previousWeightGrams: number;
+  previousThreshold: number;
+  nextStock: number;
+  nextWeightGrams: number;
+  nextThreshold: number;
+}) {
+  return {
+    stockOnHandGrams: currentStockGrams - previousStock * previousWeightGrams + nextStock * nextWeightGrams,
+    lowStockThresholdGrams: currentThresholdGrams - previousThreshold * previousWeightGrams + nextThreshold * nextWeightGrams,
+  };
+}
 const editorialBlockFieldsSchema = z.object({
   titleFr: z.string().trim().min(2).max(180),
   titleEn: z.string().trim().min(2).max(180),
@@ -723,12 +747,18 @@ export async function action({ request }: ActionFunctionArgs) {
       .eq("id", existing.id);
     if (variantError) return { ok: false, message: variantError.message };
 
-    // The product-level gram columns are the source of truth used by the
-    // public catalogue and checkout. Keep them aligned when an operator edits
-    // a variant from the product page (the legacy variant stock columns remain
-    // populated for backwards compatibility).
-    const productStockOnHandGrams = parsed.data.stockOnHand * parsed.data.weightGrams;
-    const productLowStockThresholdGrams = parsed.data.lowStockThreshold * parsed.data.weightGrams;
+    // Product stock is canonical in grams. Adjust it by this variant's delta
+    // instead of replacing the whole coffee stock with this variant's value.
+    const { stockOnHandGrams: productStockOnHandGrams, lowStockThresholdGrams: productLowStockThresholdGrams } = adjustProductStockGrams({
+      currentStockGrams: Number(parentProduct.stock_on_hand_grams ?? 0),
+      currentThresholdGrams: Number(parentProduct.low_stock_threshold_grams ?? 0),
+      previousStock: Number(existing.stock_on_hand ?? 0),
+      previousWeightGrams: Number(existing.weight_grams ?? 0),
+      previousThreshold: Number(existing.low_stock_threshold ?? 0),
+      nextStock: parsed.data.stockOnHand,
+      nextWeightGrams: parsed.data.weightGrams,
+      nextThreshold: parsed.data.lowStockThreshold,
+    });
     if (productStockOnHandGrams < Number(parentProduct.stock_reserved_grams ?? 0)) {
       await restorePreviousState();
       return { ok: false, message: "Le stock total ne peut pas être inférieur au stock réservé." };
@@ -751,7 +781,8 @@ export async function action({ request }: ActionFunctionArgs) {
     );
     const desiredOffers = buildVariantOffers({
       variantId: existing.id,
-      retailPriceCents: parsed.data.retailPriceCents,
+      // The backoffice's cent value is the single source for the retail price.
+      retailPriceCents: parsed.data.internalCostCents,
       productProfessionalEnabled: false,
       professionalRequested,
       professionalPriceCents: parsed.data.proPriceCents ?? previousOffers.find((offer) => offer.audience === "professional")?.price_cents,
@@ -842,7 +873,8 @@ export async function action({ request }: ActionFunctionArgs) {
       return { ok: false, message: error?.message ?? "Variante non créée." };
     const offers = buildVariantOffers({
       variantId: variant.id,
-      retailPriceCents: parsed.data.retailPriceCents,
+      // Keep newly created variants aligned with the same retail price source.
+      retailPriceCents: parsed.data.internalCostCents,
       productProfessionalEnabled: parentProduct.professional_enabled,
       professionalRequested: parsed.data.professional,
       professionalPriceCents: parsed.data.proPriceCents,
@@ -1530,16 +1562,11 @@ function VariantList({
             <th>SKU</th>
             <th>Poids</th>
             <th>Stock</th>
-            <th>Prix public</th>
-            <th>Coût interne</th>
             <th>Action</th>
           </tr>
         </thead>
         <tbody>
           {variants.map((variant) => {
-            const retailOffer = variant.offers.find(
-              (offer) => offer.audience === "retail" && offer.active,
-            );
             const professionalOffer = variant.offers.find(
               (offer) => offer.audience === "professional" && offer.active,
             );
@@ -1559,12 +1586,6 @@ function VariantList({
                       ? ` · ${variant.stockReserved} réservé`
                       : ""}
                   </td>
-                  <td>
-                    {retailOffer
-                      ? formatMoney(retailOffer.price.amount, "fr-FR")
-                      : "—"}
-                  </td>
-                  <td>{formatMoney(variant.internalCostCents, "fr-FR")}</td>
                   <td>
                     <div className="admin-variant-actions">
                       <button
@@ -1647,7 +1668,6 @@ function VariantEditForm({
   demo: boolean;
   onCancel: () => void;
 }) {
-  const retailOffer = variant.offers.find((offer) => offer.audience === "retail");
   const professionalOffer = variant.offers.find((offer) => offer.audience === "professional");
   const [professionalEnabled, setProfessionalEnabled] = useState(
     professionalRequired || Boolean(professionalOffer?.active),
@@ -1711,14 +1731,8 @@ function VariantEditForm({
         </div>
         <div className="field">
           <label>
-            Coût interne (¢)
+            Coût en centimes (¢)
             <input name="internalCostCents" type="number" min="0" defaultValue={variant.internalCostCents} required />
-          </label>
-        </div>
-        <div className="field">
-          <label>
-            Prix public (¢)
-            <input name="retailPriceCents" type="number" min="0" defaultValue={retailOffer?.price.amount ?? 0} required />
           </label>
         </div>
         <div className="field">
@@ -2062,7 +2076,7 @@ export default function AdminProduct() {
             <LanguageTabs
               label="Langue du contenu produit"
               french={<TranslationFields language="Français" translation={product.translations["fr-FR"]} altitudeMeters={product.altitudeMeters} />}
-              english={<>{isNew ? <AutomaticEnglishTranslation /> : null}<TranslationFields language="English" translation={product.translations["en-GB"]} /></>}
+              english={<><AutomaticEnglishTranslation /><TranslationFields language="English" translation={product.translations["en-GB"]} /></>}
             />
           </div>
         </section>
@@ -2135,20 +2149,9 @@ export default function AdminProduct() {
               </div>
               <div className="field">
                 <label>
-                  Coût interne (¢)
+                  Coût en centimes (¢)
                   <input
                     name="internalCostCents"
-                    type="number"
-                    min="0"
-                    required
-                  />
-                </label>
-              </div>
-              <div className="field">
-                <label>
-                  Prix public (¢)
-                  <input
-                    name="retailPriceCents"
                     type="number"
                     min="0"
                     required
