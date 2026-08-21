@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Archive, GripVertical, MoveDown, MoveUp, PackageOpen, Plus, Save } from "lucide-react";
+import { Archive, GripVertical, MoveDown, MoveUp, PackageOpen, Plus, Save, Trash2 } from "lucide-react";
 import { z } from "zod";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Form, Link, useActionData, useFetcher, useLoaderData } from "react-router";
@@ -14,6 +14,7 @@ import { getAdminProducts } from "~/lib/catalog.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
 const productStockUpdateSchema = z.object({ productId: z.uuid(), stockOnHandGrams: z.coerce.number().int().min(0), lowStockThresholdGrams: z.coerce.number().int().min(0) });
+const deleteProductSchema = z.object({ deleteProductId: z.uuid() });
 const variantUpdateSchema = z.object({
   variantId: z.uuid(), internalCostCents: z.coerce.number().int().min(0),
 });
@@ -24,6 +25,22 @@ export async function action({ request }: ActionFunctionArgs) {
   if (admin.demo) return { ok: false, message: "Les mutations sont désactivées en mode démonstration." };
   const form = await request.formData();
   const intent = form.get("intent");
+  if (form.get("deleteProductId")) {
+    const parsed = deleteProductSchema.safeParse({ deleteProductId: form.get("deleteProductId") });
+    if (!parsed.success) return { ok: false, message: "Produit à supprimer invalide." };
+    const client = createServiceSupabase();
+    if (!client) return { ok: false, message: "Base de données indisponible." };
+    const { data: productAssets, error: assetsError } = await client.from("products").select("thumbnail_label_storage_path,hover_image_storage_path").eq("id", parsed.data.deleteProductId).maybeSingle();
+    if (assetsError) return { ok: false, message: assetsError.message };
+    const { data: media, error: mediaError } = await client.from("product_media").select("storage_path").eq("product_id", parsed.data.deleteProductId);
+    if (mediaError) return { ok: false, message: mediaError.message };
+    const { error: deleteError } = await client.from("products").delete().eq("id", parsed.data.deleteProductId);
+    if (deleteError) return { ok: false, message: `Impossible de supprimer ce produit : ${deleteError.message}` };
+    const storagePaths = [productAssets?.thumbnail_label_storage_path, productAssets?.hover_image_storage_path, ...(media ?? []).map((item) => item.storage_path)].filter((path): path is string => Boolean(path));
+    if (storagePaths.length > 0) await client.storage.from("product-media").remove(storagePaths);
+    await client.from("audit_log").insert({ actor_id: admin.id, action: "product.deleted", entity_type: "product", entity_id: parsed.data.deleteProductId, after_data: { deleted: true } });
+    return { ok: true, message: "Produit supprimé définitivement." };
+  }
   if (intent === "reorder_products") {
     const parsed = productOrderSchema.safeParse({ catalogue: form.get("catalogue"), productIds: form.getAll("productId").map(String) });
     if (!parsed.success) return { ok: false, message: "Ordre de produits invalide." };
@@ -100,6 +117,10 @@ function groupProductsByName(products: readonly Product[]): ProductGroup[] {
 function LegacyProductTable({ products, emptyMessage, label }: { products: readonly Product[]; emptyMessage: string; label: string }) {
  return <CardContent style={{ padding: 0 }}><Table aria-label={label}><TableHeader><TableRow><TableHead>Fiche</TableHead><TableHead>Statut</TableHead><TableHead>Variante</TableHead><TableHead>Stock disponible</TableHead><TableHead>Coût interne</TableHead><TableHead>Mise à jour rapide</TableHead></TableRow></TableHeader><TableBody>{products.flatMap((product) => product.variants.length === 0 ? [<TableRow key={product.id}><TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>Ouvrir la fiche</Link></TableCell><TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell><TableCell colSpan={4}><span className="admin-muted">Aucune variante — ouvrez la fiche pour en ajouter une.</span></TableCell></TableRow>] : [...product.variants].sort((left, right) => left.weightGrams - right.weightGrams || left.label.localeCompare(right.label, "fr-FR")).map((variant) => { const availableStock = variant.stockOnHand - variant.stockReserved; return <TableRow key={variant.id}><TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>Ouvrir la fiche</Link><br /><small>{variant.sku}</small></TableCell><TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell><TableCell>{variant.label}</TableCell><TableCell><span className={availableStock <= variant.lowStockThreshold ? "admin-stock-warning" : undefined}>{availableStock}</span><br /><small>Réservé : {variant.stockReserved} · Seuil {variant.lowStockThreshold}</small></TableCell><TableCell>{formatMoney(variant.internalCostCents, "fr-FR")}</TableCell><TableCell><div className="admin-quick-form"><input type="hidden" name="variantId" value={variant.id} /><label><span>Stock total</span><input name="stockOnHand" type="number" min="0" defaultValue={variant.stockOnHand} /></label><label><span>Seuil d’alerte</span><input name="lowStockThreshold" type="number" min="0" defaultValue={variant.lowStockThreshold} /></label><label><span>Coût en centimes</span><input name="internalCostCents" type="number" min="0" defaultValue={variant.internalCostCents} /></label></div></TableCell></TableRow>; }))}</TableBody></Table>{products.length === 0 ? <p className="admin-empty-state">{emptyMessage}</p> : null}</CardContent>;
 }
+function DeleteProductButton({ product }: { product: Product }) {
+  const name = product.translations["fr-FR"].name;
+  return <button className="ui-button ui-button--danger ui-button--sm" type="submit" name="deleteProductId" value={product.id} onClick={(event) => { if (!window.confirm(`Supprimer définitivement « ${name} » et toutes ses données ? Cette action est irréversible.`)) event.preventDefault(); }}><Trash2 aria-hidden="true" /> Supprimer</button>;
+}
 function ProductTable({ products, emptyMessage, label }: { products: readonly Product[]; emptyMessage: string; label: string }) {
   return (
     <CardContent style={{ padding: 0 }}>
@@ -136,7 +157,7 @@ function CoffeeTabs({ products, emptyMessage, label }: { products: readonly Prod
   const groups = groupProductsByName(products); const [activeTab, setActiveTab] = useState(groups[0]?.id ?? ""); useEffect(() => { if (!groups.some((group) => group.id === activeTab)) setActiveTab(groups[0]?.id ?? ""); }, [activeTab, groups]);
   const tabsId = `admin-coffee-${adminCoffeeId(label)}`;
   if (groups.length === 0) return <Card><ProductTable products={[]} label={label} emptyMessage={emptyMessage} /></Card>;
-  return <div className="admin-coffee-tabs"><div className="admin-coffee-tabs__list" role="tablist" aria-label={label}>{groups.map((group) => <button key={group.id} id={`${tabsId}-${group.id}-tab`} className="admin-coffee-tabs__tab" type="button" role="tab" aria-selected={group.id === activeTab} aria-controls={`${tabsId}-${group.id}-panel`} onClick={() => setActiveTab(group.id)}>{group.name}<span>{group.products.reduce((count, product) => count + product.variants.length, 0)}</span></button>)}</div>{groups.map((group) => { const variantCount = group.products.reduce((count, product) => count + product.variants.length, 0); return <div key={group.id} id={`${tabsId}-${group.id}-panel`} role="tabpanel" aria-labelledby={`${tabsId}-${group.id}-tab`} hidden={group.id !== activeTab}><div className="admin-coffee-tabs__summary"><strong>{group.name}</strong><span>{variantCount} variante{variantCount > 1 ? "s" : ""}{group.products.length > 1 ? ` réunies depuis ${group.products.length} fiches` : ""}</span></div><Card><ProductTable products={group.products} label={`${label} — ${group.name}`} emptyMessage={emptyMessage} /></Card></div>; })}</div>;
+  return <div className="admin-coffee-tabs"><div className="admin-coffee-tabs__list" role="tablist" aria-label={label}>{groups.map((group) => <button key={group.id} id={`${tabsId}-${group.id}-tab`} className="admin-coffee-tabs__tab" type="button" role="tab" aria-selected={group.id === activeTab} aria-controls={`${tabsId}-${group.id}-panel`} onClick={() => setActiveTab(group.id)}>{group.name}<span>{group.products.reduce((count, product) => count + product.variants.length, 0)}</span></button>)}</div>{groups.map((group) => { const variantCount = group.products.reduce((count, product) => count + product.variants.length, 0); return <div key={group.id} id={`${tabsId}-${group.id}-panel`} role="tabpanel" aria-labelledby={`${tabsId}-${group.id}-tab`} hidden={group.id !== activeTab}><div className="admin-coffee-tabs__summary"><div className="admin-coffee-tabs__summary-product"><strong>{group.name}</strong><div className="admin-coffee-tabs__summary-actions">{group.products.map((product) => <DeleteProductButton key={product.id} product={product} />)}</div></div><span>{variantCount} variante{variantCount > 1 ? "s" : ""}{group.products.length > 1 ? ` réunies depuis ${group.products.length} fiches` : ""}</span></div><Card><ProductTable products={group.products} label={`${label} — ${group.name}`} emptyMessage={emptyMessage} /></Card></div>; })}</div>;
 }
 function ProductOrderList({
   products,

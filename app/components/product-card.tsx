@@ -119,7 +119,6 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
             loading="lazy"
             decoding="async"
           /> : null}
-          {product.status === "archived" ? <div className="product-ribbons" aria-label={locale === "fr-FR" ? "Statut du café" : "Coffee status"}><span className="product-ribbon product-ribbon--last-stock">{locale === "fr-FR" ? "Archivé" : "Archived"}</span></div> : null}
         </div>
         {quickAdd ? <div className="product-card__image-actions">
           <ProductCardQuickAdd product={product} locale={locale} audience={resolvedAudience} />

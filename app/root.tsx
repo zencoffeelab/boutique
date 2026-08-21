@@ -56,12 +56,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
               .map((product) => ({
                 slug: product.slug,
                 name: product.translations[locale].name,
+                publishedAt: product.publishedAt,
               }))
               .toSorted((first, second) =>
-                first.name.localeCompare(second.name, locale, {
-                  sensitivity: "base",
-                }),
-              ),
+                (second.publishedAt ? Date.parse(second.publishedAt) : 0) -
+                (first.publishedAt ? Date.parse(first.publishedAt) : 0),
+              )
+              .slice(0, 4),
     ),
     shellHidden ? Promise.resolve(null) : getContentPage("bandeau", locale),
     shellHidden ? Promise.resolve(defaultSiteNavigation) : getSiteNavigation(),

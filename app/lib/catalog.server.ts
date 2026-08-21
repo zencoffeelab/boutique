@@ -58,6 +58,7 @@ function mapDatabaseProduct(row: any): Product {
     id: row.id,
     slug: row.slug,
     status: row.status,
+    publishedAt: row.created_at ?? null,
     altitudeMeters: row.altitude_meters,
     featured: row.featured,
     ribbonNew: Boolean(row.ribbon_new),
@@ -135,7 +136,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     .from("products")
     .select(
       `
-      id, slug, status, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+      id, slug, status, created_at, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
       thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
       product_translations(*),
       product_media(*),
@@ -150,7 +151,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const compatibleResult = await client
       .from("products")
       .select(`
-        id, slug, status, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+        id, slug, status, created_at, display_order, altitude_meters, featured, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
         thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
         product_translations(*),
         product_media(*),
@@ -167,7 +168,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const compatibleResult = await client
       .from("products")
       .select(`
-        id, slug, status, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+        id, slug, status, created_at, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
         thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
         product_translations(*),
         product_media(*),
@@ -183,7 +184,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const compatibleResult = await client
       .from("products")
       .select(`
-        id, slug, status, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+        id, slug, status, created_at, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
         thumbnail_label_public_url, thumbnail_background_color,
         product_translations(*),
         product_media(*),
@@ -200,7 +201,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const compatibleResult = await client
       .from("products")
       .select(`
-        id, slug, status, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+        id, slug, status, created_at, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
         product_translations(*),
         product_media(*),
         product_editorial_blocks(*),
@@ -215,7 +216,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const legacyResult = await client
       .from("products")
       .select(`
-        id, slug, status, display_order, altitude_meters, featured,
+        id, slug, status, created_at, display_order, altitude_meters, featured,
         product_translations(*),
         product_media(*),
         product_editorial_blocks(*),
@@ -231,7 +232,7 @@ async function databaseProducts(includeDrafts = false): Promise<Product[]> {
     const legacyResult = await client
       .from("products")
       .select(`
-        id, slug, status, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
+        id, slug, status, created_at, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg,
         thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
         product_translations(*),
         product_media(*),

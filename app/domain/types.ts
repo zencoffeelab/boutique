@@ -99,6 +99,7 @@ export type Product = Readonly<{
   id: string;
   slug: string;
   status: ProductStatus;
+  publishedAt?: string | null;
   altitudeMeters: number;
   featured: boolean;
   ribbonNew: boolean;

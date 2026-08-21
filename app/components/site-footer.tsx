@@ -5,6 +5,7 @@ import { defaultSiteNavigation, getSiteNavigationItem, siteNavigationLabel, type
 type FooterProductLink = Readonly<{
   slug: string;
   name: string;
+  publishedAt?: string | null;
 }>;
 
 export function SiteFooter({ products = [], admin = false, navigation = defaultSiteNavigation }: { products?: readonly FooterProductLink[]; admin?: boolean; navigation?: SiteNavigationConfiguration }) {

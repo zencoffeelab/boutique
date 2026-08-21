@@ -240,7 +240,10 @@ export default function ProductDetail() {
       <article className="product-detail">
         <ProductGallery product={product} locale={locale} />
         <div className="product-info">
-          <h1>{t.name}</h1>
+          <div className="product-info__title">
+            <h1>{t.name}</h1>
+            <p className="product-info__category">{english ? "Specialty coffee" : "Café de spécialité"}</p>
+          </div>
           <table className="product-specifications">
             <tbody>
               <tr><th scope="row">{english ? "Producer" : "Producteur"}</th><td>{t.producer}</td></tr>
