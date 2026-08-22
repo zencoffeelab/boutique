@@ -1632,6 +1632,8 @@ button:disabled {
 .product-info__description {
   margin: 0 0 1.75rem;
   font: 400 1.05rem/1.5 var(--serif);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .variant-selector {
   display: grid;

@@ -1,5 +1,5 @@
 import { Upload } from "lucide-react";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Form } from "react-router";
 import { AdminImageEditorInput, type AdminProcessedImage } from "~/components/admin-image-editor-input";
 import { PRODUCT_THUMBNAIL_BAG_URL, ProductThumbnailLabel } from "~/components/product-thumbnail-label";
@@ -44,6 +44,7 @@ export function AdminProductThumbnailForm({
   const [labelPreview, setLabelPreview] = useState(currentLabelUrl);
   const [detecting, setDetecting] = useState(false);
   const [detectionMessage, setDetectionMessage] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const previewObjectUrl = useRef<string | null>(null);
   const detectionSequence = useRef(0);
 
@@ -72,6 +73,15 @@ export function AdminProductThumbnailForm({
     }
   };
 
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (currentLabelUrl) return;
+    const hasFile = Array.from(event.currentTarget.querySelectorAll<HTMLInputElement>('input[type="file"]'))
+      .some((input) => input.files && input.files.length > 0);
+    if (hasFile) return;
+    event.preventDefault();
+    formRef.current?.querySelector<HTMLInputElement>('input[name="fileSource"]')?.click();
+  };
+
   return <section className="ui-card admin-editor admin-thumbnail-editor">
     <div className="admin-thumbnail-editor__heading">
       <div>
@@ -90,7 +100,7 @@ export function AdminProductThumbnailForm({
         <img className="admin-thumbnail-preview__bag" src={PRODUCT_THUMBNAIL_BAG_URL} alt="" />
         {labelPreview ? <ProductThumbnailLabel className="admin-thumbnail-preview__label" src={labelPreview} alt="Aperçu de l’étiquette" /> : null}
       </div>
-      <Form method="post" encType="multipart/form-data" className="admin-thumbnail-form">
+      <Form ref={formRef} method="post" encType="multipart/form-data" className="admin-thumbnail-form" noValidate onSubmit={handleSubmit}>
         <input type="hidden" name="intent" value="upload_thumbnail_label" />
         <input type="hidden" name="productId" value={productId} />
         <AdminImageEditorInput
@@ -117,7 +127,7 @@ export function AdminProductThumbnailForm({
           </label>
           <small aria-live="polite">{detecting ? "Analyse de l’étiquette…" : detectionMessage ?? "Détectée automatiquement, puis ajustable si nécessaire."}</small>
         </div>
-        <button className="ui-button ui-button--outline" type="submit" disabled={demo || detecting}>
+        <button className="ui-button ui-button--outline" type="submit" disabled={demo}>
           <Upload aria-hidden="true" /> {currentLabelUrl ? "Enregistrer la miniature" : "Ajouter l’étiquette"}
         </button>
       </Form>

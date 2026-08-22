@@ -12,6 +12,55 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-22-product-thumbnail-label-button-opens-file-picker",
+    date: "2026-08-22",
+    kind: "Correction",
+    title: "Bouton d’ajout d’étiquette plus direct",
+    description: "Le bouton « Ajouter l’étiquette » ouvre désormais le sélecteur d’image lorsqu’aucun fichier n’est encore sélectionné, au lieu de rester sans effet visible.",
+  },
+  {
+    id: "2026-08-22-product-thumbnail-label-upload-not-blocked-by-color-detection",
+    date: "2026-08-22",
+    kind: "Correction",
+    title: "Ajout d’étiquette non bloqué par la détection de couleur",
+    description: "L’étiquette de la miniature peut désormais être enregistrée dès que l’image est prête, même si la détection automatique de sa couleur prend plus de temps.",
+  },
+  {
+    id: "2026-08-22-product-short-description-preserves-editor-layout",
+    date: "2026-08-22",
+    kind: "Correction",
+    title: "Description courte alignée sur le contenu de l’éditeur",
+    description: "La fiche publique conserve désormais les retours à la ligne et les espaces saisis dans la description courte de l’éditeur, notamment pour le café Test de torréfaction.",
+  },
+  {
+    id: "2026-08-22-product-publication-missing-translation-fields",
+    date: "2026-08-22",
+    kind: "Correction",
+    title: "Publication possible lorsque des champs de traduction sont absents",
+    description: "Les champs textuels non transmis par le formulaire sont désormais enregistrés comme vides, afin de ne plus bloquer la mise en ligne d’un café incomplet.",
+  },
+  {
+    id: "2026-08-22-product-translation-allows-incomplete-result",
+    date: "2026-08-22",
+    kind: "Correction",
+    title: "Traduction automatique tolérante aux résultats partiels",
+    description: "La traduction anglaise ne bloque plus lorsque le service renvoie un champ vide ou manquant : les champs concernés restent simplement à compléter.",
+  },
+  {
+    id: "2026-08-22-product-translation-with-incomplete-french-content",
+    date: "2026-08-22",
+    kind: "Correction",
+    title: "Traduction anglaise possible avec un contenu français partiel",
+    description: "Le bouton de traduction automatique peut désormais être utilisé avant d’avoir renseigné tous les champs français du café.",
+  },
+  {
+    id: "2026-08-22-product-publication-with-incomplete-translations",
+    date: "2026-08-22",
+    kind: "Correction",
+    title: "Publication d’un café avec des traductions incomplètes",
+    description: "La mise en ligne d’un café n’est plus bloquée lorsque certains champs de contenu ou de traduction ne sont pas encore renseignés.",
+  },
+  {
     id: "2026-08-21-product-specialty-coffee-label-aligned-to-name",
     date: "2026-08-21",
     kind: "Design",

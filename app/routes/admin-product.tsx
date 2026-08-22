@@ -27,6 +27,8 @@ import { getAdminProducts } from "~/lib/catalog.server";
 import { PUBLIC_MEDIA_CACHE_SECONDS, PUBLIC_MEDIA_MAX_UPLOAD_BYTES } from "~/lib/public-media";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
+const optionalText = (max: number) => z.string().trim().max(max).optional().default("");
+
 const productSchema = z.object({
   intent: z.literal("save_product"),
   productId: z.string().min(1),
@@ -41,39 +43,29 @@ const productSchema = z.object({
   ribbonBackSoon: z.string().optional().transform(Boolean),
   professionalEnabled: z.string().optional().transform(Boolean),
   professionalStockKg: z.coerce.number().min(0).max(1_000_000),
-  nameFr: z.string().trim().min(2),
-  nameEn: z.string().trim().min(2),
-  shortFr: z.string().trim().min(10),
-  shortEn: z.string().trim().min(10),
-  producerFr: z.string().trim().min(1),
-  producerEn: z.string().trim().min(1),
-  regionFr: z.string().trim().min(1),
-  regionEn: z.string().trim().min(1),
-  varietyFr: z.string().trim().min(1),
-  varietyEn: z.string().trim().min(1),
-  processFr: z.string().trim().min(1),
-  processEn: z.string().trim().min(1),
-  notesFr: z.string(),
-  notesEn: z.string(),
-  seoTitleFr: z.string().trim().min(2),
-  seoTitleEn: z.string().trim().min(2),
-  seoDescriptionFr: z.string().trim().min(10),
-  seoDescriptionEn: z.string().trim().min(10),
-  focusKeyphraseFr: z.string().trim().max(160).optional().default(""),
-  focusKeyphraseEn: z.string().trim().max(160).optional().default(""),
+  nameFr: optionalText(180), nameEn: optionalText(180),
+  shortFr: optionalText(8_000), shortEn: optionalText(8_000),
+  producerFr: optionalText(180), producerEn: optionalText(180),
+  regionFr: optionalText(180), regionEn: optionalText(180),
+  varietyFr: optionalText(180), varietyEn: optionalText(180),
+  processFr: optionalText(180), processEn: optionalText(180),
+  notesFr: optionalText(8_000), notesEn: optionalText(8_000),
+  seoTitleFr: optionalText(180), seoTitleEn: optionalText(180),
+  seoDescriptionFr: optionalText(320), seoDescriptionEn: optionalText(320),
+  focusKeyphraseFr: optionalText(160), focusKeyphraseEn: optionalText(160),
 });
 const automaticTranslationSchema = z.object({
   intent: z.literal("translate_product_to_english"),
-  nameFr: z.string().trim().min(2), shortFr: z.string().trim().min(10),
-  producerFr: z.string().trim().min(1), regionFr: z.string().trim().min(1),
-  varietyFr: z.string().trim().min(1), processFr: z.string().trim().min(1), notesFr: z.string(),
-  seoTitleFr: z.string().trim().min(2), seoDescriptionFr: z.string().trim().min(10),
+  nameFr: optionalText(180), shortFr: optionalText(8_000),
+  producerFr: optionalText(180), regionFr: optionalText(180),
+  varietyFr: optionalText(180), processFr: optionalText(180), notesFr: optionalText(8_000),
+  seoTitleFr: optionalText(180), seoDescriptionFr: optionalText(320),
 });
 const englishTranslationSchema = z.object({
-  nameEn: z.string().trim().min(2), shortEn: z.string().trim().min(10),
-  producerEn: z.string().trim().min(1), regionEn: z.string().trim().min(1),
-  varietyEn: z.string().trim().min(1), processEn: z.string().trim().min(1), notesEn: z.string(),
-  seoTitleEn: z.string().trim().min(2), seoDescriptionEn: z.string().trim().min(10),
+  nameEn: optionalText(180), shortEn: optionalText(8_000),
+  producerEn: optionalText(180), regionEn: optionalText(180),
+  varietyEn: optionalText(180), processEn: optionalText(180), notesEn: optionalText(8_000),
+  seoTitleEn: optionalText(180), seoDescriptionEn: optionalText(320),
 });
 const variantFieldsSchema = {
   sku: z.string().trim().min(2).max(80),
@@ -963,7 +955,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!parsed.success)
     return {
       ok: false,
-      message: "Les deux versions linguistiques doivent être complètes.",
+      message: `Impossible d’enregistrer le café : ${Object.keys(parsed.error.flatten().fieldErrors).join(", ") || "un champ est invalide"}.`,
       errors: parsed.error.flatten().fieldErrors,
     };
   const creating = parsed.data.productId === "nouveau";
@@ -1212,7 +1204,6 @@ function TranslationFields({
             <input
               name={`name${suffix}`}
               defaultValue={translation.name}
-              required
             />
           </label>
         </div>
@@ -1222,7 +1213,6 @@ function TranslationFields({
             <textarea
               name={`short${suffix}`}
               defaultValue={translation.shortDescription}
-              required
             />
           </label>
         </div>
@@ -1232,7 +1222,6 @@ function TranslationFields({
             <input
               name={`seoTitle${suffix}`}
               defaultValue={translation.seoTitle}
-              required
             />
           </label>
         </div>
@@ -1242,7 +1231,6 @@ function TranslationFields({
             <textarea
               name={`seoDescription${suffix}`}
               defaultValue={translation.seoDescription}
-              required
             />
           </label>
         </div>
@@ -1275,7 +1263,6 @@ function TranslationFields({
             <input
               name={`producer${suffix}`}
               defaultValue={translation.producer}
-              required
             />
           </label>
         </div>
@@ -1285,7 +1272,6 @@ function TranslationFields({
             <input
               name={`region${suffix}`}
               defaultValue={translation.region}
-              required
             />
           </label>
         </div>
@@ -1295,7 +1281,6 @@ function TranslationFields({
             <input
               name={`variety${suffix}`}
               defaultValue={translation.variety}
-              required
             />
           </label>
         </div>
@@ -1311,7 +1296,6 @@ function TranslationFields({
             <input
               name={`process${suffix}`}
               defaultValue={translation.process}
-              required
             />
           </label>
         </div>
