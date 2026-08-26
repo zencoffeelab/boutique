@@ -107,6 +107,7 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(() => new URLSearchParams(location.search).get("account") === "welcome");
   const [mobilePreview, setMobilePreview] = useState(false);
+  const embeddedMobilePreview = new URLSearchParams(location.search).get("mobilePreview") === "1";
   const { itemCount, drawerOpen, openDrawer, closeDrawer } = useCart();
   const quoteCart = useQuoteCart();
   const paths = locale === "fr-FR"
@@ -128,18 +129,34 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
   const frenchPath = locale === "fr-FR" ? currentLanguagePath : alternateLanguagePath;
   const englishPath = locale === "en-GB" ? currentLanguagePath : alternateLanguagePath;
   useEffect(() => {
-    if (!admin) return;
+    if (!admin || embeddedMobilePreview) return;
     const enabled = window.sessionStorage.getItem("zen-admin-mobile-preview") === "true";
     setMobilePreview(enabled);
-    document.body.classList.toggle("mobile-preview-mode", enabled);
-    return () => document.body.classList.remove("mobile-preview-mode");
-  }, [admin]);
+  }, [admin, embeddedMobilePreview]);
+  useEffect(() => {
+    if (!embeddedMobilePreview) return;
+    const preservePreviewOnNavigation = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!(target instanceof HTMLAnchorElement) || target.target === "_blank" || target.hasAttribute("download")) return;
+      const url = new URL(target.href, window.location.href);
+      if (url.origin !== window.location.origin || url.searchParams.has("mobilePreview")) return;
+      event.preventDefault();
+      url.searchParams.set("mobilePreview", "1");
+      window.location.assign(`${url.pathname}${url.search}${url.hash}`);
+    };
+    document.addEventListener("click", preservePreviewOnNavigation, true);
+    return () => document.removeEventListener("click", preservePreviewOnNavigation, true);
+  }, [embeddedMobilePreview]);
   const toggleMobilePreview = () => {
     const next = !mobilePreview;
     setMobilePreview(next);
     window.sessionStorage.setItem("zen-admin-mobile-preview", String(next));
-    document.body.classList.toggle("mobile-preview-mode", next);
   };
+  const closeMobilePreview = () => {
+    setMobilePreview(false);
+    window.sessionStorage.setItem("zen-admin-mobile-preview", "false");
+  };
+  const mobilePreviewUrl = `${location.pathname}${location.search ? `${location.search}&` : "?"}mobilePreview=1`;
   return (
     <>
       <a className="skip-link" href="#main-content">{locale === "fr-FR" ? "Aller au contenu" : "Skip to content"}</a>
@@ -163,13 +180,22 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
           <button className="icon-button cart-button" type="button" onClick={() => { closeMenu(); openDrawer(); }} aria-label={`${t.cart} (${itemCount})`} aria-expanded={drawerOpen} aria-controls="cart-drawer">
             <ShoppingBag aria-hidden="true" /><span>{itemCount}</span>
           </button>
-          {admin ? <button className={`admin-mobile-preview-button${mobilePreview ? " is-active" : ""}`} type="button" onClick={toggleMobilePreview} aria-pressed={mobilePreview} aria-label={mobilePreview ? "Désactiver l’aperçu mobile" : "Activer l’aperçu mobile"} title={mobilePreview ? "Désactiver l’aperçu mobile" : "Aperçu mobile"}><MonitorSmartphone aria-hidden="true" /><span>Mobile</span></button> : null}
+          {admin && !embeddedMobilePreview ? <button className={`admin-mobile-preview-button${mobilePreview ? " is-active" : ""}`} type="button" onClick={toggleMobilePreview} aria-pressed={mobilePreview} aria-label={mobilePreview ? "Désactiver l’aperçu mobile" : "Activer l’aperçu mobile"} title={mobilePreview ? "Désactiver l’aperçu mobile" : "Aperçu mobile"}><MonitorSmartphone aria-hidden="true" /><span>Mobile</span></button> : null}
           {signedIn ? <button className="account-button is-signed-in" type="button" onClick={openAccountDrawer} aria-label={accountLabel} aria-expanded={accountDrawerOpen} aria-controls="account-drawer"><AccountLinkContent signedIn label={accountLabel} initials={accountInitials} /></button> : <Link className="account-button" to={paths.account} aria-label={accountLabel}><AccountLinkContent signedIn={false} label={accountLabel} initials={null} /></Link>}
         </div>
       </header>
       <CartDrawer open={drawerOpen} locale={locale} onClose={closeDrawer} />
       {professional ? <QuoteCartDrawer locale={locale} /> : null}
       {signedIn ? <AccountDrawer open={accountDrawerOpen} locale={locale} onClose={closeAccountDrawer} /> : null}
+      {admin && mobilePreview && !embeddedMobilePreview ? <div className="admin-mobile-preview" role="dialog" aria-modal="true" aria-label="Aperçu mobile du site">
+        <div className="admin-mobile-preview__toolbar">
+          <span><MonitorSmartphone aria-hidden="true" /> Aperçu mobile</span>
+          <button type="button" onClick={closeMobilePreview} aria-label="Fermer l’aperçu mobile" title="Fermer l’aperçu mobile"><X aria-hidden="true" /></button>
+        </div>
+        <div className="admin-mobile-preview__device">
+          <iframe title="Aperçu mobile de la page" src={mobilePreviewUrl} />
+        </div>
+      </div> : null}
     </>
   );
 }

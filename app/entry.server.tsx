@@ -32,7 +32,7 @@ export default async function handleRequest(
   responseHeaders.set("content-type", "text/html; charset=utf-8");
   if (!responseHeaders.has("cache-control")) responseHeaders.set("cache-control", htmlCacheControl(request));
   responseHeaders.set("x-content-type-options", "nosniff");
-  responseHeaders.set("x-frame-options", "DENY");
+  responseHeaders.set("x-frame-options", new URL(request.url).searchParams.get("mobilePreview") === "1" ? "SAMEORIGIN" : "DENY");
   responseHeaders.set("referrer-policy", "strict-origin-when-cross-origin");
   responseHeaders.set("permissions-policy", "camera=(), microphone=(), geolocation=()");
   return new Response(body, { headers: responseHeaders, status: responseStatusCode });

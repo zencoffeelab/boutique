@@ -619,21 +619,67 @@ button:disabled {
   background: var(--green);
   color: var(--cream);
 }
-body.mobile-preview-mode {
-  background: #d8d8d2;
+.admin-mobile-preview {
+  position: fixed;
+  z-index: 200;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  justify-items: center;
+  padding: 1rem;
+  background: rgb(16 23 13 / 72%);
+  overflow: auto;
 }
-body.mobile-preview-mode > .announcement,
-body.mobile-preview-mode > .site-header,
-body.mobile-preview-mode > #main-content,
-body.mobile-preview-mode > .site-footer {
-  width: min(100%, 390px);
-  margin-inline: auto;
+.admin-mobile-preview__toolbar {
+  display: flex;
+  width: min(100%, 430px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.75rem;
   background: var(--cream);
+  color: var(--green-deep);
+  font: 700 0.7rem/1 var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
-body.mobile-preview-mode > .site-header,
-body.mobile-preview-mode > #main-content,
-body.mobile-preview-mode > .site-footer {
-  box-shadow: 0 0 0 1px rgb(16 23 13 / 10%);
+.admin-mobile-preview__toolbar span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.admin-mobile-preview__toolbar svg {
+  width: 1rem;
+  height: 1rem;
+}
+.admin-mobile-preview__toolbar button {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.admin-mobile-preview__toolbar button:hover,
+.admin-mobile-preview__toolbar button:focus-visible {
+  background: var(--green-pastel);
+}
+.admin-mobile-preview__device {
+  width: 390px;
+  max-width: none;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--cream);
+  box-shadow: 0 1rem 3rem rgb(0 0 0 / 28%);
+}
+.admin-mobile-preview__device iframe {
+  display: block;
+  width: 100%;
+  height: max(600px, calc(100vh - 5.5rem));
+  border: 0;
+  background: var(--cream);
 }
 .mobile-account-link {
   display: none;
@@ -7492,12 +7538,28 @@ body.advice-detail-overflow-hidden {
 
 @media (max-width: 700px) {
   .product-tasting-notes ul {
+    flex-direction: column;
+    align-items: center;
     justify-content: flex-start;
+    gap: 0.3rem;
     overflow: hidden;
     padding-inline: 0;
   }
   .product-tasting-notes li {
-    font-size: clamp(1.15rem, 5vw, 1.8rem);
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: clamp(1.45rem, 8vw, 2.25rem);
+  }
+  .product-tasting-notes li + li::before {
+    display: none;
+  }
+  .product-tasting-notes li::after {
+    content: "—";
+    color: var(--green);
+  }
+  .product-extraction-guide h2 {
+    font-size: clamp(1.45rem, 8vw, 2.25rem);
   }
   .product-preview-banner {
     width: calc(100% - 2rem);

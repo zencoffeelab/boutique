@@ -12,6 +12,41 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-27-english-tasting-notes-capitalization",
+    date: "2026-08-27",
+    kind: "Correction",
+    title: "Majuscules des notes de dégustation anglaises harmonisées",
+    description: "La première lettre de chaque note de dégustation est désormais automatiquement affichée en majuscule sur les cartes et les fiches produit en anglais.",
+  },
+  {
+    id: "2026-08-27-mobile-extraction-guide-title-size",
+    date: "2026-08-27",
+    kind: "Design",
+    title: "Titre de la recette d’extraction agrandi sur mobile",
+    description: "Le titre « Notre recette d’extraction pour filtre/v60 » utilise désormais sur mobile la même taille renforcée que les notes de dégustation.",
+  },
+  {
+    id: "2026-08-27-mobile-product-tasting-note-separators-centered",
+    date: "2026-08-27",
+    kind: "Design",
+    title: "Séparateurs des notes de dégustation centrés",
+    description: "Les tirets affichés sous les notes de dégustation sont désormais centrés horizontalement sur mobile.",
+  },
+  {
+    id: "2026-08-27-mobile-product-tasting-notes-vertical",
+    date: "2026-08-27",
+    kind: "Design",
+    title: "Notes de dégustation verticales sur mobile",
+    description: "Les notes de dégustation des fiches produit sont désormais affichées une par une sur mobile, avec le séparateur sous chaque note et une police plus grande.",
+  },
+  {
+    id: "2026-08-26-admin-mobile-preview-frame-policy",
+    date: "2026-08-26",
+    kind: "Correction",
+    title: "Aperçu mobile rendu visible dans son iframe",
+    description: "Les pages ouvertes par le mode Mobile administrateur peuvent désormais être encadrées par leur propre origine, tandis que les pages normales conservent la protection anti-iframe.",
+  },
+  {
     id: "2026-08-26-ci-content-pages-count",
     date: "2026-08-26",
     kind: "Maintenance",
@@ -24,6 +59,13 @@ export const siteChangelog = [
     kind: "Correction",
     title: "CI et affichage des images de la messagerie corrigés",
     description: "Le badge des produits archivés est de nouveau rendu comme attendu par la CI, et les images distantes des e-mails sont désormais visibles à l’ouverture du message avec une commande pour les masquer.",
+  },
+  {
+    id: "2026-08-26-admin-mobile-page-preview-iframe",
+    date: "2026-08-26",
+    kind: "Fonctionnalité",
+    title: "Aperçu mobile fidèle dans un viewport simulé",
+    description: "Le bouton Mobile des comptes administrateurs ouvre désormais la page courante dans une iframe de 390 px afin d’appliquer exactement les règles responsive du téléphone, y compris lors des navigations internes.",
   },
   {
     id: "2026-08-26-admin-mobile-page-preview",

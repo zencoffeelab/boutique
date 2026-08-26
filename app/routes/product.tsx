@@ -13,6 +13,7 @@ import { getAdminProducts, getProducts, hasPurchasableVariant } from "~/lib/cata
 import { getLocale } from "~/lib/i18n";
 import { getRelatedProducts } from "~/lib/product-recommendations";
 import { isProductSoldOut } from "~/lib/product-ribbons";
+import { displayTastingNote } from "~/lib/product-text";
 import { JsonLd, pageMeta, productStructuredData } from "~/lib/seo";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -270,7 +271,7 @@ export default function ProductDetail() {
             {english ? "Tasting notes" : "Notes de dégustation"}
           </h2>
           <ul>
-            {t.tastingNotes.map((note) => <li key={note}>{note}</li>)}
+            {t.tastingNotes.map((note) => <li key={note}>{displayTastingNote(note, locale)}</li>)}
           </ul>
         </section>
       ) : null}

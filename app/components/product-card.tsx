@@ -10,6 +10,7 @@ import type { Audience, Locale, Product } from "~/domain/types";
 import { formatMoney } from "~/domain/money";
 import { dictionary } from "~/lib/i18n";
 import { isProductSoldOut } from "~/lib/product-ribbons";
+import { displayTastingNote } from "~/lib/product-text";
 
 function ProductCardQuickAdd({ product, locale, audience }: { product: Product; locale: Locale; audience: Audience }) {
   const menuId = useId();
@@ -131,7 +132,7 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
         <ul className="taste-list" aria-label={locale === "fr-FR" ? "Variété et traitement" : "Variety and process"}>
           <li>{translation.variety}</li><li>{translation.process}</li>
         </ul>
-        <p className="product-card__tasting-notes" aria-label={locale === "fr-FR" ? "Notes de dégustation" : "Tasting notes"}>{translation.tastingNotes.slice(0, 3).join(" — ")}</p>
+        <p className="product-card__tasting-notes" aria-label={locale === "fr-FR" ? "Notes de dégustation" : "Tasting notes"}>{translation.tastingNotes.slice(0, 3).map((note) => displayTastingNote(note, locale)).join(" — ")}</p>
         {quoteAdd || product.status === "archived" || !pack200Offer ? null : <p className="product-card__price">{formatMoney(pack200Offer.price.amount, locale)}</p>}
         {quoteAdd ? <ProfessionalQuoteAdd product={product} locale={locale} /> : null}
       </div>
