@@ -69,7 +69,7 @@ test("pages separate content editing from menu and footer arrangement", async ({
 
   await page.getByRole("tab", { name: "Contenu" }).click();
   await expect(page).toHaveURL(/\/admin\/contenus$/);
-  await expect(page.locator(".admin-content-page")).toHaveCount(9);
+  await expect(page.locator(".admin-content-page")).toHaveCount(10);
 });
 
 test("product editor provides a save action at the top", async ({ page }) => {

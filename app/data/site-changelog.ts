@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-26-ci-content-pages-count",
+    date: "2026-08-26",
+    kind: "Maintenance",
+    title: "Test CI des pages de contenu mis à jour",
+    description: "Le parcours E2E de l’administration prend désormais en compte les dix pages de contenu disponibles, dont la page Professionnel connecté.",
+  },
+  {
     id: "2026-08-26-admin-mail-ci-and-images",
     date: "2026-08-26",
     kind: "Correction",
