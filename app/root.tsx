@@ -13,6 +13,7 @@ import {
   redirect,
 } from "react-router";
 import { CartProvider } from "~/components/cart/cart-provider";
+import { PublicCaptchaMount } from "~/components/public-captcha";
 import { ComingSoonPage } from "~/components/coming-soon-page";
 import { QuoteCartProvider } from "~/components/professional-quote/quote-cart-provider";
 import { CookieConsent } from "~/components/cookie-consent";
@@ -117,6 +118,7 @@ export default function App() {
         </CartProvider>}
         <ScrollRestoration />
         <Scripts />
+        <PublicCaptchaMount />
       </body>
     </html>
   );

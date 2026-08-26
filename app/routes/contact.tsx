@@ -8,6 +8,7 @@ import { pageMeta } from "~/lib/seo";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { contactAdminAlertEmail, contactMessageReceivedEmail } from "~/services/email-templates.server";
 import { dispatchNotificationQueue, enqueueNotification } from "~/services/notifications.server";
+import { captchaRejected, verifyPublicCaptcha } from "~/lib/antispam.server";
 
 export async function loader({ request }: LoaderFunctionArgs) { const locale = getLocale(request); return { locale, content: await getContentPage("contact", locale) }; }
 
@@ -20,9 +21,10 @@ const SUBJECT_LABELS = {
 export async function action({ request, context }: ActionFunctionArgs) {
   if (request.method !== "POST") return Response.json({ ok: false, message: "Method not allowed." }, { status: 405 });
   const raw = Object.fromEntries(await request.formData());
+  const locale = raw.locale === "en-GB" ? "en-GB" : "fr-FR";
+  if (!(await verifyPublicCaptcha(request, raw))) return captchaRejected(locale);
   const input = { ...raw, privacyConsent: raw.privacyConsent === "true" };
   const parsed = contactFormSchema.safeParse(input);
-  const locale = raw.locale === "en-GB" ? "en-GB" : "fr-FR";
   const english = locale === "en-GB";
   if (!parsed.success) return data<ContactActionResult>({ ok: false, message: english ? "Please check the highlighted fields." : "Veuillez vérifier les champs du formulaire.", errors: parsed.error.flatten().fieldErrors }, { status: 422 });
   if (parsed.data.website) return data<ContactActionResult>({ ok: true, message: english ? "Your message has been sent." : "Votre message a bien été envoyé." });

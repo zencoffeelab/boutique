@@ -3,10 +3,14 @@ import { checkoutSchema } from "~/domain/schemas";
 import { getViewer } from "~/lib/auth.server";
 import { authConfirmationUrl, createRequestSupabase } from "~/lib/supabase.server";
 import { createCheckout } from "~/services/checkout.server";
+import { captchaRejected, verifyPublicCaptcha } from "~/lib/antispam.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") return Response.json({ ok: false, message: "Method not allowed." }, { status: 405 });
-  const parsed = checkoutSchema.safeParse(await request.json().catch(() => null));
+  const raw = await request.json().catch(() => null);
+  const locale = raw && typeof raw === "object" && (raw as Record<string, unknown>).locale === "en-GB" ? "en-GB" : "fr-FR";
+  if (!(await verifyPublicCaptcha(request, raw && typeof raw === "object" ? raw as Record<string, unknown> : {}))) return captchaRejected(locale);
+  const parsed = checkoutSchema.safeParse(raw);
   if (!parsed.success) return Response.json({ ok: false, message: "Invalid checkout request.", errors: parsed.error.flatten().fieldErrors }, { status: 422 });
   const viewer = await getViewer(request); const audience = viewer?.profile?.professional_status === "approved" ? "professional" : "retail";
   let profileId = viewer?.user.id;

@@ -12,6 +12,34 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-26-product-extraction-guide-page-background",
+    date: "2026-08-26",
+    kind: "Design",
+    title: "Fond du bloc de recette d’extraction harmonisé",
+    description: "Le bloc « Notre recette d’extraction » reprend désormais le même fond que la page produit au lieu d’un fond distinct.",
+  },
+  {
+    id: "2026-08-26-mobile-product-tasting-notes-size",
+    date: "2026-08-26",
+    kind: "Design",
+    title: "Notes de dégustation plus lisibles sur mobile",
+    description: "Les notes de dégustation des fiches produit utilisent désormais une police plus grande sur mobile tout en restant sur une seule ligne, avec un défilement horizontal lorsque nécessaire.",
+  },
+  {
+    id: "2026-08-26-home-editorial-paragraph-spacing",
+    date: "2026-08-26",
+    kind: "Correction",
+    title: "Espacement des paragraphes éditoriaux de l’accueil corrigé",
+    description: "Le texte de présentation de l’accueil ne conserve plus d’espace final ni de saut de ligne forcé entre les phrases sur le travail réalisé en amont et la torréfaction de chaque café, en français comme en anglais.",
+  },
+  {
+    id: "2026-08-26-public-forms-anti-spam-captcha",
+    date: "2026-08-26",
+    kind: "Configuration",
+    title: "Protection anti-spam des formulaires publics",
+    description: "Les formulaires publics utilisent désormais reCAPTCHA et Cloudflare Turnstile, avec une vérification serveur obligatoire sur les soumissions et les endpoints JSON associés.",
+  },
+  {
     id: "2026-08-22-product-thumbnail-label-button-opens-file-picker",
     date: "2026-08-22",
     kind: "Correction",

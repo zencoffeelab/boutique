@@ -1825,7 +1825,7 @@ button:disabled {
   margin: 3rem auto 0;
   padding: var(--product-guide-space) clamp(1.5rem, 4vw, 3rem) var(--product-guide-space);
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--cream);
   text-align: center;
 }
 .product-extraction-guide h2 {
@@ -7449,6 +7449,15 @@ body.advice-detail-overflow-hidden {
 }
 
 @media (max-width: 700px) {
+  .product-tasting-notes ul {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-inline: 0.25rem;
+    scrollbar-width: thin;
+  }
+  .product-tasting-notes li {
+    font-size: clamp(1.15rem, 5vw, 1.8rem);
+  }
   .product-preview-banner {
     width: calc(100% - 2rem);
     align-items: stretch;
@@ -8756,4 +8765,28 @@ body.advice-detail-overflow-hidden {
   .admin-seo-analysis__scores {
     grid-template-columns: 1fr;
   }
+}
+.public-captcha {
+  border: 0;
+  margin: 1.5rem 0 0;
+  padding: 0;
+}
+
+.public-captcha legend {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.public-captcha__checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.public-captcha__recaptcha,
+.public-captcha__turnstile {
+  min-height: 65px;
 }
