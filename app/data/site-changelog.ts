@@ -12,6 +12,27 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-26-admin-mail-ci-and-images",
+    date: "2026-08-26",
+    kind: "Correction",
+    title: "CI et affichage des images de la messagerie corrigés",
+    description: "Le badge des produits archivés est de nouveau rendu comme attendu par la CI, et les images distantes des e-mails sont désormais visibles à l’ouverture du message avec une commande pour les masquer.",
+  },
+  {
+    id: "2026-08-26-admin-mobile-page-preview",
+    date: "2026-08-26",
+    kind: "Fonctionnalité",
+    title: "Aperçu mobile accessible aux administrateurs",
+    description: "Les comptes administrateurs disposent désormais d’un bouton Mobile dans l’en-tête pour afficher chaque page du site dans une largeur mobile, avec mémorisation pendant la session.",
+  },
+  {
+    id: "2026-08-26-mobile-product-tasting-notes-no-scrollbar",
+    date: "2026-08-26",
+    kind: "Correction",
+    title: "Barre de défilement supprimée des notes de dégustation mobiles",
+    description: "Les notes de dégustation restent présentées sur une seule ligne sur mobile sans afficher de barre de défilement horizontale.",
+  },
+  {
     id: "2026-08-26-product-extraction-guide-page-background",
     date: "2026-08-26",
     kind: "Design",

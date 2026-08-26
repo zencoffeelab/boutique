@@ -12,7 +12,7 @@ export function AdminEmailBody({ messageId, html, text, attachments }: AdminEmai
   const hasHtml = Boolean(html?.trim());
   const hasText = Boolean(text?.trim());
   const [view, setView] = useState<"html" | "text">(hasHtml ? "html" : "text");
-  const [allowRemoteContent, setAllowRemoteContent] = useState(false);
+  const [allowRemoteContent, setAllowRemoteContent] = useState(true);
   const includesRemoteContent = hasHtml && hasRemoteEmailContent(html ?? "");
   const emailDocument = useMemo(() => hasHtml ? buildEmailHtmlDocument({
     html: html ?? "",

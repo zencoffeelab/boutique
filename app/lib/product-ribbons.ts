@@ -1,4 +1,4 @@
-export type ProductRibbon = "new" | "last-stock" | "sold-out" | "back-soon";
+export type ProductRibbon = "new" | "last-stock" | "sold-out" | "back-soon" | "archived";
 
 export function isProductSoldOut(stockOnHandGrams: number, status: "draft" | "published" | "archived") {
   return status !== "archived" && stockOnHandGrams <= 0;

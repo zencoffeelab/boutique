@@ -1,5 +1,5 @@
-import { Check, ChevronDown, FileText, Menu, ShoppingBag, X } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { Check, ChevronDown, FileText, Menu, MonitorSmartphone, ShoppingBag, X } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { AccountDrawer } from "~/components/account/account-drawer";
 import { CartDrawer } from "~/components/cart/cart-drawer";
@@ -100,12 +100,13 @@ function LanguageSelector({ locale, frenchPath, englishPath }: { locale: Locale;
   </div>;
 }
 
-export function SiteHeader({ signedIn, professional, accountInitials, announcement, navigation = defaultSiteNavigation }: { signedIn: boolean; professional: boolean; accountInitials: string | null; announcement?: string; navigation?: SiteNavigationConfiguration }) {
+export function SiteHeader({ signedIn, professional, accountInitials, admin = false, announcement, navigation = defaultSiteNavigation }: { signedIn: boolean; professional: boolean; accountInitials: string | null; admin?: boolean; announcement?: string; navigation?: SiteNavigationConfiguration }) {
   const location = useLocation();
   const locale = location.pathname === "/en" || location.pathname.startsWith("/en/") ? "en-GB" : "fr-FR";
   const t = dictionary[locale];
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(() => new URLSearchParams(location.search).get("account") === "welcome");
+  const [mobilePreview, setMobilePreview] = useState(false);
   const { itemCount, drawerOpen, openDrawer, closeDrawer } = useCart();
   const quoteCart = useQuoteCart();
   const paths = locale === "fr-FR"
@@ -126,6 +127,19 @@ export function SiteHeader({ signedIn, professional, accountInitials, announceme
   const alternateLanguagePath = `${alternatePath(location.pathname)}${location.search}`;
   const frenchPath = locale === "fr-FR" ? currentLanguagePath : alternateLanguagePath;
   const englishPath = locale === "en-GB" ? currentLanguagePath : alternateLanguagePath;
+  useEffect(() => {
+    if (!admin) return;
+    const enabled = window.sessionStorage.getItem("zen-admin-mobile-preview") === "true";
+    setMobilePreview(enabled);
+    document.body.classList.toggle("mobile-preview-mode", enabled);
+    return () => document.body.classList.remove("mobile-preview-mode");
+  }, [admin]);
+  const toggleMobilePreview = () => {
+    const next = !mobilePreview;
+    setMobilePreview(next);
+    window.sessionStorage.setItem("zen-admin-mobile-preview", String(next));
+    document.body.classList.toggle("mobile-preview-mode", next);
+  };
   return (
     <>
       <a className="skip-link" href="#main-content">{locale === "fr-FR" ? "Aller au contenu" : "Skip to content"}</a>
@@ -149,6 +163,7 @@ export function SiteHeader({ signedIn, professional, accountInitials, announceme
           <button className="icon-button cart-button" type="button" onClick={() => { closeMenu(); openDrawer(); }} aria-label={`${t.cart} (${itemCount})`} aria-expanded={drawerOpen} aria-controls="cart-drawer">
             <ShoppingBag aria-hidden="true" /><span>{itemCount}</span>
           </button>
+          {admin ? <button className={`admin-mobile-preview-button${mobilePreview ? " is-active" : ""}`} type="button" onClick={toggleMobilePreview} aria-pressed={mobilePreview} aria-label={mobilePreview ? "Désactiver l’aperçu mobile" : "Activer l’aperçu mobile"} title={mobilePreview ? "Désactiver l’aperçu mobile" : "Aperçu mobile"}><MonitorSmartphone aria-hidden="true" /><span>Mobile</span></button> : null}
           {signedIn ? <button className="account-button is-signed-in" type="button" onClick={openAccountDrawer} aria-label={accountLabel} aria-expanded={accountDrawerOpen} aria-controls="account-drawer"><AccountLinkContent signedIn label={accountLabel} initials={accountInitials} /></button> : <Link className="account-button" to={paths.account} aria-label={accountLabel}><AccountLinkContent signedIn={false} label={accountLabel} initials={null} /></Link>}
         </div>
       </header>

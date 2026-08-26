@@ -108,7 +108,7 @@ export default function App() {
       <body className={isAdmin ? "admin-body" : isPasswordSetup ? "password-setup-body" : constructionMode ? "coming-soon-body" : undefined}>
         {constructionMode ? <ComingSoonPage title={comingSoon.title} message={comingSoon.message} locale={locale} /> : <CartProvider locale={locale}>
           <QuoteCartProvider key={professionalUserId ?? "guest"} storageNamespace={professionalUserId ?? "guest"}>
-            {shellHidden ? null : <SiteHeader signedIn={signedIn} professional={professional} accountInitials={accountInitials} announcement={announcement ?? undefined} navigation={navigation} />}
+            {shellHidden ? null : <SiteHeader signedIn={signedIn} professional={professional} accountInitials={accountInitials} admin={admin} announcement={announcement ?? undefined} navigation={navigation} />}
             <main id="main-content" tabIndex={-1}>
               <Outlet />
             </main>
