@@ -10,3 +10,4 @@ migration-report*.json
 coverage/
 reports/wordpress-import.json
 .DS_Store
+.mcp.json

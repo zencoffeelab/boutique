@@ -5,15 +5,16 @@ import {
   RotateCcw,
   Search,
   Archive,
+  ArchiveRestore,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import type {
   ActionFunctionArgs,
   LoaderFunctionArgs,
   MetaFunction,
 } from "react-router";
-import { Form, useActionData, useFetcher, useLoaderData, useRevalidator } from "react-router";
+import { Form, Link, useActionData, useFetcher, useLoaderData, useRevalidator } from "react-router";
 import { AdminShell } from "~/components/admin-shell";
 import { Badge } from "~/components/ui/badge";
 import { labelIsRefundable } from "~/domain/label-refunds";
@@ -38,6 +39,26 @@ const archiveSchema = z.object({
   intent: z.literal("archive_order"),
   orderId: z.uuid(),
 });
+const archiveSelectedSchema = z.object({
+  intent: z.literal("archive_selected"),
+  orderIds: z.array(z.uuid()).min(1),
+});
+const restoreSchema = z.object({
+  intent: z.literal("restore_order"),
+  orderId: z.uuid(),
+});
+const restoreSelectedSchema = z.object({
+  intent: z.literal("restore_selected"),
+  orderIds: z.array(z.uuid()).min(1),
+});
+const prepareSelectedSchema = z.object({
+  intent: z.literal("prepare_selected"),
+  orderIds: z.array(z.uuid()).min(1),
+});
+const shipSelectedSchema = z.object({
+  intent: z.literal("ship_selected"),
+  orderIds: z.array(z.uuid()).min(1),
+});
 
 const validatedOrderStatuses = ["paid", "preparing", "ready_to_ship", "shipped", "delivered", "partially_refunded", "refunded"] as const;
 
@@ -46,8 +67,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const search = url.searchParams.get("q")?.trim() ?? "";
   const status = url.searchParams.get("status") ?? "";
-  const view = url.searchParams.get("view") === "archived" ? "archived" : "active";
-  if (admin.demo) return { demo: true, orders: [], search, status, view, cartStats: { unvalidated: 0, total: 0 } };
+  const requestedView = url.searchParams.get("view");
+  const view = requestedView === "archived" || requestedView === "preparing" || requestedView === "to_ship" ? requestedView : "active";
+  const pageSize = 50;
+  const page = view === "archived" ? Math.max(0, Math.min(Number(url.searchParams.get("page") ?? 0) || 0, 100_000)) : 0;
+  if (admin.demo) return { demo: true, orders: [], search, status, view, pagination: { page, pageSize, total: 0, hasNext: false, hasPrevious: page > 0 }, cartStats: { unvalidated: 0, total: 0 } };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
   const { error: viewedUpdateError } = await client.from("orders").update({ admin_viewed_at: new Date().toISOString() }).not("paid_at", "is", null).is("admin_viewed_at", null);
@@ -60,8 +84,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     .from("orders")
     .select("*,order_lines(*),shipments(*),payments(*)")
     .order("created_at", { ascending: false })
-    .limit(100);
-  if (view === "active") query = query.is("archived_at", null).neq("status", "pending_payment");
+    .limit(view === "archived" ? 0 : 100);
+  if (view !== "archived") {
+    query = query.is("archived_at", null).neq("status", "pending_payment");
+    if (view === "active") query = query.not("status", "in", "(preparing,ready_to_ship)");
+    if (view === "preparing") query = query.eq("status", "preparing");
+    if (view === "to_ship") query = query.eq("status", "ready_to_ship");
+  }
   const safeSearch = search.replace(/[^\p{L}\p{N}@._+\- ]/gu, "").slice(0, 120);
   if (view === "archived") query = query.not("archived_at", "is", null);
   if (status && orderStatuses.includes(status as never))
@@ -83,9 +112,45 @@ export async function loader({ request }: LoaderFunctionArgs) {
       .limit(100));
   }
   if (error) throw new Response(error.message, { status: 500 });
+  if (view === "archived") {
+    let archivedQuery = client
+      .from("orders")
+      .select("id,order_number,email,status,total_cents,created_at,archived_at,archived_snapshot", { count: "exact" })
+      .not("archived_at", "is", null)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+    if (status && orderStatuses.includes(status as never)) archivedQuery = archivedQuery.eq("status", status);
+    if (safeSearch) archivedQuery = archivedQuery.or(`order_number.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`);
+    const { data: archivedData, error: archivedError, count: archivedCount } = await archivedQuery;
+    if (archivedError) throw new Response(archivedError.message, { status: 500 });
+    const archivedOrders = (archivedData ?? []).map((order: any) => {
+      const snapshot = order.archived_snapshot ?? {};
+      return {
+        ...order,
+        shipping_address: snapshot.shipping_address ?? null,
+        shipping_carrier: snapshot.shipping_carrier ?? "",
+        shipping_service: snapshot.shipping_service ?? "",
+        shipping_charged_cents: snapshot.shipping_charged_cents ?? 0,
+        actual_shipping_cost_cents: 0,
+        order_lines: Array.isArray(snapshot.lines) ? snapshot.lines : [],
+        shipments: [],
+        payments: [],
+      };
+    });
+    return {
+      demo: false,
+      orders: archivedOrders,
+      search,
+      status,
+      view,
+      pagination: { page, pageSize, total: archivedCount ?? 0, hasNext: (archivedCount ?? 0) > (page + 1) * pageSize, hasPrevious: page > 0 },
+      cartStats: { unvalidated: 0, total: 0 },
+    };
+  }
   const [unvalidatedResult, validatedResult] = await Promise.all([
     client.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending_payment"),
-    client.from("orders").select("id", { count: "exact", head: true }).in("status", [...validatedOrderStatuses]),
+    client.from("orders").select("id", { count: "exact", head: true }).in("status", [...validatedOrderStatuses]).is("archived_at", null),
   ]);
   const countError = unvalidatedResult.error ?? validatedResult.error;
   if (countError) throw new Response(countError.message, { status: 500 });
@@ -134,6 +199,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     search,
     status,
     view,
+    pagination: { page: 0, pageSize, total: orders.length, hasNext: false, hasPrevious: false },
     cartStats: { unvalidated, total: unvalidated + validated },
   };
 }
@@ -142,8 +208,26 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const admin = await requireAdmin(request);
   if (admin.demo)
     return { ok: false, message: "Lecture seule en démonstration." };
-  const formData = Object.fromEntries(await request.formData());
+  const requestFormData = await request.formData();
+  const formData = Object.fromEntries(requestFormData);
   const archive = archiveSchema.safeParse(formData);
+  const archiveSelected = archiveSelectedSchema.safeParse({
+    intent: requestFormData.get("intent"),
+    orderIds: requestFormData.getAll("orderId"),
+  });
+  const restore = restoreSchema.safeParse(formData);
+  const restoreSelected = restoreSelectedSchema.safeParse({
+    intent: requestFormData.get("intent"),
+    orderIds: requestFormData.getAll("orderId"),
+  });
+  const prepareSelected = prepareSelectedSchema.safeParse({
+    intent: requestFormData.get("intent"),
+    orderIds: requestFormData.getAll("orderId"),
+  });
+  const shipSelected = shipSelectedSchema.safeParse({
+    intent: requestFormData.get("intent"),
+    orderIds: requestFormData.getAll("orderId"),
+  });
   const client = createServiceSupabase();
   if (!client) return { ok: false, message: "Base indisponible." };
   if (archive.success) {
@@ -151,6 +235,43 @@ export async function action({ request, context }: ActionFunctionArgs) {
     if (error) return { ok: false, message: error.message };
     await client.from("audit_log").insert({ actor_id: admin.id, action: "order.archived", entity_type: "order", entity_id: archive.data.orderId, after_data: { archived: true } });
     return { ok: true, message: "Commande archivée. Elle reste disponible dans l’onglet Archivées." };
+  }
+  if (archiveSelected.success) {
+    let archivedCount = 0;
+    for (const orderId of archiveSelected.data.orderIds) {
+      const { error } = await client.rpc("archive_order", { p_order_id: orderId });
+      if (error) return { ok: false, message: error.message };
+      archivedCount += 1;
+    }
+    await client.from("audit_log").insert({ actor_id: admin.id, action: "orders.archived_bulk", entity_type: "order", entity_id: archiveSelected.data.orderIds.join(","), after_data: { archived_count: archivedCount } });
+    return { ok: true, message: `${archivedCount} commande${archivedCount > 1 ? "s" : ""} archivée${archivedCount > 1 ? "s" : ""}.` };
+  }
+  if (restore.success) {
+    const { error } = await client.from("orders").update({ archived_at: null, archived_snapshot: null, updated_at: new Date().toISOString() }).eq("id", restore.data.orderId).not("archived_at", "is", null);
+    if (error) return { ok: false, message: error.message };
+    await client.from("audit_log").insert({ actor_id: admin.id, action: "order.restored", entity_type: "order", entity_id: restore.data.orderId, after_data: { archived: false } });
+    return { ok: true, message: "Commande désarchivée. Elle est de nouveau visible dans Actives." };
+  }
+  if (restoreSelected.success) {
+    const { data, error } = await client.from("orders").update({ archived_at: null, archived_snapshot: null, updated_at: new Date().toISOString() }).in("id", restoreSelected.data.orderIds).not("archived_at", "is", null).select("id");
+    if (error) return { ok: false, message: error.message };
+    const restoredCount = data?.length ?? 0;
+    await client.from("audit_log").insert({ actor_id: admin.id, action: "orders.restored_bulk", entity_type: "order", entity_id: restoreSelected.data.orderIds.join(","), after_data: { restored_count: restoredCount } });
+    return { ok: true, message: `${restoredCount} commande${restoredCount > 1 ? "s" : ""} désarchivée${restoredCount > 1 ? "s" : ""}.` };
+  }
+  if (prepareSelected.success) {
+    const { data, error } = await client.from("orders").update({ status: "preparing", updated_at: new Date().toISOString() }).in("id", prepareSelected.data.orderIds).is("archived_at", null).neq("status", "pending_payment").select("id");
+    if (error) return { ok: false, message: error.message };
+    const preparedCount = data?.length ?? 0;
+    await client.from("audit_log").insert({ actor_id: admin.id, action: "orders.preparing_bulk", entity_type: "order", entity_id: prepareSelected.data.orderIds.join(","), after_data: { prepared_count: preparedCount } });
+    return { ok: true, message: `${preparedCount} commande${preparedCount > 1 ? "s" : ""} passée${preparedCount > 1 ? "s" : "e"} en préparation.` };
+  }
+  if (shipSelected.success) {
+    const { data, error } = await client.from("orders").update({ status: "ready_to_ship", updated_at: new Date().toISOString() }).in("id", shipSelected.data.orderIds).eq("status", "preparing").is("archived_at", null).select("id");
+    if (error) return { ok: false, message: error.message };
+    const shippedCount = data?.length ?? 0;
+    await client.from("audit_log").insert({ actor_id: admin.id, action: "orders.ready_to_ship_bulk", entity_type: "order", entity_id: shipSelected.data.orderIds.join(","), after_data: { ready_to_ship_count: shippedCount } });
+    return { ok: true, message: `${shippedCount} commande${shippedCount > 1 ? "s" : ""} passée${shippedCount > 1 ? "s" : "e"} à expédier.` };
   }
   const parsed = updateSchema.safeParse(formData);
   if (!parsed.success) return { ok: false, message: "Mise à jour invalide." };
@@ -251,8 +372,8 @@ function RefundOrderAction({ order }: { order: any }) {
           />
         </label>
         <label>
-          Motif
-          <input name="reason" minLength={3} required />
+          <span>Motif<br /><small>(facultatif)</small></span>
+          <input name="reason" maxLength={500} />
         </label>
         <button
           className="ui-button ui-button--danger ui-button--sm"
@@ -305,6 +426,27 @@ export function orderContentsLabel(
         `${line.quantity} × ${line.product_name} · ${line.variant_label}`,
     )
     .join(" | ");
+}
+
+function OrderContents({
+  lines,
+  compact = false,
+}: {
+  lines: readonly { quantity: number; product_name: string; variant_label: string; unit_price_cents?: number; line_total_cents?: number }[];
+  compact?: boolean;
+}) {
+  if (lines.length === 0) return <span className="admin-order__empty-lines">Aucun article</span>;
+  return (
+    <span className={`admin-order__line-list${compact ? " admin-order__line-list--compact" : ""}`}>
+      {lines.map((line, index) => (
+        <span className="admin-order__line" key={`${line.product_name}-${line.variant_label}-${index}`}>
+          <strong>{line.quantity} ×</strong>
+          <span>{line.product_name} · {line.variant_label}</span>
+          {!compact && typeof line.line_total_cents === "number" ? <span className="admin-order__line-price">{formatMoney(line.line_total_cents, "fr-FR")}</span> : null}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 function ShipmentActions({
@@ -410,9 +552,31 @@ function ShipmentActions({
 }
 
 export default function AdminOrders() {
-  const { demo, orders, search, status, view, cartStats } = useLoaderData<typeof loader>();
+  const { demo, orders, search, status, view, pagination, cartStats } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const revalidator = useRevalidator();
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const selectedProductTotals = orders
+    .filter((order) => selectedOrderIds.includes(order.id))
+    .flatMap((order) => order.order_lines ?? [])
+    .reduce<Record<string, number>>((totals, line: any) => {
+      const key = `${line.product_name} · ${line.variant_label}`;
+      totals[key] = (totals[key] ?? 0) + Number(line.quantity ?? 0);
+      return totals;
+    }, {});
+  const preparingProductTotals = orders
+    .flatMap((order) => order.order_lines ?? [])
+    .reduce<Record<string, number>>((totals, line: any) => {
+      const key = `${line.product_name} · ${line.variant_label}`;
+      totals[key] = (totals[key] ?? 0) + Number(line.quantity ?? 0) * Number(line.unit_weight_grams ?? 0);
+      return totals;
+    }, {});
+  const allVisibleSelected = orders.length > 0 && orders.every((order) => selectedOrderIds.includes(order.id));
+  const toggleAllOrders = () => setSelectedOrderIds(allVisibleSelected ? [] : orders.map((order) => order.id));
+  const toggleOrder = (orderId: string) => setSelectedOrderIds((current) => current.includes(orderId) ? current.filter((id) => id !== orderId) : [...current, orderId]);
+  useEffect(() => {
+    setSelectedOrderIds((current) => current.filter((id) => orders.some((order) => order.id === id)));
+  }, [orders]);
   useEffect(() => {
     const interval = window.setInterval(() => { if (revalidator.state === "idle") revalidator.revalidate(); }, 15_000);
     return () => window.clearInterval(interval);
@@ -422,7 +586,7 @@ export default function AdminOrders() {
       <header className="admin-heading">
         <div>
           <p className="eyebrow">Commerce</p>
-          <h1>{view === "archived" ? "Commandes archivées" : "Commandes"}</h1>
+          <h1>{view === "archived" ? "Commandes archivées" : view === "preparing" ? "Commandes en préparation" : view === "to_ship" ? "Commandes à expédier" : "Commandes"}</h1>
           <p className="admin-order-cart-indicator" aria-live="polite"><strong>{cartStats.unvalidated}/{cartStats.total}</strong><span>paniers non validés / commandes validées + paniers non validés</span></p>
         </div>
         <a className="ui-button ui-button--outline" href="/admin/commandes.csv">
@@ -441,8 +605,60 @@ export default function AdminOrders() {
       ) : null}
       <nav className="admin-order-tabs" aria-label="Vue des commandes">
         <a className={view === "active" ? "is-active" : ""} href="/admin/commandes">Actives</a>
+        <a className={view === "preparing" ? "is-active" : ""} href="/admin/commandes?view=preparing">En préparation</a>
+        <a className={view === "to_ship" ? "is-active" : ""} href="/admin/commandes?view=to_ship">À expédier</a>
         <a className={view === "archived" ? "is-active" : ""} href="/admin/commandes?view=archived">Archivées</a>
       </nav>
+      {orders.length > 0 ? (
+        <div className="admin-order-bulk-actions">
+          <label>
+            <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllOrders} />
+            {allVisibleSelected ? "Tout désélectionner" : "Tout sélectionner"}
+          </label>
+          <Form id="bulk-archive-form" method="post" onSubmit={(event) => {
+            const actionLabel = view === "archived" ? "Désarchiver" : "Archiver";
+            if (!selectedOrderIds.length || !window.confirm(`${actionLabel} ${selectedOrderIds.length} commande${selectedOrderIds.length > 1 ? "s" : ""} ?`)) event.preventDefault();
+          }}>
+            <input type="hidden" name="intent" value={view === "archived" ? "restore_selected" : "archive_selected"} />
+            <button className="ui-button ui-button--outline ui-button--sm" type="submit" disabled={!selectedOrderIds.length}>
+              {view === "archived" ? <><ArchiveRestore aria-hidden="true" /> Désarchiver la sélection</> : <><Archive aria-hidden="true" /> Archiver la sélection</>} ({selectedOrderIds.length})
+            </button>
+          </Form>
+          {view === "active" ? (
+            <Form method="post" onSubmit={(event) => {
+              if (!selectedOrderIds.length || !window.confirm("Calculer les quantités sélectionnées et passer ces commandes en préparation ?")) event.preventDefault();
+            }}>
+              <input type="hidden" name="intent" value="prepare_selected" />
+              {selectedOrderIds.map((orderId) => <input key={orderId} type="hidden" name="orderId" value={orderId} />)}
+              <button className="ui-button ui-button--default ui-button--sm" type="submit" disabled={!selectedOrderIds.length}>Calculer les cafés et préparer</button>
+            </Form>
+          ) : null}
+          {view === "preparing" ? (
+            <Form method="post" onSubmit={(event) => {
+              if (!selectedOrderIds.length || !window.confirm("Passer les commandes sélectionnées à expédier ?")) event.preventDefault();
+            }}>
+              <input type="hidden" name="intent" value="ship_selected" />
+              {selectedOrderIds.map((orderId) => <input key={orderId} type="hidden" name="orderId" value={orderId} />)}
+              <button className="ui-button ui-button--default ui-button--sm" type="submit" disabled={!selectedOrderIds.length}>Passer à expédier</button>
+            </Form>
+          ) : null}
+        </div>
+      ) : null}
+      {view === "active" && selectedOrderIds.length > 0 ? (
+        <div className="admin-order-selection-summary">
+          <strong>Quantités sélectionnées</strong>
+          {Object.entries(selectedProductTotals).map(([label, quantity]) => <span key={label}>{quantity} × {label}</span>)}
+        </div>
+      ) : null}
+      {view === "preparing" && orders.length > 0 ? (
+        <div className="admin-order-selection-summary admin-order-preparing-summary">
+          <strong>Quantités totales à préparer</strong>
+          <table>
+            <thead><tr><th>Café et poids total</th></tr></thead>
+            <tbody>{Object.entries(preparingProductTotals).sort(([left], [right]) => left.localeCompare(right, "fr-FR")).map(([label, grams]) => <tr key={label}><td><span>{label}</span><strong>{grams.toLocaleString("fr-FR")} g</strong></td></tr>)}</tbody>
+          </table>
+        </div>
+      ) : null}
       <Form className="admin-filter" method="get">
         {view === "archived" ? <input type="hidden" name="view" value="archived" /> : null}
         <label>
@@ -454,7 +670,7 @@ export default function AdminOrders() {
           <select name="status" defaultValue={status}>
             <option value="">Tous les statuts</option>
             {orderStatuses.filter((item) => item !== "pending_payment").map((item) => (
-              <option key={item}>{item}</option>
+              <option key={item} value={item}>{orderStatusLabels[item]}</option>
             ))}
           </select>
         </label>
@@ -468,27 +684,41 @@ export default function AdminOrders() {
           return (
             <details className={`ui-card admin-order admin-order--${order.status}`} key={order.id}>
               <summary>
-                <span>
-                  <strong>{order.order_number}</strong>
-                  <small>
-                    {order.email} ·{" "}
-                    {new Date(order.created_at).toLocaleDateString("fr-FR")}
-                  </small>
-                  <small className="admin-order__products">
-                    {orderContentsLabel(order.order_lines)}
-                  </small>
+                <span className="admin-order__summary-main has-selection">
+                  <input type="checkbox" name="orderId" value={order.id} form="bulk-archive-form" checked={selectedOrderIds.includes(order.id)} onClick={(event) => event.stopPropagation()} onChange={() => toggleOrder(order.id)} aria-label={`Sélectionner la commande ${order.order_number}`} />
+                  <span className="admin-order__identity">
+                    <strong>{order.order_number}</strong>
+                    <small>
+                      {order.email} ·{" "}
+                      {new Date(order.created_at).toLocaleDateString("fr-FR")}
+                    </small>
+                    <OrderContents lines={order.order_lines} compact />
+                  </span>
                 </span>
                 <OrderStatusBadge status={order.status as OrderStatus} />
                 <strong>{formatMoney(order.total_cents, "fr-FR")}</strong>
+                {view !== "archived" ? (
+                  <Form method="post" onClick={(event) => event.stopPropagation()} onSubmit={(event) => {
+                    if (!window.confirm("Archiver cette commande ? Elle restera consultable dans Archivées.")) event.preventDefault();
+                  }}>
+                    <input type="hidden" name="intent" value="archive_order" />
+                    <input type="hidden" name="orderId" value={order.id} />
+                    <button className="ui-button ui-button--outline ui-button--sm" type="submit"><Archive aria-hidden="true" /> Archiver</button>
+                  </Form>
+                ) : (
+                  <Form method="post" onClick={(event) => event.stopPropagation()} onSubmit={(event) => {
+                    if (!window.confirm("Désarchiver cette commande ? Elle sera de nouveau visible dans Actives.")) event.preventDefault();
+                  }}>
+                    <input type="hidden" name="intent" value="restore_order" />
+                    <input type="hidden" name="orderId" value={order.id} />
+                    <button className="ui-button ui-button--outline ui-button--sm" type="submit"><ArchiveRestore aria-hidden="true" /> Désarchiver</button>
+                  </Form>
+                )}
               </summary>
               <div className="admin-order__content">
-                <div className="admin-order__summary">
-                  <div className="admin-order__left-column">
-                  <section>
+                <section className="admin-order__column admin-order__column--summary">
                     <h2>Résumé de la commande</h2>
-                    <p>{orderContentsLabel(order.order_lines)}</p>
-                    <p><strong>Total :</strong> {formatMoney(order.total_cents, "fr-FR")}</p>
-                  </section>
+                    <OrderContents lines={order.order_lines} />
                   <section className="admin-order-delivery">
                     <h2>Livraison</h2>
                     <p><strong>{order.shipping_carrier}</strong> · {order.shipping_service}</p>
@@ -514,44 +744,13 @@ export default function AdminOrders() {
                       {order.shipping_address.city}
                     </p>
                   )}
-                  <p>Port facturé : <strong>{formatMoney(order.shipping_charged_cents, "fr-FR")}</strong> · Port réel : <strong>{formatMoney(order.actual_shipping_cost_cents, "fr-FR")}</strong></p>
+                  <p>Port facturé : {formatMoney(order.shipping_charged_cents, "fr-FR")}</p>
+                  <p className="admin-order__shipping-cost--actual">Port réel : {formatMoney(order.actual_shipping_cost_cents, "fr-FR")}</p>
+                  <p className="admin-order__total"><strong>Total :</strong> {formatMoney(order.total_cents, "fr-FR")}</p>
                   </section>
-                  </div>
-                  <section className="admin-order-labels">
-                    <h2>Étiquettes achetées</h2>
-                    {order.shipments?.length ? (
-                      <section className="admin-shipments">
-                        <p>
-                          <small>
-                            L’annulation crédite le transporteur ayant émis
-                            l’étiquette. Elle ne rembourse pas le paiement du client.
-                          </small>
-                        </p>
-                        {order.shipments
-                          .toSorted(
-                            (a: any, b: any) => a.parcel_index - b.parcel_index,
-                          )
-                          .map((shipment: any) => (
-                            <ShipmentActions
-                              orderId={order.id}
-                              shipment={shipment}
-                              key={shipment.id}
-                            />
-                          ))}
-                      </section>
-                    ) : null}
-                  </section>
-                </div>
-                <aside className="admin-order__operations">
-                  {view === "active" ? (
-                    <Form method="post" onSubmit={(event) => {
-                      if (!window.confirm("Archiver cette commande ? Elle ne sera plus active, mais restera consultable dans Archivées.")) event.preventDefault();
-                    }}>
-                      <input type="hidden" name="intent" value="archive_order" />
-                      <input type="hidden" name="orderId" value={order.id} />
-                      <button className="ui-button ui-button--outline ui-button--sm" type="submit"><Archive aria-hidden="true" /> Archiver</button>
-                    </Form>
-                  ) : null}
+                </section>
+                <aside className="admin-order__column admin-order__operations">
+                  <h2>Actions</h2>
                   <RefundOrderAction order={order} />
                   <LabelPurchaseAction order={order} />
                   <Form method="post" className="admin-order__update-form">
@@ -562,7 +761,7 @@ export default function AdminOrders() {
                       Statut
                       <select name="status" defaultValue={order.status}>
                         {orderStatuses.map((item) => (
-                          <option key={item}>{item}</option>
+                          <option key={item} value={item}>{orderStatusLabels[item]}</option>
                         ))}
                       </select>
                     </label>
@@ -581,6 +780,30 @@ export default function AdminOrders() {
                   </button>
                   </Form>
                 </aside>
+                <section className="admin-order__column admin-order-labels">
+                  <h2>Étiquettes achetées</h2>
+                  {order.shipments?.length ? (
+                    <section className="admin-shipments">
+                      <p>
+                        <small>
+                          L’annulation crédite le transporteur ayant émis
+                          l’étiquette. Elle ne rembourse pas le paiement du client.
+                        </small>
+                      </p>
+                      {order.shipments
+                        .toSorted(
+                          (a: any, b: any) => a.parcel_index - b.parcel_index,
+                        )
+                        .map((shipment: any) => (
+                          <ShipmentActions
+                            orderId={order.id}
+                            shipment={shipment}
+                            key={shipment.id}
+                          />
+                        ))}
+                    </section>
+                  ) : <p className="admin-order__no-labels">Aucune étiquette achetée</p>}
+                </section>
               </div>
             </details>
           );
@@ -591,6 +814,13 @@ export default function AdminOrders() {
           </div>
         ) : null}
       </div>
+      {view === "archived" && pagination.total > 0 ? (
+        <nav className="admin-order-pagination" aria-label="Pagination des commandes archivées">
+          {pagination.hasPrevious ? <Link className="ui-button ui-button--outline ui-button--sm" to={`/admin/commandes?view=archived&page=${pagination.page - 1}${search ? `&q=${encodeURIComponent(search)}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}`}>Précédente</Link> : <span />}
+          <span>Page {pagination.page + 1} · {pagination.total} commande{pagination.total > 1 ? "s" : ""}</span>
+          {pagination.hasNext ? <Link className="ui-button ui-button--outline ui-button--sm" to={`/admin/commandes?view=archived&page=${pagination.page + 1}${search ? `&q=${encodeURIComponent(search)}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}`}>Suivante</Link> : <span />}
+        </nav>
+      ) : null}
     </AdminShell>
   );
 }

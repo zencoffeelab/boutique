@@ -83,5 +83,5 @@ export const contactFormSchema = z.object({
 
 export const refundSchema = z.object({
   amountCents: z.coerce.number().int().positive(),
-  reason: z.string().trim().min(3).max(500),
+  reason: z.string().trim().max(500).transform((reason) => reason || "Demande du client").default("Demande du client"),
 });
