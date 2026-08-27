@@ -1,9 +1,9 @@
-import { BookOpen, Boxes, Check, CircleHelp, FileText, History, LayoutDashboard, LogOut, Mail, Megaphone, Package, ShoppingCart, UserRound, Users, X } from "lucide-react";
+import { BookOpen, Boxes, Check, CircleHelp, FileText, History, LayoutDashboard, LogOut, Mail, Package, ShoppingCart, UserRound, Users, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useActionData, useFetchers, useLocation, useNavigate } from "react-router";
 import { Logo } from "~/components/logo";
 
-export type AdminSection = "dashboard" | "orders" | "products" | "shipping" | "customers" | "professionals" | "mail" | "content" | "announcement" | "faq" | "advice" | "changelog";
+export type AdminSection = "dashboard" | "orders" | "products" | "shipping" | "customers" | "professionals" | "documents" | "mail" | "content" | "announcement" | "faq" | "advice" | "changelog";
 
 const navigation = [
   { section: "dashboard", label: "Tableau de bord", href: "/admin", icon: LayoutDashboard },
@@ -12,9 +12,9 @@ const navigation = [
   { section: "shipping", label: "Expédition", href: "/admin/expedition", icon: Boxes },
   { section: "customers", label: "Clients", href: "/admin/clients", icon: UserRound },
   { section: "professionals", label: "Professionnels", href: "/admin/professionnels", icon: Users },
+  { section: "documents", label: "Factures + devis", href: "/admin/professionnels/factures-devis", icon: FileText },
   { section: "mail", label: "Messagerie", href: "/admin/messagerie", icon: Mail },
   { section: "content", label: "Pages", href: "/admin/contenus", icon: FileText },
-  { section: "announcement", label: "Bandeau", href: "/admin/bandeau", icon: Megaphone },
   { section: "faq", label: "FAQ", href: "/admin/faq", icon: CircleHelp },
   { section: "advice", label: "Blog", href: "/admin/conseils", icon: BookOpen },
   { section: "changelog", label: "Modifications", href: "/admin/modifications", icon: History },

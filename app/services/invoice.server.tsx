@@ -48,9 +48,9 @@ export function invoiceReferenceLabels(input: { invoiceNumber: string; orderNumb
 const pageWidth = 595.28;
 const pageHeight = 841.89;
 const margin = 42;
-const textColor = rgb(37 / 255, 48 / 255, 33 / 255);
-const mutedColor = rgb(107 / 255, 113 / 255, 101 / 255);
-const ruleColor = rgb(216 / 255, 216 / 255, 211 / 255);
+const textColor = rgb(52 / 255, 59 / 255, 66 / 255);
+const mutedColor = rgb(112 / 255, 118 / 255, 124 / 255);
+const ruleColor = rgb(52 / 255, 59 / 255, 66 / 255);
 
 function euros(cents: number, locale: string) {
   return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(cents / 100);
@@ -78,23 +78,40 @@ function fitPdfText(font: PDFFont, value: unknown, size: number, maxWidth: numbe
   return `${fitted}${suffix}`;
 }
 
-function drawTableHeader(page: PDFPage, font: PDFFont, english: boolean, y: number) {
-  page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 1, color: ruleColor });
-  page.drawText(english ? "Description" : "Description", { x: margin, y: y - 14, size: 10, font, color: textColor });
-  const amount = english ? "Amount" : "Montant";
-  page.drawText(amount, { x: pageWidth - margin - font.widthOfTextAtSize(amount, 10), y: y - 14, size: 10, font, color: textColor });
-  page.drawLine({ start: { x: margin, y: y - 21 }, end: { x: pageWidth - margin, y: y - 21 }, thickness: 1, color: ruleColor });
-  return y - 21;
+function drawTopText(page: PDFPage, font: PDFFont, value: string, x: number, top: number, size: number, color = textColor, maxWidth = pageWidth) {
+  const text = fitPdfText(font, value, size, maxWidth - x - margin);
+  page.drawText(text, { x, y: pageHeight - top - size, size, font, color });
 }
 
-function drawTableRow(page: PDFPage, font: PDFFont, boldFont: PDFFont, description: string, amount: string, y: number, bold = false) {
-  const rowFont = bold ? boldFont : font;
-  const size = bold ? 11 : 10;
-  const safeAmount = safePdfText(rowFont, amount);
-  page.drawText(fitPdfText(rowFont, description, size, 390), { x: margin, y: y - 15, size, font: rowFont, color: textColor });
-  page.drawText(safeAmount, { x: pageWidth - margin - rowFont.widthOfTextAtSize(safeAmount, size), y: y - 15, size, font: rowFont, color: textColor });
-  page.drawLine({ start: { x: margin, y: y - 22 }, end: { x: pageWidth - margin, y: y - 22 }, thickness: 1, color: ruleColor });
-  return y - 22;
+function drawTopRule(page: PDFPage, top: number, thickness = 1) {
+  const y = pageHeight - top;
+  page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness, color: ruleColor });
+}
+
+function drawRightTopText(page: PDFPage, font: PDFFont, value: string, right: number, top: number, size: number, color = textColor) {
+  const text = safePdfText(font, value);
+  page.drawText(text, { x: right - font.widthOfTextAtSize(text, size), y: pageHeight - top - size, size, font, color });
+}
+
+function drawInvoiceTableHeader(page: PDFPage, font: PDFFont, english: boolean, top: number) {
+  const labels = english ? ["Service", "Qty", "Tax", "Price (€)", "Discount", "Total (incl. tax) (€)"] : ["Service", "Quantité", "TVA", "Prix (€)", "Remise", "Total (TTC) (€)"];
+  const positions = [margin, 300, 348, 393, 445, 510];
+  labels.forEach((label, index) => drawTopText(page, font, label, positions[index], top, 8.5, mutedColor, index === 0 ? 295 : pageWidth));
+  drawTopRule(page, top + 24, 4);
+}
+
+function drawInvoiceTableRow(page: PDFPage, font: PDFFont, boldFont: PDFFont, values: string[], top: number, final = false) {
+  const positions = [margin, 300, 348, 393, 445, 510];
+  const widths = [245, 35, 40, 48, 58, 43];
+  values.forEach((value, index) => {
+    const rowFont = final ? boldFont : font;
+    const size = final ? 9 : 8.5;
+    const safe = safePdfText(rowFont, value);
+    const rightAligned = index > 0;
+    const x = rightAligned ? positions[index] + widths[index] - rowFont.widthOfTextAtSize(safe, size) : positions[index];
+    page.drawText(fitPdfText(rowFont, value, size, rightAligned ? widths[index] : widths[index] + 30), { x, y: pageHeight - top - size, size, font: rowFont, color: textColor });
+  });
+  drawTopRule(page, top + 22, final ? 1.2 : 0.7);
 }
 
 export async function renderInvoicePdf(input: { invoice: InvoiceSnapshot; order: OrderSnapshot; lines: OrderLineSnapshot[] }) {
@@ -104,53 +121,77 @@ export async function renderInvoicePdf(input: { invoice: InvoiceSnapshot; order:
   const font = await document.embedFont(StandardFonts.Helvetica);
   const boldFont = await document.embedFont(StandardFonts.HelveticaBold);
   let page = document.addPage([pageWidth, pageHeight]);
-
-  page.drawText("ZEN COFFEE LAB", { x: margin, y: pageHeight - 58, size: 24, font: boldFont, color: textColor });
-  page.drawText(english ? "Micro-roastery - Tours, France" : "Micro-torrefacteur - Tours, France", { x: margin, y: pageHeight - 76, size: 9, font, color: mutedColor });
-  const title = english ? "INVOICE" : "FACTURE";
-  page.drawText(title, { x: pageWidth - margin - boldFont.widthOfTextAtSize(title, 18), y: pageHeight - 58, size: 18, font: boldFont, color: textColor });
-  const references = invoiceReferenceLabels({ invoiceNumber: invoice.invoice_number, orderNumber: order.order_number, english });
-  const invoiceNumber = safePdfText(font, references.invoiceNumber);
-  page.drawText(invoiceNumber, { x: pageWidth - margin - font.widthOfTextAtSize(invoiceNumber, 10), y: pageHeight - 76, size: 10, font, color: textColor });
-  const orderNumber = safePdfText(font, references.orderNumber);
-  page.drawText(orderNumber, { x: pageWidth - margin - font.widthOfTextAtSize(orderNumber, 9), y: pageHeight - 90, size: 9, font, color: mutedColor });
-  const date = new Date(invoice.issued_at).toLocaleDateString(english ? "en-GB" : "fr-FR");
-  page.drawText(date, { x: pageWidth - margin - font.widthOfTextAtSize(date, 10), y: pageHeight - 105, size: 10, font, color: textColor });
-
+  const right = pageWidth - margin;
+  const issuedDate = new Date(invoice.issued_at).toLocaleDateString(english ? "en-GB" : "fr-FR");
+  const serviceDate = new Date(invoice.issued_at).toLocaleDateString(english ? "en-GB" : "fr-FR");
   const address = order.shipping_address ?? {};
-  const addressLines = [
-    `${address.firstName ?? ""} ${address.lastName ?? ""}`.trim(),
-    address.company,
-    address.line1,
-    `${address.postalCode ?? ""} ${address.city ?? ""} - ${address.countryCode ?? ""}`.trim(),
-    address.pickupPoint ? (english ? "Pickup point" : "Point relais") : null,
-    address.pickupPoint?.name,
-    address.pickupPoint ? `${address.pickupPoint.address1 ?? ""} - ${address.pickupPoint.postalCode ?? ""} ${address.pickupPoint.city ?? ""}`.trim() : null,
-    address.pickupPoint?.id ? `ID ${address.pickupPoint.id}` : null,
-    order.email,
+  const buyerLines = [
+    `${address.firstName ?? ""} ${address.lastName ?? ""}`.trim(), address.company, address.line1,
+    `${address.postalCode ?? ""} ${address.city ?? ""}`.trim(), address.countryCode, order.email,
   ].filter((line): line is string => Boolean(line));
-  let y = pageHeight - 132;
-  for (const line of addressLines) {
-    page.drawText(fitPdfText(font, line, 10, pageWidth - 2 * margin), { x: margin, y, size: 10, font, color: textColor });
-    y -= 14;
-  }
-  y -= 18;
-  y = drawTableHeader(page, font, english, y);
+  const subtotalCents = lines.reduce((sum, line) => sum + line.line_total_cents, 0);
+  const totalCents = order.total_cents;
 
+  drawTopText(page, boldFont, "ZEN COFFEE LAB", margin + 30, 57, 22, textColor, 260);
+  drawTopText(page, font, english ? "COFFEE ROASTERS" : "MICRO-TORRÉFACTEUR", margin + 42, 84, 7.5, mutedColor, 220);
+  drawTopRule(page, 40, 4);
+  drawTopText(page, boldFont, "Zen Coffee Lab", 390, 51, 8, textColor, right);
+  drawTopText(page, font, "Ugo Simon-Meslet", 390, 65, 8.5, textColor, right);
+  drawTopText(page, font, "32 rue Louis Blanc", 390, 78, 8.5, mutedColor, right);
+  drawTopText(page, font, "37000 Tours", 390, 78, 8.5, mutedColor, right);
+  drawTopText(page, font, "France", 390, 91, 8.5, mutedColor, right);
+  drawTopText(page, font, "SIRET : 848 867 065 00056", 390, 104, 8.5, mutedColor, right);
+  drawTopText(page, font, "contact@zencoffeelab.com · 06 12 69 20 79", 390, 130, 8, mutedColor, right);
+  drawTopRule(page, 151, 4);
+  drawTopText(page, boldFont, buyerLines[0] ?? order.email, 390, 166, 9, textColor, right);
+  buyerLines.slice(1).forEach((line, index) => drawTopText(page, font, line, 390, 180 + index * 13, 8.5, mutedColor, right));
+
+  drawTopRule(page, 254, 4);
+  drawTopText(page, boldFont, english ? "INVOICE" : "FACTURE", margin, 267, 18, textColor, 250);
+  drawTopText(page, font, invoice.invoice_number, margin, 292, 10, textColor, 250);
+  drawTopText(page, boldFont, english ? "PAID" : "PAYÉ", 390, 267, 9, textColor, right);
+  drawTopText(page, font, `${english ? "Date" : "Date"} :`, 390, 286, 8.5, mutedColor, right - 74);
+  drawRightTopText(page, font, issuedDate, right, 286, 8.5, mutedColor);
+  drawTopText(page, font, english ? "Service date :" : "Date de service :", 390, 299, 8.5, mutedColor, right - 74);
+  drawRightTopText(page, font, serviceDate, right, 299, 8.5, mutedColor);
+  drawTopRule(page, 318, 1.2);
+
+  const tableTop = 370;
+  drawInvoiceTableHeader(page, font, english, tableTop);
+  let rowTop = tableTop + 33;
   for (const line of lines) {
-    if (y < 105) {
-      page = document.addPage([pageWidth, pageHeight]);
-      y = drawTableHeader(page, font, english, pageHeight - margin);
-    }
-    y = drawTableRow(page, font, boldFont, `${line.quantity} x ${line.product_name} - ${line.variant_label}`, euros(line.line_total_cents, order.locale), y);
+    if (rowTop > 675) { page = document.addPage([pageWidth, pageHeight]); rowTop = 70; drawInvoiceTableHeader(page, font, english, 45); }
+    drawInvoiceTableRow(page, font, boldFont, [
+      `${line.product_name} - ${line.variant_label}`,
+      String(line.quantity), "0 %", euros(Math.round(line.line_total_cents / Math.max(line.quantity, 1)), order.locale), "0 %", euros(line.line_total_cents, order.locale),
+    ], rowTop);
+    rowTop += 22;
   }
-  y = drawTableRow(page, font, boldFont, english ? "Shipping" : "Livraison", euros(order.shipping_charged_cents, order.locale), y);
-  y = drawTableRow(page, font, boldFont, "Total EUR", euros(order.total_cents, order.locale), y, true);
-  page.drawText(english ? "VAT not applicable under Article 293 B of the French Tax Code." : "TVA non applicable, art. 293 B du CGI.", { x: margin, y: y - 18, size: 9, font, color: mutedColor });
+  drawInvoiceTableRow(page, font, boldFont, [english ? "Shipping" : "Livraison", "1", "0 %", euros(order.shipping_charged_cents, order.locale), "0 %", euros(order.shipping_charged_cents, order.locale)], rowTop);
+  rowTop += 22;
+  drawTopRule(page, rowTop, 4);
 
-  for (const currentPage of document.getPages()) {
-    currentPage.drawText(fitPdfText(font, `Zen Coffee Lab - Tours - contact@zencoffeelab.com - ${order.order_number}`, 8, pageWidth - 2 * margin), { x: margin, y: 36, size: 8, font, color: mutedColor });
-  }
+  const summaryTop = Math.max(rowTop + 25, 520);
+  const summaryX = 390;
+  const drawSummaryLine = (label: string, value: string, top: number, bold = false) => {
+    drawTopText(page, bold ? boldFont : font, label, summaryX, top, 8.5, bold ? textColor : mutedColor, right - 82);
+    drawRightTopText(page, bold ? boldFont : font, value, right, top, 8.5, bold ? textColor : mutedColor);
+  };
+  drawTopText(page, font, english ? "VAT not applicable." : "TVA non applicable, art. 293 B du CGI.", margin, summaryTop, 8.5, mutedColor, 350);
+  drawTopText(page, font, english ? "Thank you for your order." : "Merci pour votre commande.", margin, summaryTop + 28, 8.5, mutedColor, 350);
+  drawSummaryLine(english ? "Discount (€):" : "Remise (€) :", euros(0, order.locale), summaryTop);
+  drawSummaryLine(english ? "Subtotal (€):" : "Total (€) :", euros(subtotalCents, order.locale), summaryTop + 18);
+  drawSummaryLine(english ? "VAT (€):" : "TVA 0 % (€) :", euros(0, order.locale), summaryTop + 36);
+  drawTopRule(page, summaryTop + 56, 4);
+  drawSummaryLine(english ? "FINAL TOTAL (€)" : "SOMME FINALE (€)", euros(totalCents, order.locale), summaryTop + 72, true);
+  drawTopRule(page, summaryTop + 96, 1.2);
+  drawSummaryLine(english ? "Payment method:" : "Mode de paiement :", english ? "Online" : "En ligne", summaryTop + 116);
+
+  drawTopText(page, font, "Zen Coffee Lab", 390, 704, 8.5, mutedColor, right);
+  drawTopText(page, font, "Ugo Simon-Meslet", 390, 717, 8.5, mutedColor, right);
+  drawTopRule(page, 785, 0.8);
+  drawTopText(page, font, "Zen Coffee Lab · Ugo Simon-Meslet · 32 rue Louis Blanc · 37000 Tours · France", margin + 28, 799, 7, mutedColor, right);
+  drawTopText(page, font, "SIRET 848 867 065 00056 · contact@zencoffeelab.com · TVA non applicable, art. 293 B du CGI", margin + 28, 811, 7, mutedColor, right);
   return document.save();
 }
 

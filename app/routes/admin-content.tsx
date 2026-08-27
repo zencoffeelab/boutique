@@ -89,7 +89,18 @@ const comingSoonSchema = z.object({
 });
 
 const defaults = ["accueil", "a-propos", "professionnel", "professionnel-connecte", "conseils", "faq", "contact", "cgv", "mentions-legales", "politique-de-confidentialite"];
-const pageLabels: Record<string, string> = { "professionnel-connecte": "Professionnel (connecté)" };
+const pageLabels: Record<string, string> = {
+  accueil: "Accueil",
+  "a-propos": "À propos",
+  professionnel: "Professionnels",
+  "professionnel-connecte": "Professionnels (connecté)",
+  conseils: "Blog",
+  faq: "FAQ",
+  contact: "Contact",
+  cgv: "CGV",
+  "mentions-legales": "Mentions légales",
+  "politique-de-confidentialite": "Confidentialité",
+};
 const placeholderFr = "Contenu à compléter avant publication.";
 const placeholderEn = "Content to complete before publication.";
 const aboutImageExtensions: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -555,7 +566,7 @@ export default function AdminContent() {
   const arranging = activeTab === "rangement";
   const construction = activeTab === "construction";
   const byKey = new Map(pages.map((page) => [page.page_key, page]));
-  const keys = [...new Set([...defaults, ...byKey.keys()])];
+  const keys = [...new Set([...defaults, ...byKey.keys()])].sort((left, right) => (pageLabels[left] ?? left).localeCompare(pageLabels[right] ?? right, "fr-FR"));
 
   return <AdminShell active="content">
     <header className="admin-heading">
@@ -570,6 +581,7 @@ export default function AdminContent() {
       <Link role="tab" aria-selected={!arranging && !construction} className={!arranging && !construction ? "is-active" : undefined} to="/admin/contenus">Contenu</Link>
       <Link role="tab" aria-selected={arranging} className={arranging ? "is-active" : undefined} to="/admin/contenus?tab=rangement">Rangement</Link>
       <Link role="tab" aria-selected={construction} className={construction ? "is-active" : undefined} to="/admin/contenus?tab=construction">Site en construction</Link>
+      <Link role="tab" aria-selected={false} to="/admin/bandeau">Bandeau</Link>
     </nav>
     {arranging
       ? <AdminNavigationOrganizer initialConfiguration={navigation} demo={demo} />

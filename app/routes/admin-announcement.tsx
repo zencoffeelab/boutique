@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
-import { Form, useActionData, useLoaderData } from "react-router";
+import { Form, Link, useActionData, useLoaderData } from "react-router";
 import { AdminShell } from "~/components/admin-shell";
 import { requireAdmin } from "~/lib/auth.server";
 import { dictionary } from "~/lib/i18n";
@@ -80,7 +80,7 @@ export default function AdminAnnouncement() {
   const messageFr = page?.content_page_translations.find((translation) => translation.locale === "fr-FR")?.title ?? dictionary["fr-FR"].freeShipping;
   const messageEn = page?.content_page_translations.find((translation) => translation.locale === "en-GB")?.title ?? dictionary["en-GB"].freeShipping;
 
-  return <AdminShell active="announcement">
+  return <AdminShell active="content">
     <header className="admin-heading">
       <div>
         <p className="eyebrow">Contenu global</p>
@@ -90,6 +90,12 @@ export default function AdminAnnouncement() {
     </header>
     {demo ? <p className="admin-notice">Connectez Supabase pour modifier le bandeau.</p> : null}
     {result?.message && !result.ok ? <p className="form-message form-error">{result.message}</p> : null}
+    <nav className="admin-content-tabs" aria-label="Gestion des pages" role="tablist">
+      <Link role="tab" to="/admin/contenus">Contenu</Link>
+      <Link role="tab" to="/admin/contenus?tab=rangement">Rangement</Link>
+      <Link role="tab" to="/admin/contenus?tab=construction">Site en construction</Link>
+      <Link role="tab" aria-selected="true" className="is-active" to="/admin/bandeau">Bandeau</Link>
+    </nav>
     <Form method="post" className="ui-card admin-announcement-form">
       <div className="admin-content-columns">
         <fieldset>
