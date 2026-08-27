@@ -4,6 +4,7 @@ import {
   PackageCheck,
   RotateCcw,
   Search,
+  Archive,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { z } from "zod";
@@ -33,6 +34,10 @@ const updateSchema = z.object({
   status: z.enum(orderStatuses),
   notes: z.string().max(5_000).default(""),
 });
+const archiveSchema = z.object({
+  intent: z.literal("archive_order"),
+  orderId: z.uuid(),
+});
 
 const validatedOrderStatuses = ["paid", "preparing", "ready_to_ship", "shipped", "delivered", "partially_refunded", "refunded"] as const;
 
@@ -41,7 +46,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const search = url.searchParams.get("q")?.trim() ?? "";
   const status = url.searchParams.get("status") ?? "";
-  if (admin.demo) return { demo: true, orders: [], search, status, cartStats: { unvalidated: 0, total: 0 } };
+  const view = url.searchParams.get("view") === "archived" ? "archived" : "active";
+  if (admin.demo) return { demo: true, orders: [], search, status, view, cartStats: { unvalidated: 0, total: 0 } };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
   const { error: viewedUpdateError } = await client.from("orders").update({ admin_viewed_at: new Date().toISOString() }).not("paid_at", "is", null).is("admin_viewed_at", null);
@@ -53,17 +59,29 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let query = client
     .from("orders")
     .select("*,order_lines(*),shipments(*),payments(*)")
-    .neq("status", "pending_payment")
     .order("created_at", { ascending: false })
     .limit(100);
+  if (view === "active") query = query.is("archived_at", null).neq("status", "pending_payment");
   const safeSearch = search.replace(/[^\p{L}\p{N}@._+\- ]/gu, "").slice(0, 120);
+  if (view === "archived") query = query.not("archived_at", "is", null);
   if (status && orderStatuses.includes(status as never))
     query = query.eq("status", status);
   if (safeSearch)
     query = query.or(
       `order_number.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`,
     );
-  const { data, error } = await query;
+  let { data, error } = await query;
+  const archiveColumnUnavailable = error?.code === "42703"
+    || (error?.code === "PGRST204" && error.message.includes("archived_at"));
+  if (archiveColumnUnavailable && view === "active") {
+    // Keep the page usable during the short interval before the migration is applied.
+    ({ data, error } = await client
+      .from("orders")
+      .select("*,order_lines(*),shipments(*),payments(*)")
+      .neq("status", "pending_payment")
+      .order("created_at", { ascending: false })
+      .limit(100));
+  }
   if (error) throw new Response(error.message, { status: 500 });
   const [unvalidatedResult, validatedResult] = await Promise.all([
     client.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending_payment"),
@@ -115,6 +133,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     })),
     search,
     status,
+    view,
     cartStats: { unvalidated, total: unvalidated + validated },
   };
 }
@@ -123,12 +142,18 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const admin = await requireAdmin(request);
   if (admin.demo)
     return { ok: false, message: "Lecture seule en démonstration." };
-  const parsed = updateSchema.safeParse(
-    Object.fromEntries(await request.formData()),
-  );
-  if (!parsed.success) return { ok: false, message: "Mise à jour invalide." };
+  const formData = Object.fromEntries(await request.formData());
+  const archive = archiveSchema.safeParse(formData);
   const client = createServiceSupabase();
   if (!client) return { ok: false, message: "Base indisponible." };
+  if (archive.success) {
+    const { error } = await client.rpc("archive_order", { p_order_id: archive.data.orderId });
+    if (error) return { ok: false, message: error.message };
+    await client.from("audit_log").insert({ actor_id: admin.id, action: "order.archived", entity_type: "order", entity_id: archive.data.orderId, after_data: { archived: true } });
+    return { ok: true, message: "Commande archivée. Elle reste disponible dans l’onglet Archivées." };
+  }
+  const parsed = updateSchema.safeParse(formData);
+  if (!parsed.success) return { ok: false, message: "Mise à jour invalide." };
   const { data: before } = await client
     .from("orders")
     .select("status,notes,email,locale,order_number")
@@ -385,7 +410,7 @@ function ShipmentActions({
 }
 
 export default function AdminOrders() {
-  const { demo, orders, search, status, cartStats } = useLoaderData<typeof loader>();
+  const { demo, orders, search, status, view, cartStats } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const revalidator = useRevalidator();
   useEffect(() => {
@@ -397,7 +422,7 @@ export default function AdminOrders() {
       <header className="admin-heading">
         <div>
           <p className="eyebrow">Commerce</p>
-          <h1>Commandes</h1>
+          <h1>{view === "archived" ? "Commandes archivées" : "Commandes"}</h1>
           <p className="admin-order-cart-indicator" aria-live="polite"><strong>{cartStats.unvalidated}/{cartStats.total}</strong><span>paniers non validés / commandes validées + paniers non validés</span></p>
         </div>
         <a className="ui-button ui-button--outline" href="/admin/commandes.csv">
@@ -414,7 +439,12 @@ export default function AdminOrders() {
           {result.message}
         </p>
       ) : null}
+      <nav className="admin-order-tabs" aria-label="Vue des commandes">
+        <a className={view === "active" ? "is-active" : ""} href="/admin/commandes">Actives</a>
+        <a className={view === "archived" ? "is-active" : ""} href="/admin/commandes?view=archived">Archivées</a>
+      </nav>
       <Form className="admin-filter" method="get">
+        {view === "archived" ? <input type="hidden" name="view" value="archived" /> : null}
         <label>
           <span className="sr-only">Rechercher</span>
           <input name="q" defaultValue={search} placeholder="N° ou e-mail" />
@@ -513,6 +543,15 @@ export default function AdminOrders() {
                   </section>
                 </div>
                 <aside className="admin-order__operations">
+                  {view === "active" ? (
+                    <Form method="post" onSubmit={(event) => {
+                      if (!window.confirm("Archiver cette commande ? Elle ne sera plus active, mais restera consultable dans Archivées.")) event.preventDefault();
+                    }}>
+                      <input type="hidden" name="intent" value="archive_order" />
+                      <input type="hidden" name="orderId" value={order.id} />
+                      <button className="ui-button ui-button--outline ui-button--sm" type="submit"><Archive aria-hidden="true" /> Archiver</button>
+                    </Form>
+                  ) : null}
                   <RefundOrderAction order={order} />
                   <LabelPurchaseAction order={order} />
                   <Form method="post" className="admin-order__update-form">

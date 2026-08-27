@@ -12,6 +12,27 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-27-admin-orders-archive",
+    date: "2026-08-27",
+    kind: "Fonctionnalité",
+    title: "Archivage compact des commandes",
+    description: "Les commandes validées peuvent désormais être déplacées dans un onglet Archivées. Un résumé compact est conservé et les données opérationnelles de livraison devenues inutiles sont purgées, tandis que les données nécessaires aux factures restent disponibles.",
+  },
+  {
+    id: "2026-08-27-admin-preparation-count-paid-only",
+    date: "2026-08-27",
+    kind: "Correction",
+    title: "Commandes non payées exclues du compteur de préparation",
+    description: "Le compteur Commandes à préparer vérifie désormais la présence d’une date de paiement en plus du statut de commande, afin d’exclure les anciennes lignes incomplètes.",
+  },
+  {
+    id: "2026-08-27-admin-preparation-count-exact",
+    date: "2026-08-27",
+    kind: "Correction",
+    title: "Compteur des commandes à préparer fiabilisé",
+    description: "Le compteur du tableau de bord utilise désormais un comptage exact des commandes dans les statuts de préparation, indépendamment de la liste limitée des commandes récentes affichées.",
+  },
+  {
     id: "2026-08-27-admin-documents-inline-preview",
     date: "2026-08-27",
     kind: "Correction",

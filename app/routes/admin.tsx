@@ -17,11 +17,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const client = admin.demo ? null : createServiceSupabase();
   const dashboardData = client ? Promise.all([
     client.from("orders").select("id,order_number,email,subtotal_cents,shipping_charged_cents,total_cents,cost_of_goods_cents,actual_shipping_cost_cents,stripe_fee_cents,status,created_at").neq("status", "pending_payment").order("created_at", { ascending: false }).limit(50),
+    client.from("orders").select("id", { count: "exact", head: true }).not("paid_at", "is", null).in("status", ["paid", "preparing", "ready_to_ship"]),
     client.from("professional_applications").select("id").eq("status", "pending"),
     client.rpc("commerce_dashboard_stats"),
     client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound").eq("is_read", false),
-  ]) : Promise.resolve([{ data: [] }, { data: [] }, { data: null }, { count: 0 }] as const);
-  const [products, [{ data: orders }, { data: applications }, { data: commerceStats }, { count: unreadMail }]] = await Promise.all([
+  ]) : Promise.resolve([{ data: [] }, { count: 0 }, { data: [] }, { data: null }, { count: 0 }] as const);
+  const [products, [{ data: orders }, { count: ordersToPrepareCount }, { data: applications }, { data: commerceStats }, { count: unreadMail }]] = await Promise.all([
     getAdminProducts(),
     dashboardData,
   ]);
@@ -30,7 +31,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const revenueCents = totals?.revenue_cents ?? 0;
   const orderCount = totals?.orders ?? 0;
   const lowStock = variants.filter((variant) => variant.stockOnHand - variant.stockReserved <= variant.lowStockThreshold).length;
-  const ordersToPrepare = (orders ?? []).filter((order) => ["paid", "preparing", "ready_to_ship"].includes(order.status)).length;
+  const ordersToPrepare = ordersToPrepareCount ?? 0;
   return {
     demo: admin.demo,
     stats: {
