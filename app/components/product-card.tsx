@@ -85,8 +85,10 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
   const resolvedAudience = audience ?? product.variants.flatMap((variant) => variant.offers)[0]?.audience ?? "retail";
   const baseHref = locale === "fr-FR" ? `/boutique/${product.slug}` : `/en/shop/${product.slug}`;
   const href = resolvedAudience === "professional" ? `${baseHref}?audience=professional` : baseHref;
-  const pack200 = product.variants.find((variant) => variant.weightGrams === 200);
-  const pack200Offer = pack200?.offers.find((offer) => offer.audience === resolvedAudience && offer.active);
+  const smallestVariantOffer = [...product.variants]
+    .sort((left, right) => left.weightGrams - right.weightGrams)
+    .map((variant) => variant.offers.find((offer) => offer.audience === resolvedAudience && offer.active))
+    .find((offer) => offer !== undefined);
   const composedThumbnail = Boolean(product.thumbnailLabelUrl);
   const soldOut = isProductSoldOut(product.stockOnHandGrams, product.status);
   return (
@@ -133,7 +135,7 @@ export function ProductCard({ product, locale, audience, quickAdd = false, quote
           <li>{translation.variety}</li><li>{translation.process}</li>
         </ul>
         <p className="product-card__tasting-notes" aria-label={locale === "fr-FR" ? "Notes de dégustation" : "Tasting notes"}>{translation.tastingNotes.slice(0, 3).map((note) => displayTastingNote(note, locale)).join(" — ")}</p>
-        {quoteAdd || product.status === "archived" || !pack200Offer ? null : <p className="product-card__price">{formatMoney(pack200Offer.price.amount, locale)}</p>}
+        {quoteAdd || product.status === "archived" || !smallestVariantOffer ? null : <p className="product-card__price">{formatMoney(smallestVariantOffer.price.amount, locale)}</p>}
         {quoteAdd ? <ProfessionalQuoteAdd product={product} locale={locale} /> : null}
       </div>
       <Link to={href} className="product-card__link" aria-labelledby={titleId} />

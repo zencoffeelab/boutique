@@ -12,6 +12,20 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-29-google-search-console-indexation-signals",
+    date: "2026-08-29",
+    kind: "Correction",
+    title: "Signaux d’indexation harmonisés pour Google",
+    description: "Les espaces privés, administratifs et techniques sont désormais marqués noindex, les URLs inconnues renvoient un vrai 404 et le sitemap XML publie des URLs correctement échappées avec leurs dates de modification lorsqu’elles sont disponibles.",
+  },
+  {
+    id: "2026-08-29-shop-price-smallest-variant",
+    date: "2026-08-29",
+    kind: "Correction",
+    title: "Prix boutique basé sur la plus petite variante",
+    description: "Le prix affiché sur chaque carte café correspond désormais à l’offre active de la plus petite variante disponible, quel que soit son poids.",
+  },
+  {
     id: "2026-08-27-admin-orders-select-all-checkbox-axis",
     date: "2026-08-27",
     kind: "Design",

@@ -36,11 +36,28 @@ export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://www.zencoffeelab.com" },
 ];
 
-export const meta: MetaFunction = () => [
+const nonIndexablePath = (pathname: string) =>
+  pathname === "/admin" ||
+  pathname.startsWith("/admin/") ||
+  pathname.startsWith("/api/") ||
+  pathname === "/panier" ||
+  pathname === "/en/cart" ||
+  pathname === "/commande" ||
+  pathname === "/en/checkout" ||
+  pathname === "/mon-compte" ||
+  pathname === "/en/my-account" ||
+  pathname.startsWith("/devis/") ||
+  pathname.startsWith("/en/quotes/") ||
+  pathname.startsWith("/activation/") ||
+  pathname.startsWith("/en/activate/") ||
+  pathname.startsWith("/auth/");
+
+export const meta: MetaFunction = ({ location }) => [
   { title: "Zen Coffee Lab — Café de spécialité torréfié à Tours" },
   { name: "description", content: "Micro-torréfacteur de cafés de spécialité, torréfiés à la demande à Tours." },
   { property: "og:site_name", content: "Zen Coffee Lab" },
   { property: "og:type", content: "website" },
+  ...(nonIndexablePath(location.pathname) ? [{ name: "robots", content: "noindex,nofollow" }] : []),
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
