@@ -29,16 +29,26 @@ export function productStructuredData(product: Product, locale: Locale) {
   const imageUrls = product.media.length
     ? product.media.map((media) => absoluteUrl(media.url))
     : [absoluteUrl(product.hoverImageUrl ?? product.thumbnailLabelUrl ?? "/media/product-cards/zen-coffee-bag-resealable.webp")];
+  const productUrl = `${origin}${locale === "fr-FR" ? "/boutique" : "/en/shop"}/${product.slug}`;
   const offers = product.status === "published" ? product.variants.flatMap((variant) => variant.offers
     .filter((offer) => offer.audience === "retail" && offer.active)
     .map((offer) => ({
       "@type": "Offer",
       priceCurrency: "EUR",
       price: (offer.price.amount / 100).toFixed(2),
+      url: productUrl,
       availability: variant.stockOnHand - variant.stockReserved > 0
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
       sku: variant.sku,
+      hasMerchantReturnPolicy: {
+        "@type": "MerchantReturnPolicy",
+        merchantReturnLink: `${origin}${locale === "fr-FR" ? "/cgv" : "/en/general-terms-and-conditions-of-sale"}`,
+      },
+      shippingDetails: {
+        "@type": "OfferShippingDetails",
+        hasShippingService: { "@id": `${origin}/#shipping-service` },
+      },
     }))) : [];
   return {
     "@context": "https://schema.org",

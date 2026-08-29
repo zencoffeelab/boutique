@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-29-product-offer-shipping-return-policy",
+    date: "2026-08-29",
+    kind: "Correction",
+    title: "Politiques de retour et de livraison reliées aux offres",
+    description: "Chaque offre produit référence désormais les CGV pour sa politique de retour et la politique globale de livraison calculée selon le pays et le poids du colis, afin de compléter les données marchandes Google sans publier de tarif fixe inexact.",
+  },
+  {
     id: "2026-08-29-product-structured-data-image-fallback",
     date: "2026-08-29",
     kind: "Correction",
