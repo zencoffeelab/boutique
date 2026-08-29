@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-29-ci-admin-navigation-sync",
+    date: "2026-08-29",
+    kind: "Correction",
+    title: "CI stabilisée par synchronisation du menu administrateur",
+    description: "Le lien Bandeau est de nouveau présent dans le menu partagé du back-office, conformément à la route et aux tests existants, afin d’éviter l’échec récurrent du workflow CI et ses notifications automatiques.",
+  },
+  {
     id: "2026-08-29-admin-documents-test-label",
     date: "2026-08-29",
     kind: "Correction",
