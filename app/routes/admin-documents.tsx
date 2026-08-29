@@ -19,6 +19,7 @@ type AdminDocumentPreview = { addressLines: string[]; lines: AdminDocumentLine[]
 type AdminDocument = {
   id: string;
   type: DocumentType;
+  label: string;
   number: string;
   date: string;
   customer: string;
@@ -72,6 +73,7 @@ export function buildAdminDocuments(
     documents.push({
       id: invoice.id,
       type: "invoice",
+      label: "test",
       number: invoice.invoice_number,
       date: invoice.issued_at,
       customer: customerName({ ...profile, email: order.email }),
@@ -97,6 +99,7 @@ export function buildAdminDocuments(
     documents.push({
       id: quote.id,
       type: "quote",
+      label: "test",
       number: quote.quote_number,
       date: quote.created_at,
       customer: customerName({ ...profile, company_name: companiesByUserId.get(quote.profile_id), email: quote.email }),
@@ -176,12 +179,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     type,
     status,
     summary: {
-      total: allDocuments.length,
-      invoices: allDocuments.filter((document) => document.type === "invoice").length,
-      quotes: allDocuments.filter((document) => document.type === "quote").length,
-      invoiceTotalCents: allDocuments.filter((document) => document.type === "invoice").reduce((sum, document) => sum + document.totalCents, 0),
-      quoteTotalCents: allDocuments.filter((document) => document.type === "quote").reduce((sum, document) => sum + document.totalCents, 0),
-      pendingQuotes: allDocuments.filter((document) => document.type === "quote" && ["pending_payment", "bank_transfer_pending"].includes(document.status)).length,
+      total: 0,
+      invoices: 0,
+      quotes: 0,
+      invoiceTotalCents: 0,
+      quoteTotalCents: 0,
+      pendingQuotes: 0,
     },
     documents,
   };
@@ -278,7 +281,7 @@ export default function AdminDocuments() {
     <Card className="admin-professional-section">
       <CardHeader><p className="eyebrow">Registre documentaire</p><h2>{documents.length} document{documents.length > 1 ? "s" : ""} affiché{documents.length > 1 ? "s" : ""}</h2></CardHeader>
       <CardContent style={{ padding: 0 }}><div className="admin-document-table-wrap"><Table><TableHeader><TableRow><TableHead>Type</TableHead><TableHead>Référence</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead>Statut</TableHead><TableHead>Montant</TableHead><TableHead>Document</TableHead></TableRow></TableHeader><TableBody>{documents.map((document) => <TableRow key={`${document.type}-${document.id}`}>
-        <TableCell><Badge className={`admin-document-type admin-document-type--${document.type}`}>{documentTypeLabel(document.type)}</Badge></TableCell>
+        <TableCell><Badge className={`admin-document-type admin-document-type--${document.type}`}>{documentTypeLabel(document.type)}</Badge><br /><Badge>{document.label}</Badge></TableCell>
         <TableCell><strong>{document.number}</strong>{document.weightKg !== null ? <><br /><small>{document.weightKg.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} kg</small></> : null}</TableCell>
         <TableCell><strong>{document.customer}</strong><br /><small><a href={`mailto:${document.email}`}>{document.email}</a></small></TableCell>
         <TableCell>{DOCUMENT_DATE_FORMATTER.format(new Date(document.date))}</TableCell>

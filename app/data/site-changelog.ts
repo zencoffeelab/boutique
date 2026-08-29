@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-29-admin-documents-test-label",
+    date: "2026-08-29",
+    kind: "Correction",
+    title: "Registre factures et devis marqué pour test",
+    description: "Les documents affichés dans le registre Factures + devis portent désormais le libellé test et les indicateurs du bandeau sont remis à zéro pour l’écran de vérification, sans modifier les montants ni les documents enregistrés.",
+  },
+  {
     id: "2026-08-29-public-url-canonicalization",
     date: "2026-08-29",
     kind: "Correction",
