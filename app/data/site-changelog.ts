@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-29-admin-banner-menu-deduplication",
+    date: "2026-08-29",
+    kind: "Correction",
+    title: "Menu administrateur dédoublonné",
+    description: "Le lien Bandeau est retiré du menu latéral et reste accessible dans l’onglet Pages, afin d’éviter un accès affiché en double dans le back-office.",
+  },
+  {
     id: "2026-08-29-ci-admin-navigation-sync",
     date: "2026-08-29",
     kind: "Correction",
