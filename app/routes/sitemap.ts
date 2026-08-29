@@ -18,5 +18,5 @@ export async function loader(_: LoaderFunctionArgs) {
     ]),
   ];
   const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${entries.map(({ path, lastmod }) => `<url><loc>${escapeXml(`${origin}${path}`)}</loc>${lastmod ? `<lastmod>${escapeXml(lastmod)}</lastmod>` : ""}</url>`).join("")}</urlset>`;
-  return new Response(body, { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=0, s-maxage=3600" } });
+  return new Response(body, { headers: { "content-type": "application/xml; charset=UTF-8", "cache-control": "no-store, no-cache, must-revalidate" } });
 }

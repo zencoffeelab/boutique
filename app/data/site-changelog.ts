@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-29-sitemap-cache-header",
+    date: "2026-08-29",
+    kind: "Correction",
+    title: "Lecture du sitemap fiabilisée",
+    description: "Le sitemap XML est désormais servi avec un type MIME XML explicite et sans mise en cache, afin que les robots relisent toujours la version XML actuelle au lieu d’une réponse HTML obsolète.",
+  },
+  {
     id: "2026-08-29-google-search-console-indexation-signals",
     date: "2026-08-29",
     kind: "Correction",
