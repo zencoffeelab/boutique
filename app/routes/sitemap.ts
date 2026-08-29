@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { getArticles, getProducts } from "~/lib/catalog.server";
 
 const origin = "https://www.zencoffeelab.com";
-const staticPaths = ["", "/boutique", "/archives", "/blog", "/a-propos", "/professionnel", "/faq", "/contact", "/en", "/en/shop", "/en/archives", "/en/blog", "/en/about-us", "/en/professional", "/en/faq", "/en/contact"];
+const staticPaths = ["/", "/boutique", "/archives", "/blog", "/a-propos", "/professionnel", "/faq", "/contact", "/en", "/en/shop", "/en/archives", "/en/blog", "/en/about-us", "/en/professional", "/en/faq", "/en/contact"];
 const escapeXml = (value: string) => value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character]!);
 export async function loader(_: LoaderFunctionArgs) {
   const [products, articles] = await Promise.all([getProducts(), getArticles()]);

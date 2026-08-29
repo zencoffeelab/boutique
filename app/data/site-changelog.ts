@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-29-public-url-canonicalization",
+    date: "2026-08-29",
+    kind: "Correction",
+    title: "URLs publiques harmonisées pour l’indexation",
+    description: "Les URLs publiques utilisent désormais un canonique stable sans slash final superflu, l’accueil est publié dans le sitemap avec son URL exacte et les anciens liens professionnels redirigent vers une page existante, afin de limiter les doublons, redirections et erreurs 404 signalés par Google.",
+  },
+  {
     id: "2026-08-29-product-offer-shipping-return-policy",
     date: "2026-08-29",
     kind: "Correction",

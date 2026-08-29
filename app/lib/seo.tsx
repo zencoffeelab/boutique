@@ -3,12 +3,17 @@ import { alternatePath } from "~/lib/i18n";
 
 const origin = "https://www.zencoffeelab.com";
 const absoluteUrl = (value: string) => new URL(value, origin).toString();
+const canonicalPath = (pathname: string) => {
+  if (!pathname || pathname === "/") return "/";
+  return `/${pathname.replace(/^\/+|\/+$/g, "")}`;
+};
 
 export function pageMeta(title: string, description: string, pathname: string, image?: string) {
-  const canonical = `${origin}${pathname}`;
-  const alternate = alternatePath(pathname);
-  const frenchPath = pathname === "/en" || pathname.startsWith("/en/") ? alternate : pathname;
-  const englishPath = pathname === "/en" || pathname.startsWith("/en/") ? pathname : alternate;
+  const normalizedPath = canonicalPath(pathname);
+  const canonical = `${origin}${normalizedPath}`;
+  const alternate = alternatePath(normalizedPath);
+  const frenchPath = normalizedPath === "/en" || normalizedPath.startsWith("/en/") ? alternate : normalizedPath;
+  const englishPath = normalizedPath === "/en" || normalizedPath.startsWith("/en/") ? normalizedPath : alternate;
   return [
     { title },
     { name: "description", content: description },
