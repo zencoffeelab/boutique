@@ -26,6 +26,9 @@ export function pageMeta(title: string, description: string, pathname: string, i
 
 export function productStructuredData(product: Product, locale: Locale) {
   const translation = product.translations[locale];
+  const imageUrls = product.media.length
+    ? product.media.map((media) => absoluteUrl(media.url))
+    : [absoluteUrl(product.hoverImageUrl ?? product.thumbnailLabelUrl ?? "/media/product-cards/zen-coffee-bag-resealable.webp")];
   const offers = product.status === "published" ? product.variants.flatMap((variant) => variant.offers
     .filter((offer) => offer.audience === "retail" && offer.active)
     .map((offer) => ({
@@ -42,7 +45,7 @@ export function productStructuredData(product: Product, locale: Locale) {
     "@type": "Product",
     name: translation.name,
     description: translation.shortDescription,
-    image: product.media.map((media) => absoluteUrl(media.url)),
+    image: imageUrls,
     brand: { "@type": "Brand", name: "Zen Coffee Lab" },
     ...(offers.length ? { offers } : {}),
   };

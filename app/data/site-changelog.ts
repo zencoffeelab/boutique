@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-29-product-structured-data-image-fallback",
+    date: "2026-08-29",
+    kind: "Correction",
+    title: "Image garantie dans les données produit",
+    description: "Les fiches café sans média principal exposent désormais une image de secours valide dans leurs données structurées, afin d’éviter l’erreur Google « Champ image manquant ».",
+  },
+  {
     id: "2026-08-29-sitemap-cache-header",
     date: "2026-08-29",
     kind: "Correction",
