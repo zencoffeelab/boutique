@@ -231,8 +231,10 @@ test("the top announcement has a dedicated administration page", async ({ page }
   await expect(page.getByLabel("Announcement text")).toHaveValue("Free delivery in France from €75");
   await expect(page.locator(".admin-announcement-preview")).toHaveCount(2);
   await expect(
-    page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Bandeau" }),
-  ).toHaveAttribute("aria-current", "page");
+    page
+      .getByRole("tablist", { name: "Gestion des pages" })
+      .getByRole("tab", { name: "Bandeau" }),
+  ).toHaveAttribute("aria-selected", "true");
 });
 
 test("retail customers have a dedicated administration page", async ({ page }) => {

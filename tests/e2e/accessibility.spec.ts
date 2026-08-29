@@ -38,9 +38,12 @@ for (const path of [
 test("no serious accessibility violation in the cart drawer", async ({
   page,
 }) => {
-  await page.goto("/boutique");
-  await page.getByRole("button", { name: /Panier \(0\)|Cart \(0\)/ }).click();
-  const drawer = page.getByRole("dialog");
+  await page.goto("/boutique", { waitUntil: "networkidle" });
+  const cartButton = page.locator("button.cart-button");
+  await expect(cartButton).toHaveAttribute("aria-expanded", "false");
+  await cartButton.click();
+  await expect(cartButton).toHaveAttribute("aria-expanded", "true");
+  const drawer = page.locator("#cart-drawer");
   await expect(drawer).toBeVisible();
   const results = await new AxeBuilder({ page })
     .include("#cart-drawer")

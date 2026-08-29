@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-08-29-ci-e2e-portable-environment",
+    date: "2026-08-29",
+    kind: "Correction",
+    title: "Test E2E CI rendu portable",
+    description: "Le serveur utilisé par les tests E2E reçoit désormais ses variables d’environnement via cross-env, ce qui garantit son démarrage aussi bien sur les postes Windows que dans GitHub Actions et évite l’échec récurrent de l’étape Chromium.",
+  },
+  {
     id: "2026-08-29-admin-banner-menu-deduplication",
     date: "2026-08-29",
     kind: "Correction",
