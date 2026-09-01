@@ -21,6 +21,7 @@ import { createServiceSupabase } from "~/lib/supabase.server";
 import { parseSiteNavigationConfiguration } from "~/lib/site-navigation";
 import { getSiteNavigation } from "~/lib/site-navigation.server";
 import { getProfessionalConnectedPageContent, getProfessionalPageContent, professionalPageDefaults, type ProfessionalPageContent, type ProfessionalConnectedPageContent } from "~/lib/professional-content";
+import { getInstagramUrl, saveInstagramUrl } from "~/services/site-settings.server";
 
 type ContentTranslation = {
   locale: "fr-FR" | "en-GB";
@@ -87,6 +88,10 @@ const comingSoonSchema = z.object({
   titleEn: z.string().trim().min(2).max(140),
   messageEn: z.string().trim().min(2).max(500),
 });
+const instagramSchema = z.object({
+  intent: z.literal("save_instagram_url"),
+  instagramUrl: z.string().trim().url().max(1_000),
+});
 
 const defaults = ["accueil", "a-propos", "professionnel", "professionnel-connecte", "conseils", "faq", "contact", "cgv", "mentions-legales", "politique-de-confidentialite"];
 const pageLabels: Record<string, string> = {
@@ -140,10 +145,10 @@ function aboutBlock(translation: ContentTranslation | undefined, type: string) {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
-  if (admin.demo) return { demo: true, pages: [] as ContentPage[], adviceArticles: [] as AdminAdvice[], navigation: await getSiteNavigation(), comingSoon: defaultComingSoonSettings };
+  if (admin.demo) return { demo: true, pages: [] as ContentPage[], adviceArticles: [] as AdminAdvice[], navigation: await getSiteNavigation(), comingSoon: defaultComingSoonSettings, instagramUrl: await getInstagramUrl() };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
-  const [{ data, error }, { data: adviceArticles, error: adviceError }, navigation, comingSoon] = await Promise.all([
+  const [{ data, error }, { data: adviceArticles, error: adviceError }, navigation, comingSoon, instagramUrl] = await Promise.all([
     client
       .from("content_pages")
       .select("*,content_page_translations(*)")
@@ -157,10 +162,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
       .order("created_at", { ascending: false }),
     getSiteNavigation(),
     getComingSoonSettings(),
+    getInstagramUrl(),
   ]);
   if (error) throw new Response(error.message, { status: 500 });
   if (adviceError) throw new Response(adviceError.message, { status: 500 });
-  return { demo: false, pages: (data ?? []) as ContentPage[], adviceArticles: (adviceArticles ?? []) as AdminAdvice[], navigation, comingSoon };
+  return { demo: false, pages: (data ?? []) as ContentPage[], adviceArticles: (adviceArticles ?? []) as AdminAdvice[], navigation, comingSoon, instagramUrl };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -168,6 +174,16 @@ export async function action({ request }: ActionFunctionArgs) {
   if (admin.demo) return { ok: false, message: "Lecture seule en démonstration." };
   const formData = await request.formData();
   const fields = Object.fromEntries(formData);
+  if (fields.intent === "save_instagram_url") {
+    const parsedInstagram = instagramSchema.safeParse(fields);
+    if (!parsedInstagram.success) return { ok: false, message: "Saisissez une URL Instagram valide." };
+    try {
+      await saveInstagramUrl(parsedInstagram.data.instagramUrl, admin.id);
+      return { ok: true, message: "Lien Instagram du footer enregistré." };
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : "Lien Instagram non enregistré." };
+    }
+  }
   if (fields.intent === "save_coming_soon") {
     const parsedComingSoon = comingSoonSchema.safeParse(fields);
     if (!parsedComingSoon.success) return { ok: false, message: "Les textes français et anglais sont requis." };
@@ -559,12 +575,13 @@ function HomeFields({ language, statement, values, heroImage }: { language: "Fra
 }
 
 export default function AdminContent() {
-  const { demo, pages, adviceArticles, navigation, comingSoon } = useLoaderData<typeof loader>();
+  const { demo, pages, adviceArticles, navigation, comingSoon, instagramUrl } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const location = useLocation();
   const activeTab = new URLSearchParams(location.search).get("tab");
   const arranging = activeTab === "rangement";
   const construction = activeTab === "construction";
+  const footer = activeTab === "footer";
   const byKey = new Map(pages.map((page) => [page.page_key, page]));
   const keys = [...new Set([...defaults, ...byKey.keys()])].sort((left, right) => (pageLabels[left] ?? left).localeCompare(pageLabels[right] ?? right, "fr-FR"));
 
@@ -578,13 +595,26 @@ export default function AdminContent() {
     {demo ? <p className="admin-notice">Connectez Supabase pour éditer les pages avec l’éditeur enrichi.</p> : null}
     {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"}>{result.message}</p> : null}
     <nav className="admin-content-tabs" aria-label="Gestion des pages" role="tablist">
-      <Link role="tab" aria-selected={!arranging && !construction} className={!arranging && !construction ? "is-active" : undefined} to="/admin/contenus">Contenu</Link>
+      <Link role="tab" aria-selected={!arranging && !construction && !footer} className={!arranging && !construction && !footer ? "is-active" : undefined} to="/admin/contenus">Contenu</Link>
       <Link role="tab" aria-selected={arranging} className={arranging ? "is-active" : undefined} to="/admin/contenus?tab=rangement">Rangement</Link>
+      <Link role="tab" aria-selected={footer} className={footer ? "is-active" : undefined} to="/admin/contenus?tab=footer">Footer</Link>
       <Link role="tab" aria-selected={construction} className={construction ? "is-active" : undefined} to="/admin/contenus?tab=construction">Site en construction</Link>
       <Link role="tab" aria-selected={false} to="/admin/bandeau">Bandeau</Link>
     </nav>
     {arranging
       ? <AdminNavigationOrganizer initialConfiguration={navigation} demo={demo} />
+      : footer
+        ? <section className="ui-card admin-content-page">
+          <div className="admin-content-page__journal">
+            <h2>Instagram</h2>
+            <p>Modifiez le lien du bouton Instagram affiché dans le footer du site.</p>
+            <Form method="post">
+              <input type="hidden" name="intent" value="save_instagram_url" />
+              <div className="field"><label>Lien Instagram<input type="url" name="instagramUrl" defaultValue={instagramUrl} required disabled={demo} placeholder="https://www.instagram.com/votre-compte/" /></label></div>
+              <button className="ui-button ui-button--default" type="submit" disabled={demo}>Enregistrer</button>
+            </Form>
+          </div>
+        </section>
       : construction
         ? <AdminComingSoonEditor initialSettings={comingSoon} demo={demo} />
         : <div className="admin-content-list">

@@ -11,4 +11,19 @@ describe("product structured data", () => {
   it("keeps offers on published coffee pages", () => {
     expect(productStructuredData(demoProducts[0], "fr-FR")).toHaveProperty("offers");
   });
+
+  it("declares the required return policy fields on every retail offer", () => {
+    for (const product of demoProducts.filter((product) => product.status === "published")) {
+      const structuredData = productStructuredData(product, "fr-FR");
+      const offers = structuredData.offers as Array<{ hasMerchantReturnPolicy: Record<string, unknown> }>;
+      expect(offers).not.toHaveLength(0);
+      for (const offer of offers) {
+        expect(offer.hasMerchantReturnPolicy).toMatchObject({
+          "@type": "MerchantReturnPolicy",
+          returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted",
+        });
+        expect(offer.hasMerchantReturnPolicy.applicableCountry).toEqual(expect.arrayContaining(["FR", "DE", "GB"]));
+      }
+    }
+  });
 });

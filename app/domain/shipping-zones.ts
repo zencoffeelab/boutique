@@ -23,6 +23,8 @@ const countryZones: Readonly<Record<string, ShippingZone>> = {
   CY: 5, LI: 5, MT: 5, NO: 5,
 };
 
+export const SHIPPING_COUNTRY_CODES = Object.freeze(Object.keys(countryZones));
+
 const zoneServices: Readonly<Record<ShippingZone, readonly ConfiguredShippingService[]>> = {
   1: ["mondial_relay", "fedex"],
   2: ["mondial_relay", "fedex", "fedex_signature"],

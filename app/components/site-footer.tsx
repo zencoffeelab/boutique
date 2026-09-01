@@ -8,7 +8,7 @@ type FooterProductLink = Readonly<{
   publishedAt?: string | null;
 }>;
 
-export function SiteFooter({ products = [], admin = false, navigation = defaultSiteNavigation }: { products?: readonly FooterProductLink[]; admin?: boolean; navigation?: SiteNavigationConfiguration }) {
+export function SiteFooter({ products = [], admin = false, navigation = defaultSiteNavigation, instagramUrl = "https://www.instagram.com/zencoffeeclub/" }: { products?: readonly FooterProductLink[]; admin?: boolean; navigation?: SiteNavigationConfiguration; instagramUrl?: string }) {
   const location = useLocation();
   const english = location.pathname === "/en" || location.pathname.startsWith("/en/");
   const locale = english ? "en-GB" : "fr-FR";
@@ -37,7 +37,7 @@ export function SiteFooter({ products = [], admin = false, navigation = defaultS
           <p>© {new Date().getFullYear()} Zen Coffee Lab</p>
           {admin ? <Link className="footer-admin-link" to="/admin">Back-office</Link> : null}
         </div>
-        <a href="https://www.instagram.com/zencoffeeclub/" rel="noreferrer" target="_blank">Instagram ↗</a>
+        <a href={instagramUrl} rel="noreferrer" target="_blank">Instagram ↗</a>
       </div>
     </footer>
   );

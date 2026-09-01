@@ -29,6 +29,7 @@ import { defaultSiteNavigation } from "~/lib/site-navigation";
 import { getSiteNavigation } from "~/lib/site-navigation.server";
 import { isAllowedDuringRequiredPasswordSetup, passwordSetupPath } from "~/lib/password-setup";
 import { safeInternalPath } from "~/lib/redirects";
+import { getInstagramUrl } from "~/services/site-settings.server";
 import "./app.css";
 
 export const links: LinksFunction = () => [
@@ -64,7 +65,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const requestUrl = new URL(request.url);
   const locale = getLocale(request);
   const shellHidden = isSiteShellHiddenPath(requestUrl.pathname);
-  const [session, footerProducts, announcementContent, navigation, comingSoon] = await Promise.all([
+  const [session, footerProducts, announcementContent, navigation, comingSoon, instagramUrl] = await Promise.all([
     getSessionStatus(request),
     shellHidden
       ? Promise.resolve([])
@@ -85,6 +86,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     shellHidden ? Promise.resolve(null) : getContentPage("bandeau", locale),
     shellHidden ? Promise.resolve(defaultSiteNavigation) : getSiteNavigation(),
     shellHidden ? Promise.resolve(comingSoonCopy(defaultComingSoonSettings, locale)) : getComingSoon(locale),
+    shellHidden ? Promise.resolve("") : getInstagramUrl(),
   ]);
   const setupPath = passwordSetupPath(locale);
   if (session.passwordSetupRequired && !isAllowedDuringRequiredPasswordSetup(requestUrl.pathname)) {
@@ -103,11 +105,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     announcement: announcementContent?.title ?? null,
     navigation,
     comingSoon,
+    instagramUrl,
   }, { headers: session.responseHeaders });
 }
 
 export default function App() {
-  const { locale, gaMeasurementId, signedIn, professional, professionalUserId, accountInitials, admin, footerProducts, announcement, navigation, comingSoon } = useLoaderData<typeof loader>();
+  const { locale, gaMeasurementId, signedIn, professional, professionalUserId, accountInitials, admin, footerProducts, announcement, navigation, comingSoon, instagramUrl } = useLoaderData<typeof loader>();
   const location = useLocation();
   const isAdmin = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
   const isPasswordSetup = location.pathname === "/activation/mot-de-passe" || location.pathname === "/en/activate/password";
@@ -129,7 +132,7 @@ export default function App() {
             <main id="main-content" tabIndex={-1}>
               <Outlet />
             </main>
-            {shellHidden ? null : <SiteFooter products={footerProducts} admin={admin} navigation={navigation} />}
+            {shellHidden ? null : <SiteFooter products={footerProducts} admin={admin} navigation={navigation} instagramUrl={instagramUrl} />}
             {shellHidden ? null : <CookieConsent measurementId={gaMeasurementId} />}
           </QuoteCartProvider>
         </CartProvider>}

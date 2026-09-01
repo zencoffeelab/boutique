@@ -12,6 +12,48 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-01-admin-quote-simulation-indy-link",
+    date: "2026-09-01",
+    kind: "Fonctionnalité",
+    title: "Simulation de devis via Indy",
+    description: "Le bouton Simuler un devis du back-office ouvre désormais la page de devis Indy dans un nouvel onglet.",
+  },
+  {
+    id: "2026-09-01-invoices-english-outside-france",
+    date: "2026-09-01",
+    kind: "Fonctionnalité",
+    title: "Factures en anglais hors de France",
+    description: "Les commandes livrées hors de France reçoivent désormais une facture PDF en anglais. La simulation de facture permet également de contrôler la version anglaise.",
+  },
+  {
+    id: "2026-09-01-invoice-layout-simplified",
+    date: "2026-09-01",
+    kind: "Design",
+    title: "Factures simplifiées et harmonisées",
+    description: "Les prochaines factures et leurs aperçus reprennent une mise en page épurée avec en-tête client, tableau vert à quatre colonnes, total unique et bloc « Termes et conditions », sans colonne TVA ni mentions HT.",
+  },
+  {
+    id: "2026-09-01-product-return-policy-schema-required-fields",
+    date: "2026-09-01",
+    kind: "Correction",
+    title: "Politique de retour complète dans les fiches café",
+    description: "Toutes les offres des cafés publiés, y compris les prochaines sorties, indiquent désormais les pays concernés et la catégorie de retour prévue par les CGV dans leurs données structurées Google.",
+  },
+  {
+    id: "2026-09-01-admin-footer-instagram-link",
+    date: "2026-09-01",
+    kind: "Fonctionnalité",
+    title: "Lien Instagram du footer administrable",
+    description: "La rubrique Pages du back-office propose désormais un onglet Footer pour modifier le lien du bouton Instagram affiché en bas du site.",
+  },
+  {
+    id: "2026-09-01-mobile-product-tasting-notes-final-separator",
+    date: "2026-09-01",
+    kind: "Design",
+    title: "Dernier séparateur des notes de dégustation retiré",
+    description: "Sur mobile, le tiret placé sous la dernière note de dégustation d’une fiche café n’est plus affiché.",
+  },
+  {
     id: "2026-08-29-ci-e2e-portable-environment",
     date: "2026-08-29",
     kind: "Correction",

@@ -1,4 +1,5 @@
 import type { Locale, Product } from "~/domain/types";
+import { SHIPPING_COUNTRY_CODES } from "~/domain/shipping-zones";
 import { alternatePath } from "~/lib/i18n";
 
 const origin = "https://www.zencoffeelab.com";
@@ -48,6 +49,8 @@ export function productStructuredData(product: Product, locale: Locale) {
       sku: variant.sku,
       hasMerchantReturnPolicy: {
         "@type": "MerchantReturnPolicy",
+        applicableCountry: SHIPPING_COUNTRY_CODES,
+        returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted",
         merchantReturnLink: `${origin}${locale === "fr-FR" ? "/cgv" : "/en/general-terms-and-conditions-of-sale"}`,
       },
       shippingDetails: {

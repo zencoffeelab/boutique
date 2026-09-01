@@ -1,6 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { generateInvoicePdfSafely, invoiceReferenceLabels, renderInvoicePdf } from "~/services/invoice.server";
+import { generateInvoicePdfSafely, invoiceReferenceLabels, invoiceUsesEnglish, renderInvoicePdf } from "~/services/invoice.server";
 
 describe("invoice PDF", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -28,6 +28,12 @@ describe("invoice PDF", () => {
       invoiceNumber: "ZCL-F-202608-000001",
       orderNumber: "Commande ZCL-202608-000001",
     });
+  });
+
+  it("uses English for invoices delivered outside France", () => {
+    expect(invoiceUsesEnglish("FR")).toBe(false);
+    expect(invoiceUsesEnglish("GB")).toBe(true);
+    expect(invoiceUsesEnglish(undefined)).toBe(false);
   });
 
   it("does not block the payment webhook when invoice generation fails", async () => {

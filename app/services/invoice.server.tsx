@@ -32,8 +32,10 @@ type OrderSnapshot = {
 
 type OrderLineSnapshot = {
   id: string;
+  product_id?: string;
   quantity: number;
   product_name: string;
+  english_product_name?: string;
   variant_label: string;
   line_total_cents: number;
 };
@@ -45,6 +47,10 @@ export function invoiceReferenceLabels(input: { invoiceNumber: string; orderNumb
   };
 }
 
+export function invoiceUsesEnglish(countryCode?: string) {
+  return Boolean(countryCode && countryCode.toUpperCase() !== "FR");
+}
+
 const pageWidth = 595.28;
 const pageHeight = 841.89;
 const margin = 42;
@@ -53,7 +59,11 @@ const mutedColor = rgb(112 / 255, 118 / 255, 124 / 255);
 const ruleColor = rgb(52 / 255, 59 / 255, 66 / 255);
 
 function euros(cents: number, locale: string) {
-  return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(cents / 100);
+  const amount = new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
+  return `${amount} €`;
 }
 
 function safePdfText(font: PDFFont, value: unknown) {
@@ -94,15 +104,15 @@ function drawRightTopText(page: PDFPage, font: PDFFont, value: string, right: nu
 }
 
 function drawInvoiceTableHeader(page: PDFPage, font: PDFFont, english: boolean, top: number) {
-  const labels = english ? ["Service", "Qty", "Tax", "Price (€)", "Discount", "Total (incl. tax) (€)"] : ["Service", "Quantité", "TVA", "Prix (€)", "Remise", "Total (TTC) (€)"];
-  const positions = [margin, 300, 348, 393, 445, 510];
-  labels.forEach((label, index) => drawTopText(page, font, label, positions[index], top, 8.5, mutedColor, index === 0 ? 295 : pageWidth));
-  drawTopRule(page, top + 24, 4);
+  const labels = english ? ["Description", "Qty", "Unit price", "Amount"] : ["Libellé", "Quantité", "Prix unitaire", "Montant"];
+  const positions = [margin + 9, 352, 412, 496];
+  page.drawRectangle({ x: margin, y: pageHeight - top - 27, width: pageWidth - margin * 2, height: 27, color: rgb(128 / 255, 157 / 255, 136 / 255) });
+  labels.forEach((label, index) => drawTopText(page, font, label, positions[index], top + 8, 8.5, rgb(1, 1, 1), index === 0 ? 300 : pageWidth));
 }
 
 function drawInvoiceTableRow(page: PDFPage, font: PDFFont, boldFont: PDFFont, values: string[], top: number, final = false) {
-  const positions = [margin, 300, 348, 393, 445, 510];
-  const widths = [245, 35, 40, 48, 58, 43];
+  const positions = [margin + 9, 352, 412, 496];
+  const widths = [290, 36, 70, 56];
   values.forEach((value, index) => {
     const rowFont = final ? boldFont : font;
     const size = final ? 9 : 8.5;
@@ -111,87 +121,69 @@ function drawInvoiceTableRow(page: PDFPage, font: PDFFont, boldFont: PDFFont, va
     const x = rightAligned ? positions[index] + widths[index] - rowFont.widthOfTextAtSize(safe, size) : positions[index];
     page.drawText(fitPdfText(rowFont, value, size, rightAligned ? widths[index] : widths[index] + 30), { x, y: pageHeight - top - size, size, font: rowFont, color: textColor });
   });
-  drawTopRule(page, top + 22, final ? 1.2 : 0.7);
+  drawTopRule(page, top + 24, final ? 1.2 : 0.5);
 }
 
 export async function renderInvoicePdf(input: { invoice: InvoiceSnapshot; order: OrderSnapshot; lines: OrderLineSnapshot[] }) {
   const { invoice, order, lines } = input;
-  const english = order.locale === "en-GB";
+  const english = invoiceUsesEnglish(order.shipping_address?.countryCode);
+  const documentLocale = english ? "en-GB" : "fr-FR";
   const document = await PDFDocument.create();
   const font = await document.embedFont(StandardFonts.Helvetica);
   const boldFont = await document.embedFont(StandardFonts.HelveticaBold);
   let page = document.addPage([pageWidth, pageHeight]);
   const right = pageWidth - margin;
-  const issuedDate = new Date(invoice.issued_at).toLocaleDateString(english ? "en-GB" : "fr-FR");
-  const serviceDate = new Date(invoice.issued_at).toLocaleDateString(english ? "en-GB" : "fr-FR");
+  const issuedDate = new Date(invoice.issued_at).toLocaleDateString(documentLocale);
   const address = order.shipping_address ?? {};
   const buyerLines = [
     `${address.firstName ?? ""} ${address.lastName ?? ""}`.trim(), address.company, address.line1,
     `${address.postalCode ?? ""} ${address.city ?? ""}`.trim(), address.countryCode, order.email,
   ].filter((line): line is string => Boolean(line));
-  const subtotalCents = lines.reduce((sum, line) => sum + line.line_total_cents, 0);
   const totalCents = order.total_cents;
 
-  drawTopText(page, boldFont, "ZEN COFFEE LAB", margin + 30, 57, 22, textColor, 260);
-  drawTopText(page, font, english ? "COFFEE ROASTERS" : "MICRO-TORRÉFACTEUR", margin + 42, 84, 7.5, mutedColor, 220);
-  drawTopRule(page, 40, 4);
-  drawTopText(page, boldFont, "Zen Coffee Lab", 390, 51, 8, textColor, right);
-  drawTopText(page, font, "Ugo Simon-Meslet", 390, 65, 8.5, textColor, right);
-  drawTopText(page, font, "32 rue Louis Blanc", 390, 78, 8.5, mutedColor, right);
-  drawTopText(page, font, "37000 Tours", 390, 78, 8.5, mutedColor, right);
-  drawTopText(page, font, "France", 390, 91, 8.5, mutedColor, right);
-  drawTopText(page, font, "SIRET : 848 867 065 00056", 390, 104, 8.5, mutedColor, right);
-  drawTopText(page, font, "contact@zencoffeelab.com · 06 12 69 20 79", 390, 130, 8, mutedColor, right);
-  drawTopRule(page, 151, 4);
-  drawTopText(page, boldFont, buyerLines[0] ?? order.email, 390, 166, 9, textColor, right);
-  buyerLines.slice(1).forEach((line, index) => drawTopText(page, font, line, 390, 180 + index * 13, 8.5, mutedColor, right));
+  drawTopText(page, boldFont, "ZEN", margin, 58, 26, textColor, 130);
+  drawTopText(page, font, "coffee lab", margin + 16, 86, 8.5, mutedColor, 130);
+  drawTopText(page, boldFont, "Zen Coffee Lab", 142, 50, 10, textColor, 210);
+  drawTopText(page, font, "32 rue Louis Blanc", 142, 72, 8.5, mutedColor, 210);
+  drawTopText(page, font, "37000 Tours, France", 142, 85, 8.5, mutedColor, 210);
+  drawTopText(page, font, "contact@zencoffeelab.com", 142, 110, 8.5, mutedColor, 210);
+  drawTopText(page, boldFont, buyerLines[0] ?? order.email, 390, 50, 10, textColor, right);
+  buyerLines.slice(1).forEach((line, index) => drawRightTopText(page, font, line, right, 72 + index * 13, 8.5, mutedColor));
 
-  drawTopRule(page, 254, 4);
-  drawTopText(page, boldFont, english ? "INVOICE" : "FACTURE", margin, 267, 18, textColor, 250);
-  drawTopText(page, font, invoice.invoice_number, margin, 292, 10, textColor, 250);
-  drawTopText(page, boldFont, english ? "PAID" : "PAYÉ", 390, 267, 9, textColor, right);
-  drawTopText(page, font, `${english ? "Date" : "Date"} :`, 390, 286, 8.5, mutedColor, right - 74);
-  drawRightTopText(page, font, issuedDate, right, 286, 8.5, mutedColor);
-  drawTopText(page, font, english ? "Service date :" : "Date de service :", 390, 299, 8.5, mutedColor, right - 74);
-  drawRightTopText(page, font, serviceDate, right, 299, 8.5, mutedColor);
-  drawTopRule(page, 318, 1.2);
+  drawTopText(page, boldFont, english ? "INVOICE" : "FACTURE", margin, 215, 16, textColor, 250);
+  drawTopText(page, font, invoice.invoice_number, margin, 239, 9.5, mutedColor, 250);
+  drawRightTopText(page, font, english ? `Issued on ${issuedDate}` : `Émise le ${issuedDate}`, right, 250, 8.5, mutedColor);
 
-  const tableTop = 370;
+  const tableTop = 287;
   drawInvoiceTableHeader(page, font, english, tableTop);
-  let rowTop = tableTop + 33;
+  let rowTop = tableTop + 38;
   for (const line of lines) {
-    if (rowTop > 675) { page = document.addPage([pageWidth, pageHeight]); rowTop = 70; drawInvoiceTableHeader(page, font, english, 45); }
+    if (rowTop > 620) { page = document.addPage([pageWidth, pageHeight]); rowTop = 84; drawInvoiceTableHeader(page, font, english, 45); }
     drawInvoiceTableRow(page, font, boldFont, [
-      `${line.product_name} - ${line.variant_label}`,
-      String(line.quantity), "0 %", euros(Math.round(line.line_total_cents / Math.max(line.quantity, 1)), order.locale), "0 %", euros(line.line_total_cents, order.locale),
+      `${english ? line.english_product_name ?? line.product_name : line.product_name} - ${line.variant_label}`,
+      String(line.quantity), euros(Math.round(line.line_total_cents / Math.max(line.quantity, 1)), documentLocale), euros(line.line_total_cents, documentLocale),
     ], rowTop);
-    rowTop += 22;
+    rowTop += 24;
   }
-  drawInvoiceTableRow(page, font, boldFont, [english ? "Shipping" : "Livraison", "1", "0 %", euros(order.shipping_charged_cents, order.locale), "0 %", euros(order.shipping_charged_cents, order.locale)], rowTop);
-  rowTop += 22;
-  drawTopRule(page, rowTop, 4);
+  if (order.shipping_charged_cents > 0) {
+    drawInvoiceTableRow(page, font, boldFont, [english ? "Shipping" : "Livraison", "1", euros(order.shipping_charged_cents, documentLocale), euros(order.shipping_charged_cents, documentLocale)], rowTop);
+    rowTop += 24;
+  }
 
-  const summaryTop = Math.max(rowTop + 25, 520);
-  const summaryX = 390;
+  const summaryTop = Math.max(rowTop + 36, 545);
+  const summaryX = 410;
   const drawSummaryLine = (label: string, value: string, top: number, bold = false) => {
     drawTopText(page, bold ? boldFont : font, label, summaryX, top, 8.5, bold ? textColor : mutedColor, right - 82);
     drawRightTopText(page, bold ? boldFont : font, value, right, top, 8.5, bold ? textColor : mutedColor);
   };
-  drawTopText(page, font, english ? "VAT not applicable." : "TVA non applicable, art. 293 B du CGI.", margin, summaryTop, 8.5, mutedColor, 350);
-  drawTopText(page, font, english ? "Thank you for your order." : "Merci pour votre commande.", margin, summaryTop + 28, 8.5, mutedColor, 350);
-  drawSummaryLine(english ? "Discount (€):" : "Remise (€) :", euros(0, order.locale), summaryTop);
-  drawSummaryLine(english ? "Subtotal (€):" : "Total (€) :", euros(subtotalCents, order.locale), summaryTop + 18);
-  drawSummaryLine(english ? "VAT (€):" : "TVA 0 % (€) :", euros(0, order.locale), summaryTop + 36);
-  drawTopRule(page, summaryTop + 56, 4);
-  drawSummaryLine(english ? "FINAL TOTAL (€)" : "SOMME FINALE (€)", euros(totalCents, order.locale), summaryTop + 72, true);
-  drawTopRule(page, summaryTop + 96, 1.2);
-  drawSummaryLine(english ? "Payment method:" : "Mode de paiement :", english ? "Online" : "En ligne", summaryTop + 116);
+  drawTopText(page, boldFont, english ? "Terms and conditions" : "Termes et conditions", margin, summaryTop, 8.5, mutedColor, 330);
+  drawTopText(page, font, english ? "VAT not applicable, art. 293 B of the French tax code." : "TVA non applicable, art. 293 B du CGI.", margin, summaryTop + 16, 7.5, mutedColor, 340);
+  drawSummaryLine("Total", euros(totalCents, documentLocale), summaryTop + 8, true);
+  drawTopRule(page, summaryTop + 34, 1);
 
-  drawTopText(page, font, "Zen Coffee Lab", 390, 704, 8.5, mutedColor, right);
-  drawTopText(page, font, "Ugo Simon-Meslet", 390, 717, 8.5, mutedColor, right);
   drawTopRule(page, 785, 0.8);
   drawTopText(page, font, "Zen Coffee Lab · Ugo Simon-Meslet · 32 rue Louis Blanc · 37000 Tours · France", margin + 28, 799, 7, mutedColor, right);
-  drawTopText(page, font, "SIRET 848 867 065 00056 · contact@zencoffeelab.com · TVA non applicable, art. 293 B du CGI", margin + 28, 811, 7, mutedColor, right);
+  drawTopText(page, font, "SIRET 848 867 065 00056 · contact@zencoffeelab.com", margin + 28, 811, 7, mutedColor, right);
   return document.save();
 }
 
@@ -204,7 +196,23 @@ export async function generateInvoicePdf(orderId: string) {
   ]);
   if (!invoice || !order) throw new Error("Invoice snapshot is incomplete.");
   if (invoice.storage_path) return invoice.storage_path;
-  const bytes = await renderInvoicePdf({ invoice: invoice as InvoiceSnapshot, order: order as OrderSnapshot, lines: (lines ?? []) as OrderLineSnapshot[] });
+  const invoiceLines = (lines ?? []) as OrderLineSnapshot[];
+  const english = invoiceUsesEnglish((order as OrderSnapshot).shipping_address?.countryCode);
+  let englishNames = new Map<string, string>();
+  const productIds = [...new Set(invoiceLines.map((line) => line.product_id).filter((id): id is string => Boolean(id)))];
+  if (english && productIds.length) {
+    const { data } = await client
+      .from("product_translations")
+      .select("product_id,name")
+      .eq("locale", "en-GB")
+      .in("product_id", productIds);
+    englishNames = new Map((data ?? []).map((translation) => [translation.product_id, translation.name]));
+  }
+  const bytes = await renderInvoicePdf({
+    invoice: invoice as InvoiceSnapshot,
+    order: order as OrderSnapshot,
+    lines: invoiceLines.map((line) => ({ ...line, english_product_name: line.product_id ? englishNames.get(line.product_id) : undefined })),
+  });
   const path = `${new Date(invoice.issued_at).getUTCFullYear()}/${invoice.invoice_number}.pdf`;
   const { error } = await client.storage.from("invoices").upload(path, Buffer.from(bytes), { contentType: "application/pdf", upsert: false });
   if (error && !error.message.toLowerCase().includes("already exists")) throw error;
