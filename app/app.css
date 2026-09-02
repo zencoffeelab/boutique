@@ -1927,7 +1927,7 @@ button:disabled {
   text-align: center;
 }
 .product-freshness-faq > div {
-  max-width: 52rem;
+  max-width: 76rem;
 }
 .product-freshness-faq h2 {
   margin: 0 0 1.5rem;
@@ -1940,6 +1940,15 @@ button:disabled {
   color: var(--green);
   font-size: clamp(0.95rem, 1.05vw, 1.12rem);
   line-height: 1.65;
+}
+.product-freshness-faq__line {
+  display: block;
+  white-space: nowrap;
+}
+@media (max-width: 1100px) {
+  .product-freshness-faq__line {
+    white-space: normal;
+  }
 }
 .product-freshness-faq + .product-extraction-guide {
   margin-top: 2rem;

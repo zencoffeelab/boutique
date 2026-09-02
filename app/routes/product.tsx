@@ -62,7 +62,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     products.filter((candidate) => candidate.status === "published" && hasPurchasableVariant(candidate, audience)),
     locale,
   );
-  const freshnessFaq = product.status === "published"
+  const freshnessFaq = product.status !== "archived"
     ? await getFaqItemByFrenchQuestion(freshnessFaqQuestion)
     : null;
   return { locale, product, audience, archived, preview, relatedProducts, freshnessFaq };
@@ -176,16 +176,25 @@ function ProductFreshnessFaq({
   const answer = english ? item.answer_en : item.answer_fr;
   const recommendationStart = answer.search(english ? /we recommend/i : /nous recommandons/i);
   const betweenStart = english ? answer.search(/between/i) : -1;
+  const aromaPeakStart = english ? -1 : answer.search(/avec un pic d['’]arômes/i);
+  const lines = recommendationStart > 0
+    ? english
+      ? [
+        answer.slice(0, recommendationStart).trimEnd(),
+        betweenStart > recommendationStart ? answer.slice(recommendationStart, betweenStart).trimEnd() : answer.slice(recommendationStart),
+        betweenStart > recommendationStart ? answer.slice(betweenStart) : "",
+      ]
+      : [
+        answer.slice(0, recommendationStart).trimEnd(),
+        aromaPeakStart > recommendationStart ? answer.slice(recommendationStart, aromaPeakStart).trimEnd() : answer.slice(recommendationStart),
+        aromaPeakStart > recommendationStart ? answer.slice(aromaPeakStart) : "",
+      ]
+    : [answer, "", ""];
   return (
     <section className="product-freshness-faq" aria-labelledby="product-freshness-faq-title">
       <div>
         <h2 id="product-freshness-faq-title">{english ? item.question_en : item.question_fr}</h2>
-        <p>
-          {recommendationStart > 0 ? <>
-            {answer.slice(0, recommendationStart).trimEnd()}<br />
-            {betweenStart > recommendationStart ? <>{answer.slice(recommendationStart, betweenStart).trimEnd()}<br />{answer.slice(betweenStart)}</> : answer.slice(recommendationStart)}
-          </> : answer}
-        </p>
+        <p>{lines.filter(Boolean).map((line, index) => <span className="product-freshness-faq__line" key={index}>{line}</span>)}</p>
       </div>
     </section>
   );

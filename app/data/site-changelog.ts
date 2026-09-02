@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-02-product-freshness-faq-three-lines",
+    date: "2026-09-02",
+    kind: "Design",
+    title: "Conseil de repos du café présenté en trois lignes",
+    description: "Sur les fiches des cafés publiés et à venir, le conseil de repos après torréfaction est désormais structuré en trois lignes : le repos, l’ouverture du paquet et le pic d’arômes.",
+  },
+  {
     id: "2026-09-02-contact-form-spam-protection-scope",
     date: "2026-09-02",
     kind: "Correction",
