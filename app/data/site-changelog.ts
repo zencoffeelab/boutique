@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-02-contact-form-spam-protection-scope",
+    date: "2026-09-02",
+    kind: "Correction",
+    title: "Protection anti-spam réservée au formulaire Contact",
+    description: "Les contrôles reCAPTCHA, Turnstile et la limitation de tentatives sont désormais appliqués uniquement au formulaire Contact. La connexion, la création de compte, les commandes et les autres démarches du site restent accessibles sans CAPTCHA.",
+  },
+  {
     id: "2026-09-02-public-forms-and-mail-spam-hardening",
     date: "2026-09-02",
     kind: "Sécurité",

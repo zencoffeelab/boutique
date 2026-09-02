@@ -13,7 +13,6 @@ import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
 import { createRequestSupabase } from "~/lib/supabase.server";
 import { pickupPointsConfigured } from "~/services/pickup-points.server";
-import { getPublicCaptchaTokens } from "~/components/public-captcha";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request); const viewer = await getViewer(request); const audience = viewer?.profile?.professional_status === "approved" ? "professional" : "retail";
@@ -110,7 +109,7 @@ export default function Checkout() {
     try {
       const response = await fetch("/api/shipping/pickup-points", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ locale, address: { line1: address.line1, line2: address.line2, postalCode: address.postalCode, city: address.city, countryCode: address.countryCode }, weightGrams: estimatedShippingWeight, ...getPublicCaptchaTokens(form) }),
+        body: JSON.stringify({ locale, address: { line1: address.line1, line2: address.line2, postalCode: address.postalCode, city: address.city, countryCode: address.countryCode }, weightGrams: estimatedShippingWeight }),
       });
       const data = await response.json() as PickupResponse;
       if (!response.ok || !data.ok) throw new Error(data.message || (english ? "Pickup-point search is unavailable." : "La recherche de points relais est indisponible."));
@@ -132,7 +131,7 @@ export default function Checkout() {
     try {
       const response = await fetch("/api/shipping/quote", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(event.currentTarget), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, ...getPublicCaptchaTokens(event.currentTarget) }),
+        body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(event.currentTarget), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined }),
       });
       const data = await response.json() as QuoteResponse;
       if (!response.ok || !data.ok) throw new Error(data.message || (english ? "Unable to retrieve shipping rates." : "Impossible de récupérer les tarifs de livraison."));
@@ -147,7 +146,7 @@ export default function Checkout() {
     try {
       const response = await fetch("/api/checkout/payment-intent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(formRef.current), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, shippingRateId: selectedRate, acceptTerms: true, createAccount: !account && createAccount, accountPassword: !account && createAccount ? String(new FormData(formRef.current).get("accountPassword") ?? "") : undefined, ...getPublicCaptchaTokens(formRef.current) }),
+        body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(formRef.current), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, shippingRateId: selectedRate, acceptTerms: true, createAccount: !account && createAccount, accountPassword: !account && createAccount ? String(new FormData(formRef.current).get("accountPassword") ?? "") : undefined }),
       });
       const data = await response.json() as CheckoutResponse;
       if (!response.ok || !data.ok) throw new Error(data.message || "Checkout unavailable");

@@ -1,13 +1,11 @@
 import type { ActionFunctionArgs } from "react-router";
 import { pickupPointSearchSchema } from "~/domain/schemas";
 import { searchPickupPoints } from "~/services/pickup-points.server";
-import { captchaRejected, verifyPublicCaptcha } from "~/lib/antispam.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") return Response.json({ ok: false, message: "Method not allowed." }, { status: 405 });
   const raw = await request.json().catch(() => null);
   const locale = raw && typeof raw === "object" && (raw as Record<string, unknown>).locale === "en-GB" ? "en-GB" : "fr-FR";
-  if (!(await verifyPublicCaptcha(request, raw && typeof raw === "object" ? raw as Record<string, unknown> : {}, "checkout"))) return captchaRejected(locale);
   const parsed = pickupPointSearchSchema.safeParse(raw);
   if (!parsed.success) return Response.json({ ok: false, message: "Invalid pickup-point search." }, { status: 422 });
   try {

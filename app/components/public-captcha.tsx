@@ -78,7 +78,7 @@ export function PublicCaptcha({ locale }: { locale: "fr-FR" | "en-GB" }) {
     }
     if (turnstileSiteKey && turnstileRef.current) {
       void loadScript("cloudflare-turnstile-script", "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit")
-        .then(() => { if (!cancelled && window.turnstile && turnstileRef.current && !turnstileRef.current.dataset.widgetId) { const id = window.turnstile.render(turnstileRef.current, { sitekey: turnstileSiteKey, action: "public-form", callback: (token) => setToken("cf-turnstile-response", token), "expired-callback": () => clearToken("cf-turnstile-response"), "error-callback": () => clearToken("cf-turnstile-response") }); turnstileRef.current.dataset.widgetId = id; } })
+        .then(() => { if (!cancelled && window.turnstile && turnstileRef.current && !turnstileRef.current.dataset.widgetId) { const id = window.turnstile.render(turnstileRef.current, { sitekey: turnstileSiteKey, action: "contact", callback: (token) => setToken("cf-turnstile-response", token), "expired-callback": () => clearToken("cf-turnstile-response"), "error-callback": () => clearToken("cf-turnstile-response") }); turnstileRef.current.dataset.widgetId = id; } })
         .catch(() => setMessage(english ? "The anti-spam checks could not be loaded." : "Les contrôles anti-spam n’ont pas pu être chargés."));
     }
     return () => { cancelled = true; };
@@ -99,14 +99,7 @@ export function PublicCaptcha({ locale }: { locale: "fr-FR" | "en-GB" }) {
 function publicFormAction(form: HTMLFormElement) {
   if (form.method.toLowerCase() === "dialog" || form.closest(".admin-body")) return false;
   const path = window.location.pathname;
-  if (/contact/.test(path)) return "contact";
-  if (/activation/.test(path)) return "password-setup";
-  if (/devis|quotes/.test(path)) return "quote-payment";
-  if (/commande|checkout/.test(path)) return "checkout";
-  if (/professionnel|professional/.test(path)) return "professional-application";
-  if (!/(mon-compte|my-account)/.test(path)) return false;
-  const intent = form.querySelector<HTMLInputElement>("[name='intent']")?.value;
-  return "account-auth";
+  return /contact/.test(path) ? "contact" : false;
 }
 
 export function PublicCaptchaMount() {

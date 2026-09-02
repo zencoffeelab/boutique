@@ -1,7 +1,7 @@
 import { env } from "./env.server";
 
 type CaptchaPayload = FormData | Record<string, unknown>;
-type CaptchaAction = "account-auth" | "checkout" | "contact" | "password-setup" | "professional-application" | "quote-payment";
+type CaptchaAction = "contact";
 
 function valueOf(payload: CaptchaPayload, key: string) {
   if (payload instanceof FormData) return String(payload.get(key) ?? "").trim();
@@ -37,7 +37,7 @@ async function withinRateLimit(request: Request, action: CaptchaAction) {
   const key = new Request(`https://antispam.invalid/${encodeURIComponent(action)}/${encodeURIComponent(ip)}`);
   const previous = await cache.match(key);
   const count = previous ? Number(await previous.text()) : 0;
-  const limit = action === "contact" || action === "professional-application" || action === "account-auth" ? 3 : 12;
+  const limit = 3;
   if (!Number.isFinite(count) || count >= limit) return false;
   await cache.put(key, new Response(String(count + 1), { headers: { "cache-control": "max-age=600" } }));
   return true;

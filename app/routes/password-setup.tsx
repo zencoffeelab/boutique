@@ -7,7 +7,6 @@ import { getLocale } from "~/lib/i18n";
 import { passwordSetupPath } from "~/lib/password-setup";
 import { safeInternalPath } from "~/lib/redirects";
 import { createRequestSupabase, createServiceSupabase } from "~/lib/supabase.server";
-import { captchaRejected, verifyPublicCaptcha } from "~/lib/antispam.server";
 
 const passwordSetupSchema = z.object({
   password: z.string().min(10).max(200),
@@ -40,7 +39,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
   const routePaths = paths(request);
   const form = await request.formData();
-  if (!(await verifyPublicCaptcha(request, form, "password-setup"))) return captchaRejected(routePaths.locale);
   const parsed = passwordSetupSchema.safeParse(Object.fromEntries(form));
   const english = routePaths.locale === "en-GB";
   if (!parsed.success) {
