@@ -12,6 +12,41 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-02-advice-articles-mobile-wide-accordions",
+    date: "2026-09-02",
+    kind: "Design",
+    title: "Tiroirs des publications élargis sur mobile",
+    description: "Dans toutes les publications, les tiroirs présents dans les blocs utilisent désormais presque toute la largeur disponible sur mobile, en français comme en anglais, tout en conservant une marge qui laisse les contrôles plus et moins entièrement visibles. Cette règle s’applique aussi aux futurs contenus.",
+  },
+  {
+    id: "2026-09-02-v60-recipe-mobile-first-table",
+    date: "2026-09-02",
+    kind: "Design",
+    title: "Deux premiers tableaux V60 plus lisibles sur mobile",
+    description: "Sur mobile, les deux tableaux de matériel de la publication Recette d’extraction pour V60 présentent désormais leurs quatre repères en deux colonnes sur deux lignes, avec chaque valeur blanche conservée sous son intitulé beige. Les tableaux des blocs de recette conservent leur présentation habituelle avec des marges internes réduites, une colonne Versement plus compacte et des retours ciblés avant les quantités longues, adaptés à chaque langue, dont 40 ml et 80 ml en anglais.",
+  },
+  {
+    id: "2026-09-02-faq-english-numeric-coffee-resting-times",
+    date: "2026-09-02",
+    kind: "Correction",
+    title: "Durées de repos chiffrées dans la FAQ anglaise",
+    description: "La réponse anglaise indiquant à partir de quand déguster le café emploie désormais les chiffres 2, 3, 6 et 4–6, comme la version française.",
+  },
+  {
+    id: "2026-09-02-product-freshness-faq",
+    date: "2026-09-02",
+    kind: "Fonctionnalité",
+    title: "Conseil de dégustation ajouté aux fiches café",
+    description: "Les fiches des cafés publiés affichent désormais, entre les blocs éditoriaux et la recette d’extraction, la réponse de la FAQ indiquant à partir de quand le café peut être dégusté, dans un encart centré, sans cadre ni hauteur vide réservée, à la typographie discrète et aux espacements réguliers. Les recommandations sont isolées sur une nouvelle ligne dans les deux langues et la réponse anglaise sépare aussi le passage commençant par « between », tout en conservant les durées sous forme de chiffres.",
+  },
+  {
+    id: "2026-09-02-admin-product-label-jpg-download",
+    date: "2026-09-02",
+    kind: "Fonctionnalité",
+    title: "Téléchargement haute résolution des miniatures produit",
+    description: "Chaque fiche produit du back-office permet désormais de télécharger sa miniature complète — fond coloré, paquet blanc et étiquette — en PNG 3000 × 3000, prête à être enregistrée sur l’ordinateur sans compression JPEG.",
+  },
+  {
     id: "2026-09-01-admin-quote-simulation-indy-link",
     date: "2026-09-01",
     kind: "Fonctionnalité",

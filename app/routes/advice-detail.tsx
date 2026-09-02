@@ -54,6 +54,9 @@ function AdviceStory({ article, locale, storyImages }: { article: Awaited<Return
   const layout = adviceLayout((article.story[locale] as typeof article.story["fr-FR"] & { layoutConfig?: unknown }).layoutConfig);
   const texts: Partial<Record<AdviceElement, typeof article.body["fr-FR"]>> = { introText: article.excerptBody?.[locale] ?? [article.excerpt[locale]], bodyText: article.body[locale], body2Text: article.body2?.[locale] };
   const story = article.story[locale];
+  const v60TableLineBreaks = article.slug === "recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france"
+    ? locale === "en-GB" ? ["40 ml", "80 ml", "100 ml", "200 ml", "140 ml"] : ["40 ml", "80 ml"]
+    : undefined;
   const images: Partial<Record<AdviceElement, { src: string; alt: string }>> = {
     introImage: story.introImageUrl ? { src: story.introImageUrl, alt: story.introImageAlt ?? "Coffee" } : (storyImages[0] ?? { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" }),
     bodyImage: story.bodyImageUrl ? { src: story.bodyImageUrl, alt: story.bodyImageAlt ?? "Coffee" } : (storyImages[0] ?? { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" }),
@@ -66,12 +69,13 @@ function AdviceStory({ article, locale, storyImages }: { article: Awaited<Return
     if (item.compartment === "image" && item.customId && customItem?.imageUrl) return <figure className="advice-story__image advice-story__custom-image" key={item.id}><img src={customItem.imageUrl} alt={locale === "fr-FR" ? customItem.imageAltFr ?? "" : customItem.imageAltEn ?? ""} /></figure>;
     if (item.compartment === "text" && item.element && texts[item.element]) return <div className="advice-story__text" key={item.id}><RichTextContent content={texts[item.element]!} /></div>;
     if (item.compartment === "image" && item.element && images[item.element]) return <figure className="advice-story__image" key={item.id}><img src={images[item.element]!.src} alt={images[item.element]!.alt} /></figure>;
-    if (item.compartment === "textImage") return <EditorialStory key={item.id} content={texts.bodyText ?? []} images={[images.bodyImage ?? { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" }]} splitSections={false} />;
-    if (item.compartment === "imageText") return <EditorialStory key={item.id} content={texts.body2Text ?? []} images={[images.body2Image ?? { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" }]} imageFirst splitSections={false} />;
+    if (item.compartment === "textImage") return <EditorialStory key={item.id} content={texts.bodyText ?? []} images={[images.bodyImage ?? { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" }]} splitSections={false} tableLineBreaks={v60TableLineBreaks} />;
+    if (item.compartment === "imageText") return <EditorialStory key={item.id} content={texts.body2Text ?? []} images={[images.body2Image ?? { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" }]} imageFirst splitSections={false} tableLineBreaks={v60TableLineBreaks} />;
     return null;
   };
   const placedCustomIds = new Set(layout.items.map((item) => item.customId).filter(Boolean));
-  return <div className="advice-story">{layout.items.map(renderItem)}{layout.customItems.filter((item) => !placedCustomIds.has(item.id)).map((item) => item.type === "text" ? <div className="advice-story__text advice-story__custom-text" key={item.id}><RichTextContent content={customTextContent(customTextValue(layout.customText?.[item.id], locale === "fr-FR" ? item.textFr : item.textEn) ?? "")} /></div> : item.imageUrl ? <figure className="advice-story__image advice-story__custom-image" key={item.id}><img src={item.imageUrl} alt={locale === "fr-FR" ? item.imageAltFr ?? "" : item.imageAltEn ?? ""} /></figure> : null)}</div>;
+  const v60Article = article.slug === "recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france";
+  return <div className={`advice-story${v60Article ? " advice-story--v60-extraction" : ""}`}>{layout.items.map(renderItem)}{layout.customItems.filter((item) => !placedCustomIds.has(item.id)).map((item) => item.type === "text" ? <div className="advice-story__text advice-story__custom-text" key={item.id}><RichTextContent content={customTextContent(customTextValue(layout.customText?.[item.id], locale === "fr-FR" ? item.textFr : item.textEn) ?? "")} /></div> : item.imageUrl ? <figure className="advice-story__image advice-story__custom-image" key={item.id}><img src={item.imageUrl} alt={locale === "fr-FR" ? item.imageAltFr ?? "" : item.imageAltEn ?? ""} /></figure> : null)}</div>;
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

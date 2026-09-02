@@ -10,11 +10,14 @@ import { ProfessionalQuoteAdd } from "~/components/professional-quote/profession
 import type { Audience, Locale, Product, ProductEditorialBlock } from "~/domain/types";
 import { getAudience, requireAdmin } from "~/lib/auth.server";
 import { getAdminProducts, getProducts, hasPurchasableVariant } from "~/lib/catalog.server";
+import { getFaqItemByFrenchQuestion } from "~/lib/content.server";
 import { getLocale } from "~/lib/i18n";
 import { getRelatedProducts } from "~/lib/product-recommendations";
 import { isProductSoldOut } from "~/lib/product-ribbons";
 import { displayTastingNote } from "~/lib/product-text";
 import { JsonLd, pageMeta, productStructuredData } from "~/lib/seo";
+
+const freshnessFaqQuestion = "À partir de quel moment peut-on commencer à déguster le café ?";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const locale = getLocale(request);
@@ -59,7 +62,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     products.filter((candidate) => candidate.status === "published" && hasPurchasableVariant(candidate, audience)),
     locale,
   );
-  return { locale, product, audience, archived, preview, relatedProducts };
+  const freshnessFaq = product.status === "published"
+    ? await getFaqItemByFrenchQuestion(freshnessFaqQuestion)
+    : null;
+  return { locale, product, audience, archived, preview, relatedProducts, freshnessFaq };
 }
 
 export function headers() {
@@ -159,6 +165,32 @@ function ProductExtractionGuide({ product, locale }: { product: Product; locale:
   );
 }
 
+function ProductFreshnessFaq({
+  item,
+  locale,
+}: {
+  item: NonNullable<Awaited<ReturnType<typeof getFaqItemByFrenchQuestion>>>;
+  locale: Locale;
+}) {
+  const english = locale === "en-GB";
+  const answer = english ? item.answer_en : item.answer_fr;
+  const recommendationStart = answer.search(english ? /we recommend/i : /nous recommandons/i);
+  const betweenStart = english ? answer.search(/between/i) : -1;
+  return (
+    <section className="product-freshness-faq" aria-labelledby="product-freshness-faq-title">
+      <div>
+        <h2 id="product-freshness-faq-title">{english ? item.question_en : item.question_fr}</h2>
+        <p>
+          {recommendationStart > 0 ? <>
+            {answer.slice(0, recommendationStart).trimEnd()}<br />
+            {betweenStart > recommendationStart ? <>{answer.slice(recommendationStart, betweenStart).trimEnd()}<br />{answer.slice(betweenStart)}</> : answer.slice(recommendationStart)}
+          </> : answer}
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export function ProductGallery({ product, locale }: { product: Product; locale: Locale }) {
   const labelUrl = product.thumbnailLabelUrl;
   const translation = product.translations[locale];
@@ -198,7 +230,7 @@ export function ProductGallery({ product, locale }: { product: Product; locale: 
 }
 
 export default function ProductDetail() {
-  const { locale, product, audience, archived, preview, relatedProducts } =
+  const { locale, product, audience, archived, preview, relatedProducts, freshnessFaq } =
     useLoaderData<typeof loader>();
   const t = product.translations[locale];
   const english = locale === "en-GB";
@@ -276,6 +308,7 @@ export default function ProductDetail() {
         </section>
       ) : null}
       <ProductStory blocks={product.editorialBlocks} locale={locale} />
+      {freshnessFaq ? <ProductFreshnessFaq item={freshnessFaq} locale={locale} /> : null}
       <ProductExtractionGuide product={product} locale={locale} />
       {relatedProducts.length > 0 ? (
         <section

@@ -20,3 +20,22 @@ export async function getFaqItems(locale: Locale) {
   const { data } = await client.from("faq_items").select("*").eq("active", true).order("position");
   return (data ?? []).map((item) => locale === "fr-FR" ? [item.question_fr, item.answer_fr] : [item.question_en, item.answer_en]) as Array<[string, string]>;
 }
+
+export type FaqItem = {
+  question_fr: string;
+  answer_fr: string;
+  question_en: string;
+  answer_en: string;
+};
+
+export async function getFaqItemByFrenchQuestion(question: string): Promise<FaqItem | null> {
+  const client = createPublicSupabase() ?? createServiceSupabase();
+  if (!client) return null;
+  const { data } = await client
+    .from("faq_items")
+    .select("question_fr,answer_fr,question_en,answer_en")
+    .eq("active", true)
+    .eq("question_fr", question)
+    .maybeSingle();
+  return data as FaqItem | null;
+}

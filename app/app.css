@@ -1916,6 +1916,34 @@ button:disabled {
   background: var(--cream);
   text-align: center;
 }
+.product-freshness-faq {
+  display: grid;
+  width: min(calc(100% - 2rem), 1600px);
+  place-items: center;
+  box-sizing: border-box;
+  margin: 2rem auto 0;
+  padding: clamp(1.75rem, 4.5vw, 4.5rem);
+  background: var(--paper);
+  text-align: center;
+}
+.product-freshness-faq > div {
+  max-width: 52rem;
+}
+.product-freshness-faq h2 {
+  margin: 0 0 1.5rem;
+  color: var(--green);
+  font-size: clamp(1.55rem, 2.85vw, 3.25rem);
+  line-height: 1.08;
+}
+.product-freshness-faq p {
+  margin: 0;
+  color: var(--green);
+  font-size: clamp(0.95rem, 1.05vw, 1.12rem);
+  line-height: 1.65;
+}
+.product-freshness-faq + .product-extraction-guide {
+  margin-top: 2rem;
+}
 .product-extraction-guide h2 {
   margin: 0;
   color: var(--green);
@@ -2717,6 +2745,76 @@ body.advice-detail-overflow-hidden {
   background: var(--cream-dark);
   color: var(--green);
   font-weight: 700;
+}
+.rich-text-table__mobile-break {
+  display: none;
+}
+@media (max-width: 600px) {
+  .rich-text-table__mobile-break {
+    display: initial;
+  }
+  .advice-story {
+    overflow-x: visible;
+  }
+  .advice-story .product-story-block {
+    overflow: visible;
+  }
+  .advice-story .rich-text-accordion {
+    width: calc(100vw - 1.5rem);
+    max-width: none;
+    margin-inline: calc(50% - 50vw + 0.75rem);
+  }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2),
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) tbody {
+    display: block;
+  }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) tr {
+    display: contents;
+  }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) tbody {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) th:nth-child(1),
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) td:nth-child(1) {
+    grid-column: 1;
+  }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) th:nth-child(2),
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) td:nth-child(2) {
+    grid-column: 2;
+  }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) th:nth-child(3),
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) td:nth-child(3) {
+    grid-column: 1;
+  }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) th:nth-child(4),
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) td:nth-child(4) {
+    grid-column: 2;
+  }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) th:nth-child(1) { grid-row: 1; }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) td:nth-child(1) { grid-row: 2; }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) th:nth-child(2) { grid-row: 1; }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) td:nth-child(2) { grid-row: 2; }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) th:nth-child(3) { grid-row: 3; }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) td:nth-child(3) { grid-row: 4; }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) th:nth-child(4) { grid-row: 3; }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) td:nth-child(4) { grid-row: 4; }
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) th,
+  .advice-story--v60-extraction > .advice-story__text .rich-text-table:nth-of-type(-n + 2) td {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 0.65rem 0.5rem;
+  }
+  .advice-story--v60-extraction .product-story-block__copy .rich-text-table th,
+  .advice-story--v60-extraction .product-story-block__copy .rich-text-table td {
+    padding: 0.45rem 0.35rem;
+  }
+  .advice-story--v60-extraction .product-story-block__copy .rich-text-table th:nth-child(3),
+  .advice-story--v60-extraction .product-story-block__copy .rich-text-table td:nth-child(3) {
+    padding-inline: 0.15rem;
+  }
 }
 .rich-text-accordion {
   margin: 2rem 0;
@@ -5524,6 +5622,13 @@ body.advice-detail-overflow-hidden {
 .admin-thumbnail-form {
   display: grid;
   gap: 1.25rem;
+}
+.admin-thumbnail-form__export {
+  display: grid;
+  gap: 0.55rem;
+}
+.admin-thumbnail-form__export small {
+  color: var(--muted);
 }
 .admin-image-input {
   position: relative;

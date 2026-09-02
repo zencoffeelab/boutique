@@ -2186,6 +2186,7 @@ export default function AdminProduct() {
           <div id="product-thumbnail" className="admin-product-anchor-target">
             <AdminProductThumbnailForm
               productId={product.id}
+              productSlug={product.slug}
               currentLabelUrl={product.thumbnailLabelUrl}
               currentBackgroundColor={product.thumbnailBackgroundColor}
               demo={demo}

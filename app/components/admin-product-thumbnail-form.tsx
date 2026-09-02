@@ -1,4 +1,4 @@
-import { Upload } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Form } from "react-router";
 import { AdminImageEditorInput, type AdminProcessedImage } from "~/components/admin-image-editor-input";
@@ -29,13 +29,100 @@ async function detectFileColor(file: File) {
   }
 }
 
+async function loadImage(sourceUrl: string) {
+  const response = await fetch(sourceUrl);
+  if (!response.ok) throw new Error("Image indisponible");
+  const objectUrl = URL.createObjectURL(await response.blob());
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const candidate = new Image();
+      candidate.onload = () => resolve(candidate);
+      candidate.onerror = () => reject(new Error("Image illisible"));
+      candidate.src = objectUrl;
+    });
+    return { image, objectUrl };
+  } catch (error) {
+    URL.revokeObjectURL(objectUrl);
+    throw error;
+  }
+}
+
+function drawContainedImage(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, width: number, height: number) {
+  const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+  const renderedWidth = image.naturalWidth * scale;
+  const renderedHeight = image.naturalHeight * scale;
+  context.drawImage(image, x + (width - renderedWidth) / 2, y + (height - renderedHeight) / 2, renderedWidth, renderedHeight);
+}
+
+function pastelColor(color: string) {
+  const channels = color.match(/[a-f\d]{2}/gi)?.map((channel) => Number.parseInt(channel, 16));
+  if (!channels || channels.length !== 3) return "#e8eee4";
+  return `rgb(${channels.map((channel) => Math.round(255 * 0.72 + channel * 0.28)).join(" ")})`;
+}
+
+async function exportThumbnailAsPng(labelUrl: string, backgroundColor: string, filename: string) {
+  const [label, bag] = await Promise.all([loadImage(labelUrl), loadImage(PRODUCT_THUMBNAIL_BAG_URL)]);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 3000;
+    canvas.height = 3000;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Export indisponible");
+    context.fillStyle = pastelColor(backgroundColor);
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    context.save();
+    context.translate(canvas.width * 0.54, canvas.height * 0.78);
+    context.scale(canvas.width * 0.26, canvas.height * 0.055);
+    const shadow = context.createRadialGradient(0, 0, 0, 0, 0, 1);
+    shadow.addColorStop(0, "#10170d3d");
+    shadow.addColorStop(0.48, "#10170d12");
+    shadow.addColorStop(0.76, "transparent");
+    context.fillStyle = shadow;
+    context.fillRect(-1, -1, 2, 2);
+    context.restore();
+
+    context.save();
+    context.shadowColor = "#10170d2e";
+    context.shadowBlur = canvas.width * 0.024;
+    context.shadowOffsetY = canvas.height * 0.028;
+    drawContainedImage(context, bag.image, canvas.width * 0.136, canvas.height * 0.13, canvas.width * 0.73, canvas.height * 0.76);
+    context.restore();
+
+    const labelWidth = canvas.width * 0.28;
+    const labelHeight = labelWidth * (697 / 1240);
+    context.save();
+    context.shadowColor = "#10170d38";
+    context.shadowBlur = canvas.width * 0.009;
+    context.shadowOffsetY = canvas.height * 0.01;
+    context.drawImage(label.image, (canvas.width - labelWidth) / 2, canvas.height * 0.595 - labelHeight / 2, labelWidth, labelHeight);
+    context.restore();
+
+    const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!png) throw new Error("Export indisponible");
+    const downloadUrl = URL.createObjectURL(png);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(downloadUrl);
+  } finally {
+    URL.revokeObjectURL(label.objectUrl);
+    URL.revokeObjectURL(bag.objectUrl);
+  }
+}
+
 export function AdminProductThumbnailForm({
   productId,
+  productSlug,
   currentLabelUrl,
   currentBackgroundColor,
   demo,
 }: {
   productId: string;
+  productSlug: string;
   currentLabelUrl: string | null;
   currentBackgroundColor: string;
   demo: boolean;
@@ -44,6 +131,8 @@ export function AdminProductThumbnailForm({
   const [labelPreview, setLabelPreview] = useState(currentLabelUrl);
   const [detecting, setDetecting] = useState(false);
   const [detectionMessage, setDetectionMessage] = useState<string | null>(null);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const previewObjectUrl = useRef<string | null>(null);
   const detectionSequence = useRef(0);
@@ -80,6 +169,20 @@ export function AdminProductThumbnailForm({
     if (hasFile) return;
     event.preventDefault();
     formRef.current?.querySelector<HTMLInputElement>('input[name="fileSource"]')?.click();
+  };
+
+  const handleExport = async () => {
+    if (!labelPreview) return;
+    setExporting(true);
+    setExportMessage(null);
+    try {
+      await exportThumbnailAsPng(labelPreview, backgroundColor, `${productSlug}-miniature-3000.png`);
+      setExportMessage("Miniature complète PNG 3000 × 3000 téléchargée.");
+    } catch {
+      setExportMessage("Le téléchargement n’a pas pu être préparé. Réessayez dans un instant.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return <section className="ui-card admin-editor admin-thumbnail-editor">
@@ -130,6 +233,12 @@ export function AdminProductThumbnailForm({
         <button className="ui-button ui-button--outline" type="submit" disabled={demo}>
           <Upload aria-hidden="true" /> {currentLabelUrl ? "Enregistrer la miniature" : "Ajouter l’étiquette"}
         </button>
+        <div className="admin-thumbnail-form__export">
+          <button className="ui-button ui-button--outline" type="button" disabled={!labelPreview || exporting} onClick={handleExport}>
+            <Download aria-hidden="true" /> {exporting ? "Préparation du PNG…" : "Télécharger la miniature PNG 3000 × 3000"}
+          </button>
+          <small aria-live="polite">{exportMessage ?? "La miniature complète est exportée avec son fond coloré et son paquet blanc."}</small>
+        </div>
       </Form>
     </div>
   </section>;
