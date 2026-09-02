@@ -96,12 +96,17 @@ export function PublicCaptcha({ locale }: { locale: "fr-FR" | "en-GB" }) {
   </fieldset>;
 }
 
-function publicForm(form: HTMLFormElement) {
+function publicFormAction(form: HTMLFormElement) {
   if (form.method.toLowerCase() === "dialog" || form.closest(".admin-body")) return false;
   const path = window.location.pathname;
-  if (!/(contact|professionnel|professional|mon-compte|my-account|commande|checkout|activation|devis|quotes)/.test(path)) return false;
+  if (/contact/.test(path)) return "contact";
+  if (/activation/.test(path)) return "password-setup";
+  if (/devis|quotes/.test(path)) return "quote-payment";
+  if (/commande|checkout/.test(path)) return "checkout";
+  if (/professionnel|professional/.test(path)) return "professional-application";
+  if (!/(mon-compte|my-account)/.test(path)) return false;
   const intent = form.querySelector<HTMLInputElement>("[name='intent']")?.value;
-  return !intent || ["login", "register", "reset"].includes(intent);
+  return "account-auth";
 }
 
 export function PublicCaptchaMount() {
@@ -109,7 +114,8 @@ export function PublicCaptchaMount() {
     if (!recaptchaSiteKey || !turnstileSiteKey) return;
     let cancelled = false;
     const decorate = (form: HTMLFormElement) => {
-      if (cancelled || !publicForm(form) || form.querySelector("[data-public-captcha]")) return;
+      const action = publicFormAction(form);
+      if (cancelled || !action || form.querySelector("[data-public-captcha]")) return;
       const fieldset = document.createElement("fieldset");
       fieldset.dataset.publicCaptcha = "true";
       fieldset.className = "public-captcha";
@@ -130,7 +136,7 @@ export function PublicCaptchaMount() {
         }
       }, true);
       if (recaptchaSiteKey && recaptcha) void loadScript("google-recaptcha-script", "https://www.google.com/recaptcha/api.js?render=explicit").then(() => window.grecaptcha?.ready(() => { if (!recaptcha.dataset.widgetId) recaptcha.dataset.widgetId = String(window.grecaptcha?.render(recaptcha, { sitekey: recaptchaSiteKey, callback: (token) => setToken("g-recaptcha-response", token), "expired-callback": () => clearToken("g-recaptcha-response"), "error-callback": () => clearToken("g-recaptcha-response") })); }));
-      if (turnstileSiteKey && turnstile) void loadScript("cloudflare-turnstile-script", "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit").then(() => { if (window.turnstile && !turnstile.dataset.widgetId) turnstile.dataset.widgetId = window.turnstile.render(turnstile, { sitekey: turnstileSiteKey, action: "public-form", callback: (token) => setToken("cf-turnstile-response", token), "expired-callback": () => clearToken("cf-turnstile-response"), "error-callback": () => clearToken("cf-turnstile-response") }); });
+      if (turnstileSiteKey && turnstile) void loadScript("cloudflare-turnstile-script", "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit").then(() => { if (window.turnstile && !turnstile.dataset.widgetId) turnstile.dataset.widgetId = window.turnstile.render(turnstile, { sitekey: turnstileSiteKey, action, callback: (token) => setToken("cf-turnstile-response", token), "expired-callback": () => clearToken("cf-turnstile-response"), "error-callback": () => clearToken("cf-turnstile-response") }); });
     };
     const scan = () => document.querySelectorAll<HTMLFormElement>("form").forEach(decorate);
     scan();

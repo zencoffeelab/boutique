@@ -24,7 +24,7 @@ async function ownedQuote(request: Request, id?: string) {
 export async function loader({ request, params }: LoaderFunctionArgs) { return ownedQuote(request, params.id); }
 export async function action({ request, params }: ActionFunctionArgs) {
   const form = await request.formData();
-  if (!(await verifyPublicCaptcha(request, form))) return captchaRejected(getLocale(request));
+  if (!(await verifyPublicCaptcha(request, form, "quote-payment"))) return captchaRejected(getLocale(request));
   const { viewer, locale, quote } = await ownedQuote(request, params.id);
   const url = await createProfessionalQuoteCheckout({ quoteId: quote.id, profileId: viewer.user.id, email: viewer.user.email!, locale });
   return redirect(url);

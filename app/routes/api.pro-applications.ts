@@ -12,7 +12,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const contentType = request.headers.get("content-type") ?? "";
   const raw = contentType.includes("application/json") ? await request.json().catch(() => null) : Object.fromEntries(await request.formData());
   const locale = raw && typeof raw === "object" && (raw as Record<string, unknown>).locale === "en-GB" ? "en-GB" : "fr-FR";
-  if (!(await verifyPublicCaptcha(request, raw && typeof raw === "object" ? raw as Record<string, unknown> : {}))) return captchaRejected(locale);
+  if (!(await verifyPublicCaptcha(request, raw && typeof raw === "object" ? raw as Record<string, unknown> : {}, "professional-application"))) return captchaRejected(locale);
   const viewer = await getViewer(request);
   const input = raw && typeof raw === "object" ? { ...raw, email: viewer?.user.email ?? (raw as Record<string, unknown>).email, privacyConsent: (raw as Record<string, unknown>).privacyConsent === true || (raw as Record<string, unknown>).privacyConsent === "true" } : raw;
   const parsed = professionalApplicationSchema.safeParse(input);

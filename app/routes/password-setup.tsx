@@ -40,7 +40,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
   const routePaths = paths(request);
   const form = await request.formData();
-  if (!(await verifyPublicCaptcha(request, form))) return captchaRejected(routePaths.locale);
+  if (!(await verifyPublicCaptcha(request, form, "password-setup"))) return captchaRejected(routePaths.locale);
   const parsed = passwordSetupSchema.safeParse(Object.fromEntries(form));
   const english = routePaths.locale === "en-GB";
   if (!parsed.success) {

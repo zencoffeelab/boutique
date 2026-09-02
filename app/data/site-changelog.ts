@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-02-public-forms-and-mail-spam-hardening",
+    date: "2026-09-02",
+    kind: "Sécurité",
+    title: "Protections anti-spam renforcées",
+    description: "Les formulaires publics limitent désormais les tentatives par adresse IP et vérifient que chaque jeton Turnstile correspond bien au formulaire et au domaine du site. Les e-mails entrants présentant des signaux de spam sont automatiquement classés dans le label Spam, masqué de la boîte de réception principale.",
+  },
+  {
     id: "2026-09-02-advice-articles-mobile-wide-accordions",
     date: "2026-09-02",
     kind: "Design",

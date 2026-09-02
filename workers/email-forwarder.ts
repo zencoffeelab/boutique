@@ -73,8 +73,12 @@ function supabaseHeaders(env: EmailForwardingEnv, extra?: HeadersInit) {
   };
 }
 
-export function classifyIncomingEmail(input: { senderAddress: string; recipientAddresses: string[]; subject: string; text: string }) {
+export function classifyIncomingEmail(input: { senderAddress: string; recipientAddresses: string[]; subject: string; text: string; headers?: Headers }) {
   const searchable = `${input.subject} ${input.text}`.toLocaleLowerCase("en-US");
+  const spamStatus = input.headers?.get("x-spam-status") ?? "";
+  const links = (input.text.match(/https?:\/\//gi) ?? []).length;
+  const spamTerms = /(buy now|seo service|guest post|backlinks?|crypto(?:currency)?|bitcoin|casino|viagra|loan approval|traffic to your website|rank your website)/i;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.senderAddress) || /\byes\b/i.test(spamStatus) || spamTerms.test(searchable) || links > 5) return "Spam";
   const noReplyNotification = /(no-?reply|no.?reply)/i.test(input.senderAddress);
   const actualDeliveryError = /(mailer-daemon|postmaster|bounce|delivery status|undeliverable|failed|failure|error|erreur|exception|stack trace|http 5\d\d)/i.test(`${input.senderAddress} ${input.subject} ${searchable}`);
   if (noReplyNotification && !actualDeliveryError) return "Système";
@@ -139,7 +143,7 @@ export async function persistIncomingEmail(message: ForwardableEmail, env: Email
   if (recipients.length === 0 && message.to) recipients.push({ name: "", address: message.to.toLocaleLowerCase("en-US") });
   const messageIdHeader = (parsed.messageId || message.headers?.get("message-id") || await stableMessageId(raw)).slice(0, 998);
   const receivedDate = parsed.date && !Number.isNaN(Date.parse(parsed.date)) ? new Date(parsed.date).toISOString() : new Date().toISOString();
-  const classification = classifyIncomingEmail({ senderAddress: sender.address, recipientAddresses: recipients.map((recipient) => recipient.address), subject: parsed.subject?.trim() || "", text: parsed.text?.trim() || htmlToPlainText(parsed.html) });
+  const classification = classifyIncomingEmail({ senderAddress: sender.address, recipientAddresses: recipients.map((recipient) => recipient.address), subject: parsed.subject?.trim() || "", text: parsed.text?.trim() || htmlToPlainText(parsed.html), headers: message.headers });
   const labelId = await classificationLabelId(env, classification);
   const body = {
     direction: "inbound",

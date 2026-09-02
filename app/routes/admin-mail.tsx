@@ -129,6 +129,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const normalizedQuery = query.toLocaleLowerCase("fr-FR");
   const messages = allMessages.filter((message) => {
     if (message.direction !== (view === "sent" ? "outbound" : "inbound")) return false;
+    // Automatically classified spam remains accessible through its label, but
+    // never clutters the normal inbox.
+    if (!labelFilter && message.admin_mail_labels?.name === "Spam") return false;
     if (labelFilter === "none" && message.label_id) return false;
     if (labelFilter && labelFilter !== "none" && message.label_id !== labelFilter) return false;
     if (!normalizedQuery) return true;

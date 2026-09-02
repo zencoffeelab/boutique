@@ -22,7 +22,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
   if (request.method !== "POST") return Response.json({ ok: false, message: "Method not allowed." }, { status: 405 });
   const raw = Object.fromEntries(await request.formData());
   const locale = raw.locale === "en-GB" ? "en-GB" : "fr-FR";
-  if (!(await verifyPublicCaptcha(request, raw))) return captchaRejected(locale);
+  if (!(await verifyPublicCaptcha(request, raw, "contact"))) return captchaRejected(locale);
   const input = { ...raw, privacyConsent: raw.privacyConsent === "true" };
   const parsed = contactFormSchema.safeParse(input);
   const english = locale === "en-GB";

@@ -22,7 +22,8 @@
     "ALLOW_DEMO_DATA": "false",
     "PAYMENTS_MOCK": "false",
     "SHIPPING_MOCK": "false",
-    "DEMO_ADMIN": "false"
+    "DEMO_ADMIN": "false",
+    "TURNSTILE_HOSTNAMES": "zencoffeelab.com,www.zencoffeelab.com"
   },
   "observability": {
     "enabled": true

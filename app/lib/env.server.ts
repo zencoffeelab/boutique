@@ -13,6 +13,7 @@ const schema = z.object({
   VITE_TURNSTILE_SITE_KEY: z.string().optional(),
   RECAPTCHA_SECRET_KEY: z.string().optional(),
   TURNSTILE_SECRET_KEY: z.string().optional(),
+  TURNSTILE_HOSTNAMES: z.string().optional(),
   VITE_SUPABASE_URL: z.string().optional(),
   VITE_SUPABASE_ANON_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),

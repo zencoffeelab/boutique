@@ -7,6 +7,11 @@ describe("email mailbox worker", () => {
     expect(classifyIncomingEmail({ senderAddress: "no-reply@stripe.com", recipientAddresses: ["contact@zencoffeelab.com"], subject: "Delivery failed", text: "The message could not be delivered." })).toBe("Erreur");
   });
 
+  it("quarantines high-confidence unsolicited mail", () => {
+    expect(classifyIncomingEmail({ senderAddress: "sales@example.com", recipientAddresses: ["contact@zencoffeelab.com"], subject: "SEO service", text: "Buy now: backlinks for your website." })).toBe("Spam");
+    expect(classifyIncomingEmail({ senderAddress: "sales@example.com", recipientAddresses: ["contact@zencoffeelab.com"], subject: "Hello", text: "Please see https://a.example https://b.example https://c.example https://d.example https://e.example https://f.example" })).toBe("Spam");
+  });
+
   it("rejects mail instead of silently dropping it when storage is unavailable", async () => {
     const setReject = vi.fn();
 

@@ -9,7 +9,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") return Response.json({ ok: false, message: "Method not allowed." }, { status: 405 });
   const raw = await request.json().catch(() => null);
   const locale = raw && typeof raw === "object" && (raw as Record<string, unknown>).locale === "en-GB" ? "en-GB" : "fr-FR";
-  if (!(await verifyPublicCaptcha(request, raw && typeof raw === "object" ? raw as Record<string, unknown> : {}))) return captchaRejected(locale);
+  if (!(await verifyPublicCaptcha(request, raw && typeof raw === "object" ? raw as Record<string, unknown> : {}, "checkout"))) return captchaRejected(locale);
   const parsed = checkoutSchema.safeParse(raw);
   if (!parsed.success) return Response.json({ ok: false, message: "Invalid checkout request.", errors: parsed.error.flatten().fieldErrors }, { status: 422 });
   const viewer = await getViewer(request); const audience = viewer?.profile?.professional_status === "approved" ? "professional" : "retail";
