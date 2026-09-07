@@ -4294,27 +4294,29 @@ body.advice-detail-overflow-hidden {
   color: var(--green-deep);
 }
 .professional-hero--connected {
-  padding-bottom: clamp(1.5rem, 3vw, 2.5rem);
+  padding-bottom: clamp(0.5rem, 1vw, 1rem);
 }
 .professional-connected-layout {
-  display: grid;
-  grid-template-columns: minmax(250px, 0.65fr) minmax(0, 1.35fr);
-  align-items: start;
-  gap: clamp(2rem, 6vw, 6rem);
-  padding-block: clamp(1.5rem, 3vw, 2.5rem) clamp(5rem, 9vw, 9rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(2.5rem, 5vw, 4.5rem);
+  padding-block: clamp(0.75rem, 1.5vw, 1.25rem) clamp(5rem, 9vw, 9rem);
 }
 .professional-connected-steps {
-  position: sticky;
-  top: calc(88px + 2rem);
   display: grid;
-  grid-template-columns: 1fr;
-  width: auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  gap: 1rem;
   margin: 0;
   padding: 0;
 }
 .professional-connected-steps article {
-  padding: 1.5rem 0;
-  border-top: 1px solid var(--ink);
+  padding: clamp(2rem, 3.5vw, 3rem);
+  border: 1px solid var(--line);
+}
+.professional-connected-steps h3 {
+  margin-bottom: 0.8rem;
 }
 .professional-connected-steps span {
   color: var(--orange);
@@ -4322,6 +4324,7 @@ body.advice-detail-overflow-hidden {
 }
 .professional-connected-actions {
   display: grid;
+  width: min(100%, 760px);
   gap: 1.2rem;
 }
 .professional-connected-actions article {
@@ -4333,9 +4336,15 @@ body.advice-detail-overflow-hidden {
   border: 1px solid var(--line);
   background: var(--paper);
 }
+.professional-connected-actions article h3 {
+  font: 400 clamp(1.4rem, 2.3vw, 2.2rem)/0.98 var(--serif);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
 .professional-connected-actions article p {
   margin: 0;
-  font: 400 clamp(1.2rem, 2vw, 1.6rem)/1.35 var(--serif);
+  font: inherit;
+  white-space: pre-wrap;
 }
 .professional-connected-content {
   max-width: none;
@@ -5631,6 +5640,9 @@ body.advice-detail-overflow-hidden {
 .admin-thumbnail-form {
   display: grid;
   gap: 1.25rem;
+}
+.professional-banner--connected {
+  border-bottom: clamp(3rem, 6vw, 6rem) solid #fff;
 }
 .admin-thumbnail-form__export {
   display: grid;

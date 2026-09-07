@@ -76,6 +76,14 @@ const pageSchema = z.object({
     [`aboutStoryAlt${index}En`, z.string().trim().max(240).optional()],
   ])),
 }).passthrough();
+const seoPageSchema = z.object({
+  intent: z.literal("save_page_seo"),
+  pageKey: z.literal("accueil"),
+  seoTitleFr: z.string().trim().min(2),
+  seoTitleEn: z.string().trim().min(2),
+  seoDescriptionFr: z.string().trim().min(10),
+  seoDescriptionEn: z.string().trim().min(10),
+});
 const navigationSchema = z.object({
   intent: z.literal("save_navigation"),
   configuration: z.string().min(2).max(20_000),
@@ -252,6 +260,38 @@ export async function action({ request }: ActionFunctionArgs) {
       after_data: configuration,
     });
     return { ok: true, message: "Rangement du menu et du footer enregistré." };
+  }
+
+  if (fields.intent === "save_page_seo") {
+    const parsedSeoPage = seoPageSchema.safeParse(fields);
+    if (!parsedSeoPage.success) return { ok: false, message: "Renseignez un titre SEO et une description SEO dans les deux langues." };
+    const client = createServiceSupabase();
+    if (!client) return { ok: false, message: "Base indisponible." };
+    const { data: page, error } = await client
+      .from("content_pages")
+      .upsert({ page_key: parsedSeoPage.data.pageKey, status: "published", updated_at: new Date().toISOString() }, { onConflict: "page_key" })
+      .select("id")
+      .single();
+    if (error || !page) return { ok: false, message: error?.message ?? "Référencement non enregistré." };
+    const { data: existingTranslations, error: existingTranslationsError } = await client
+      .from("content_page_translations")
+      .select("locale,title")
+      .eq("page_id", page.id);
+    if (existingTranslationsError) return { ok: false, message: existingTranslationsError.message };
+    const titleFor = (locale: "fr-FR" | "en-GB") => existingTranslations?.find((translation) => translation.locale === locale)?.title ?? "Blog";
+    const { error: translationError } = await client.from("content_page_translations").upsert([
+      { page_id: page.id, locale: "fr-FR", title: titleFor("fr-FR"), seo_title: parsedSeoPage.data.seoTitleFr, seo_description: parsedSeoPage.data.seoDescriptionFr },
+      { page_id: page.id, locale: "en-GB", title: titleFor("en-GB"), seo_title: parsedSeoPage.data.seoTitleEn, seo_description: parsedSeoPage.data.seoDescriptionEn },
+    ], { onConflict: "page_id,locale" });
+    if (translationError) return { ok: false, message: translationError.message };
+    await client.from("audit_log").insert({
+      actor_id: admin.id,
+      action: "content_page.seo_updated",
+      entity_type: "content_page",
+      entity_id: page.id,
+      after_data: parsedSeoPage.data,
+    });
+    return { ok: true, message: "Référencement du site enregistré." };
   }
 
   const parsed = pageSchema.safeParse(fields);
@@ -537,7 +577,8 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
         <div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? pageKey} required /></label></div>
         <div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? "Description à compléter avant publication."} required /></label></div>
         <AdminSeoAnalysis formId={formId} locale="fr-FR" focusKeyphraseName="focusKeyphraseFr" defaultFocusKeyphrase={fr?.focus_keyphrase ?? ""} titleFieldName="titleFr" seoTitleFieldName="seoTitleFr" seoDescriptionFieldName="seoDescriptionFr" slugValue={pageKey} contentFieldNames={seoContentFields("Fr")} imageAltFieldNames={["aboutStoryAlt1Fr", "aboutStoryAlt2Fr"]} disabled={demo} />
-        {pageKey === "a-propos" ? null : <RichTextEditor name="contentFr" label="Paragraphes" initialContent={initialContent(fr, placeholderFr)} disabled={demo} />}
+        {pageKey === "professionnel-connecte" ? <input type="hidden" name="contentFr" value={JSON.stringify(initialContent(fr, placeholderFr))} /> : null}
+        {pageKey === "a-propos" || pageKey === "professionnel-connecte" ? null : <RichTextEditor name="contentFr" label="Paragraphes" initialContent={initialContent(fr, placeholderFr)} disabled={demo} />}
         {pageKey === "a-propos" ? <AboutPageFields translation={fr} language="fr-FR" shared /> : null}
         {pageKey === "accueil" ? <HomeFields language="Français" statement={homeFr.statement} values={homeFr.values} heroImage={heroImage} /> : null}
         {pageKey === "professionnel" ? <ProfessionalPageFields translation={fr} language="fr-FR" /> : null}
@@ -549,7 +590,8 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
         <div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? pageKey} required /></label></div>
         <div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? "Description to complete before publication."} required /></label></div>
         <AdminSeoAnalysis formId={formId} locale="en-GB" focusKeyphraseName="focusKeyphraseEn" defaultFocusKeyphrase={en?.focus_keyphrase ?? ""} titleFieldName="titleEn" seoTitleFieldName="seoTitleEn" seoDescriptionFieldName="seoDescriptionEn" slugValue={pageKey} contentFieldNames={seoContentFields("En")} imageAltFieldNames={["aboutStoryAlt1En", "aboutStoryAlt2En"]} disabled={demo} />
-        {pageKey === "a-propos" ? null : <RichTextEditor name="contentEn" label="Paragraphs" initialContent={initialContent(en, placeholderEn)} disabled={demo} />}
+        {pageKey === "professionnel-connecte" ? <input type="hidden" name="contentEn" value={JSON.stringify(initialContent(en, placeholderEn))} /> : null}
+        {pageKey === "a-propos" || pageKey === "professionnel-connecte" ? null : <RichTextEditor name="contentEn" label="Paragraphs" initialContent={initialContent(en, placeholderEn)} disabled={demo} />}
         {pageKey === "a-propos" ? <AboutPageFields translation={en} language="en-GB" shared={false} /> : null}
         {pageKey === "accueil" ? <HomeFields language="English" statement={homeEn.statement} values={homeEn.values} heroImage={heroImageEn.url ? heroImageEn : heroImage} /> : null}
         {pageKey === "professionnel" ? <ProfessionalPageFields translation={en} language="en-GB" /> : null}
@@ -557,6 +599,30 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
       </fieldset>
     </div>
     <button className="ui-button ui-button--default" type="submit" formNoValidate disabled={demo}>Enregistrer</button>
+  </Form>;
+}
+
+function SiteSeoForm({ page, demo }: { page?: ContentPage; demo: boolean }) {
+  const fr = page?.content_page_translations.find((translation) => translation.locale === "fr-FR");
+  const en = page?.content_page_translations.find((translation) => translation.locale === "en-GB");
+  return <Form method="post" className="admin-content-page__seo">
+    <input type="hidden" name="intent" value="save_page_seo" />
+    <input type="hidden" name="pageKey" value="accueil" />
+    <h2>Référencement du site</h2>
+    <p className="admin-muted">Modifiez le titre et la description affichés par les moteurs de recherche pour la page d’accueil du site.</p>
+    <div className="admin-content-columns">
+      <fieldset>
+        <legend>Français</legend>
+        <div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? "Zen Coffee Lab — Café de spécialité torréfié à Tours"} required disabled={demo} /></label></div>
+        <div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? "Cafés de spécialité torréfiés avec précision et légèreté à Tours."} required disabled={demo} /></label></div>
+      </fieldset>
+      <fieldset>
+        <legend>English</legend>
+        <div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? "Zen Coffee Lab — Specialty coffee roasted in Tours"} required disabled={demo} /></label></div>
+        <div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? "Light-roasted specialty coffee, selected and roasted with precision in Tours, France."} required disabled={demo} /></label></div>
+      </fieldset>
+    </div>
+    <button className="ui-button ui-button--default" type="submit" disabled={demo}>Enregistrer le référencement du site</button>
   </Form>;
 }
 
@@ -582,6 +648,7 @@ export default function AdminContent() {
   const arranging = activeTab === "rangement";
   const construction = activeTab === "construction";
   const footer = activeTab === "footer";
+  const seo = activeTab === "seo";
   const byKey = new Map(pages.map((page) => [page.page_key, page]));
   const keys = [...new Set([...defaults, ...byKey.keys()])].sort((left, right) => (pageLabels[left] ?? left).localeCompare(pageLabels[right] ?? right, "fr-FR"));
 
@@ -595,14 +662,17 @@ export default function AdminContent() {
     {demo ? <p className="admin-notice">Connectez Supabase pour éditer les pages avec l’éditeur enrichi.</p> : null}
     {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"}>{result.message}</p> : null}
     <nav className="admin-content-tabs" aria-label="Gestion des pages" role="tablist">
-      <Link role="tab" aria-selected={!arranging && !construction && !footer} className={!arranging && !construction && !footer ? "is-active" : undefined} to="/admin/contenus">Contenu</Link>
+      <Link role="tab" aria-selected={!arranging && !construction && !footer && !seo} className={!arranging && !construction && !footer && !seo ? "is-active" : undefined} to="/admin/contenus">Contenu</Link>
       <Link role="tab" aria-selected={arranging} className={arranging ? "is-active" : undefined} to="/admin/contenus?tab=rangement">Rangement</Link>
       <Link role="tab" aria-selected={footer} className={footer ? "is-active" : undefined} to="/admin/contenus?tab=footer">Footer</Link>
+      <Link role="tab" aria-selected={seo} className={seo ? "is-active" : undefined} to="/admin/contenus?tab=seo">Référencement</Link>
       <Link role="tab" aria-selected={construction} className={construction ? "is-active" : undefined} to="/admin/contenus?tab=construction">Site en construction</Link>
       <Link role="tab" aria-selected={false} to="/admin/bandeau">Bandeau</Link>
     </nav>
     {arranging
       ? <AdminNavigationOrganizer initialConfiguration={navigation} demo={demo} />
+      : seo
+        ? <section className="ui-card admin-content-page"><SiteSeoForm page={byKey.get("accueil")} demo={demo} /></section>
       : footer
         ? <section className="ui-card admin-content-page">
           <div className="admin-content-page__journal">

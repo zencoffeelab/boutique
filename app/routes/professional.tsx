@@ -50,15 +50,23 @@ export function ProfessionalCatalogHeading({ english, content }: { english: bool
   </header>;
 }
 
+function ProfessionalConnectedAction({ text, button, to }: { text: string; button: string; to: string }) {
+  const lines = text.split(/\r?\n/);
+  const headingIndex = lines.findIndex((line) => line.trim());
+  const heading = headingIndex === -1 ? text : lines[headingIndex].trim();
+  const description = headingIndex === -1 ? "" : lines.slice(headingIndex + 1).join("\n").trim();
+  return <article><h3>{heading}</h3>{description ? <p>{description}</p> : null}<Link className="button button--dark" to={to}>{button}<ArrowRight aria-hidden="true" /></Link></article>;
+}
+
 function ProfessionalConnectedPage({ english, content }: { english: boolean; content: { blocks: Array<{ type?: unknown; content?: unknown }> } | null }) {
   const copy = getProfessionalConnectedPageContent(english ? "en-GB" : "fr-FR", content?.blocks);
   return <>
     <header className="page-hero professional-hero professional-hero--connected"><p className="eyebrow">{copy.eyebrow}</p><h1>{copy.title}</h1><p className="lede">{copy.lede}</p></header>
     <section className="professional-connected-layout page-shell" aria-label={english ? "Professional next steps" : "Prochaines étapes professionnelles"}>
       <section className="steps professional-connected-steps" aria-label={english ? "Professional account steps" : "Étapes du compte professionnel"}>{copy.steps.map((step, index) => <article key={index}><span>{String(index + 1).padStart(2, "0")}</span><h3>{step.title}</h3><p>{step.text}</p></article>)}</section>
-      <section className="professional-connected-actions"><ContentBlocks blocks={content?.blocks} className="professional-connected-content" /><article><p>{copy.shopText}</p><Link className="button button--dark" to={english ? "/en/shop" : "/boutique"}>{copy.shopButton}<ArrowRight aria-hidden="true" /></Link></article><article><p>{copy.contactText}</p><Link className="button button--dark" to={english ? "/en/contact" : "/contact"}>{copy.contactButton}<ArrowRight aria-hidden="true" /></Link></article><article><p>{copy.sampleText}</p><Link className="button button--dark" to={english ? "/en/professional/quote" : "/professionnel/devis"}>{copy.sampleButton}<ArrowRight aria-hidden="true" /></Link></article></section>
+      <section className="professional-connected-actions"><ProfessionalConnectedAction text={copy.shopText} button={copy.shopButton} to={english ? "/en/shop" : "/boutique"} /><ProfessionalConnectedAction text={copy.contactText} button={copy.contactButton} to={english ? "/en/contact" : "/contact"} /><ProfessionalConnectedAction text={copy.sampleText} button={copy.sampleButton} to={english ? "/en/professional/quote" : "/professionnel/devis"} /></section>
     </section>
-    <aside className="professional-banner"><p className="eyebrow">{copy.bannerEyebrow}</p><h2>{copy.bannerTitle}</h2><p>{copy.bannerText}</p></aside>
+    <aside className="professional-banner professional-banner--connected"><p className="eyebrow">{copy.bannerEyebrow}</p><h2>{copy.bannerTitle}</h2><p>{copy.bannerText}</p></aside>
   </>;
 }
 
