@@ -1566,22 +1566,22 @@ button:disabled {
 .value-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border-top: 1px solid var(--line);
-  border-left: 1px solid var(--line);
+  width: var(--page);
+  margin-inline: auto;
+  gap: 1rem;
 }
 .value-card {
-  padding: clamp(2rem, 5vw, 5rem);
-  border-right: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  padding: clamp(2rem, 3.5vw, 3rem);
+  border: 1px solid var(--line);
 }
 .value-card b {
   display: block;
-  margin-bottom: 2rem;
+  margin-bottom: 0.8rem;
   color: var(--orange);
   font: 400 3rem/1 var(--display);
 }
 .value-card h3 {
-  margin-bottom: 1rem;
+  margin-bottom: 0.8rem;
 }
 
 .page-hero {
@@ -4301,7 +4301,7 @@ body.advice-detail-overflow-hidden {
   flex-direction: column;
   align-items: center;
   gap: clamp(2.5rem, 5vw, 4.5rem);
-  padding-block: clamp(0.75rem, 1.5vw, 1.25rem) clamp(5rem, 9vw, 9rem);
+  padding-block: clamp(0.75rem, 1.5vw, 1.25rem) clamp(3rem, 6vw, 6rem);
 }
 .professional-connected-steps {
   display: grid;
@@ -4317,6 +4317,7 @@ body.advice-detail-overflow-hidden {
 }
 .professional-connected-steps h3 {
   margin-bottom: 0.8rem;
+  white-space: nowrap;
 }
 .professional-connected-steps span {
   color: var(--orange);
@@ -4330,20 +4331,32 @@ body.advice-detail-overflow-hidden {
 .professional-connected-actions article {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 1.25rem;
   padding: clamp(1.5rem, 3vw, 2.5rem);
   border: 1px solid var(--line);
   background: var(--paper);
+  text-align: center;
 }
 .professional-connected-actions article h3 {
-  font: 400 clamp(1.4rem, 2.3vw, 2.2rem)/0.98 var(--serif);
+  font: 400 clamp(1.7rem, 2.8vw, 2.65rem)/0.98 var(--display);
   font-weight: 400;
   letter-spacing: -0.035em;
+  padding-bottom: 0.5rem;
+  text-wrap: balance;
+}
+.professional-connected-actions__question {
+  max-inline-size: 48ch;
+  white-space: normal;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-wrap: balance;
 }
 .professional-connected-actions article p {
   margin: 0;
   font: inherit;
+  text-wrap: balance;
   white-space: pre-wrap;
 }
 .professional-connected-content {
@@ -7627,6 +7640,9 @@ body.advice-detail-overflow-hidden {
 }
 
 @media (max-width: 980px) {
+  .professional-connected-steps h3 {
+    white-space: normal;
+  }
   .professional-connected-actions {
     gap: 1rem;
   }

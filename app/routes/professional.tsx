@@ -54,8 +54,11 @@ function ProfessionalConnectedAction({ text, button, to }: { text: string; butto
   const lines = text.split(/\r?\n/);
   const headingIndex = lines.findIndex((line) => line.trim());
   const heading = headingIndex === -1 ? text : lines[headingIndex].trim();
-  const description = headingIndex === -1 ? "" : lines.slice(headingIndex + 1).join("\n").trim();
-  return <article><h3>{heading}</h3>{description ? <p>{description}</p> : null}<Link className="button button--dark" to={to}>{button}<ArrowRight aria-hidden="true" /></Link></article>;
+  const descriptionLines = headingIndex === -1 ? [] : lines.slice(headingIndex + 1);
+  const questionIndex = descriptionLines.findIndex((line) => line.trim());
+  const question = questionIndex === -1 ? "" : descriptionLines[questionIndex].trim();
+  const detail = questionIndex === -1 ? "" : descriptionLines.slice(questionIndex + 1).join("\n").trim();
+  return <article><h3>{heading}</h3>{question ? <p className="professional-connected-actions__question">{question}</p> : null}{detail ? <p>{detail}</p> : null}<Link className="button button--dark" to={to}>{button}<ArrowRight aria-hidden="true" /></Link></article>;
 }
 
 function ProfessionalConnectedPage({ english, content }: { english: boolean; content: { blocks: Array<{ type?: unknown; content?: unknown }> } | null }) {
