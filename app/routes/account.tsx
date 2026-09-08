@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { data, Form, Link, redirect, useActionData, useLoaderData } from "react-router";
@@ -25,6 +25,11 @@ export function AccountLanguageSwitch({ english }: { english: boolean }) {
   return <Link className="account-language-switch" to={english ? "/mon-compte" : "/en/my-account"}>
     {english ? "Français" : "English"}
   </Link>;
+}
+
+function SignInPasswordInput({ english }: { english: boolean }) {
+  const [visible, setVisible] = useState(false);
+  return <span className="password-input"><input id="account-password" name="password" type={visible ? "text" : "password"} minLength={10} required autoComplete="current-password" /><button type="button" onClick={() => setVisible((current) => !current)} aria-label={visible ? (english ? "Hide password" : "Masquer le mot de passe") : (english ? "Show password" : "Afficher le mot de passe")} title={visible ? (english ? "Hide password" : "Masquer le mot de passe") : (english ? "Show password" : "Afficher le mot de passe")}>{visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}</button></span>;
 }
 
 function PasswordResetConfirmation({ english, message }: { english: boolean; message: string }) {
@@ -198,7 +203,7 @@ export default function Account() {
   }
   return <>
     <header className="page-hero account-welcome-hero"><AccountLanguageSwitch english={english} /><p className="eyebrow">{english ? "Private space" : "Espace privé"}</p><h1>{english ? "Your account" : "Votre compte"}</h1><p className="lede">{english ? "Find your orders, invoices, addresses and tracking." : "Retrouvez vos commandes, factures, adresses et suivis."}</p></header>
-    <Form method="post" className="form-card"><input type="hidden" name="next" value={next} /><h2>{english ? "Sign in" : "Se connecter"}</h2>{authError ? <p className="form-message form-error" role="alert">{authError}</p> : null}{result?.message && !((result as { scope?: string; ok?: boolean }).scope === "password_reset" && result.ok) ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}<div className="form-grid"><div className="field field--wide"><label htmlFor="account-email">Email</label><input id="account-email" name="email" type="email" required autoComplete="email" /></div><div className="field field--wide"><label htmlFor="account-password">{english ? "Password" : "Mot de passe"}</label><input id="account-password" name="password" type="password" minLength={10} required autoComplete="current-password" /></div></div><div className="account-login-actions"><button className="button button--dark" name="intent" value="login" type="submit">{english ? "Sign in" : "Se connecter"}</button><button className="button button--ghost" name="intent" value="register" type="submit">{english ? "Create an account" : "Créer un compte"}</button><button className="button button--ghost" formNoValidate name="intent" value="reset" type="submit">{english ? "Reset password" : "Mot de passe oublié"}</button></div></Form>
+    <Form method="post" className="form-card"><input type="hidden" name="next" value={next} /><h2>{english ? "Sign in" : "Se connecter"}</h2>{authError ? <p className="form-message form-error" role="alert">{authError}</p> : null}{result?.message && !((result as { scope?: string; ok?: boolean }).scope === "password_reset" && result.ok) ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}<div className="form-grid"><div className="field field--wide"><label htmlFor="account-email">Email</label><input id="account-email" name="email" type="email" required autoComplete="email" /></div><div className="field field--wide"><label htmlFor="account-password">{english ? "Password" : "Mot de passe"}</label><SignInPasswordInput english={english} /></div></div><div className="account-login-actions"><button className="button button--dark" name="intent" value="login" type="submit">{english ? "Sign in" : "Se connecter"}</button><button className="button button--ghost" name="intent" value="register" type="submit">{english ? "Create an account" : "Créer un compte"}</button><button className="button button--ghost" formNoValidate name="intent" value="reset" type="submit">{english ? "Reset password" : "Mot de passe oublié"}</button></div></Form>
     {result && (result as { scope?: string; ok?: boolean }).scope === "password_reset" && result.ok ? <PasswordResetConfirmation english={english} message={result.message} /> : null}
   </>;
 }

@@ -27,6 +27,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   ]);
   return { locale, approved, admin, signedIn: Boolean(viewer), accountEmail: viewer?.user.email ?? null, professionalStatus, content, connectedContent, sampleSet };
 }
+export function headers() { return { "Cache-Control": "private, no-store" }; }
 export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(data?.locale === "en-GB" ? "Coffee for professionals | Zen Coffee Lab" : "Café pour professionnels | Zen Coffee Lab", data?.locale === "en-GB" ? "Specialty coffee and support for cafés, restaurants and resellers." : "Cafés de spécialité et accompagnement pour coffee shops, restaurants et revendeurs.", data?.locale === "en-GB" ? "/en/professional" : "/professionnel");
 
 type ApplicationResponse = { ok?: boolean; message?: string; errors?: Record<string, string[]> };

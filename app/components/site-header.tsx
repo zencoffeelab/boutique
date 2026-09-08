@@ -1,6 +1,6 @@
 import { Check, ChevronDown, Menu, MonitorSmartphone, Search, ShoppingBag, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { AccountDrawer } from "~/components/account/account-drawer";
 import { CartDrawer } from "~/components/cart/cart-drawer";
 import { useCart } from "~/components/cart/cart-provider";
@@ -36,7 +36,7 @@ function AccountLinkContent({ signedIn, label, initials }: { signedIn: boolean; 
   return <><span className="account-button__label">{label}</span>{signedIn ? <span className="account-avatar" aria-hidden="true">{initials || "Z"}</span> : null}</>;
 }
 
-function LanguageSelector({ locale, frenchPath, englishPath }: { locale: Locale; frenchPath: string; englishPath: string }) {
+function LanguageSelector({ locale, frenchPath, englishPath, onLanguageChange }: { locale: Locale; frenchPath: string; englishPath: string; onLanguageChange?: () => void }) {
   const menuId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const firstOptionRef = useRef<HTMLAnchorElement>(null);
@@ -86,7 +86,7 @@ function LanguageSelector({ locale, frenchPath, englishPath }: { locale: Locale;
           role="menuitem"
           aria-label={`${option.label} (${option.code})`}
           aria-current={active ? "true" : undefined}
-          onClick={() => setOpen(false)}
+          onClick={() => { setOpen(false); onLanguageChange?.(); }}
           key={option.locale}
         >
           <LanguageFlag locale={option.locale} className="language-selector__option-flag" />
@@ -100,6 +100,7 @@ function LanguageSelector({ locale, frenchPath, englishPath }: { locale: Locale;
 
 export function SiteHeader({ signedIn, professional, accountInitials, admin = false, announcement, navigation = defaultSiteNavigation }: { signedIn: boolean; professional: boolean; accountInitials: string | null; admin?: boolean; announcement?: string; navigation?: SiteNavigationConfiguration }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const locale = location.pathname === "/en" || location.pathname.startsWith("/en/") ? "en-GB" : "fr-FR";
   const t = dictionary[locale];
   const [menuOpen, setMenuOpen] = useState(false);
@@ -116,6 +117,10 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
   const openAccountDrawer = () => {
     closeMenu();
     closeDrawer();
+    if (window.matchMedia("(max-width: 800px)").matches) {
+      navigate(paths.account);
+      return;
+    }
     setAccountDrawerOpen(true);
   };
   const closeAccountDrawer = () => setAccountDrawerOpen(false);
@@ -131,6 +136,11 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
   const accountLabel = signedIn
     ? (locale === "fr-FR" ? "Mon compte" : "My account")
     : (locale === "fr-FR" ? "Connexion" : "Sign in");
+  useEffect(() => {
+    if (!signedIn || !accountDrawerOpen || !window.matchMedia("(max-width: 800px)").matches) return;
+    setAccountDrawerOpen(false);
+    navigate(paths.account, { replace: true });
+  }, [accountDrawerOpen, navigate, paths.account, signedIn]);
   const currentLanguagePath = `${location.pathname}${location.search}`;
   const alternateLanguagePath = `${alternatePath(location.pathname)}${location.search}`;
   const frenchPath = locale === "fr-FR" ? currentLanguagePath : alternateLanguagePath;
@@ -181,8 +191,8 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
             const item = getSiteNavigationItem(key);
             return item.paths ? <Link onClick={closeMenu} to={item.paths[locale]} key={key}>{siteNavigationLabel(key, locale, "menu")}</Link> : null;
           })}
-          {signedIn ? <button className="mobile-account-link is-signed-in" type="button" onClick={openAccountDrawer} aria-expanded={accountDrawerOpen} aria-controls="account-drawer"><AccountLinkContent signedIn label={accountLabel} initials={accountInitials} /></button> : <Link className="mobile-account-link" onClick={closeMenu} to={paths.account}><AccountLinkContent signedIn={false} label={accountLabel} initials={null} /></Link>}
-          <div className="mobile-language-selector"><LanguageSelector locale={locale} frenchPath={frenchPath} englishPath={englishPath} /></div>
+          {signedIn ? <Link className="mobile-account-link is-signed-in" onClick={closeMenu} to={paths.account}><AccountLinkContent signedIn label={accountLabel} initials={accountInitials} /></Link> : <Link className="mobile-account-link" onClick={closeMenu} to={paths.account}><AccountLinkContent signedIn={false} label={accountLabel} initials={null} /></Link>}
+          <div className="mobile-language-selector"><LanguageSelector locale={locale} frenchPath={frenchPath} englishPath={englishPath} onLanguageChange={closeMenu} /></div>
         </nav>
         <Logo home={paths.home} />
         <div className="header-actions">
