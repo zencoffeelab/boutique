@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Link, useLoaderData } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
+import { AddressAutocomplete } from "~/components/address-autocomplete";
 import { formatMoney } from "~/domain/money";
 import { shippingRateLabel, shippingRatePromotionLabel } from "~/domain/shipping-rate-label";
 import { EU_SHIPPING_COUNTRY_CODES, NON_EU_SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
 import { supportsPickupDelivery } from "~/domain/shipping-zones";
 import type { PickupPoint, ShippingRate } from "~/domain/types";
 import { getViewer } from "~/lib/auth.server";
-import { getProducts, getProfessionalCartProducts } from "~/lib/catalog.server";
+import { getProducts, getProfessionalCartProductsWithSampleSet } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
 import { createRequestSupabase } from "~/lib/supabase.server";
@@ -33,7 +34,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       } : null,
     } : null,
     pickupConfigured: pickupPointsConfigured(),
-    products: audience === "professional" ? await getProfessionalCartProducts() : await getProducts({ status: "published", audience }),
+    products: audience === "professional" ? await getProfessionalCartProductsWithSampleSet() : await getProducts({ status: "published", audience }),
   };
 }
 
@@ -179,7 +180,7 @@ export default function Checkout() {
           <h2>2. {english ? "Shipping address" : "Adresse de livraison"}</h2>
           <div className="form-grid">
             <div className="field field--wide"><label htmlFor="company">{english ? "Company (optional)" : "Société (facultatif)"}</label><input id="company" name="company" defaultValue={account?.address?.company} autoComplete="organization" /></div>
-            <div className="field field--wide"><label htmlFor="line1">{english ? "Address" : "Adresse"}</label><input id="line1" name="line1" defaultValue={account?.address?.line1} required autoComplete="address-line1" /></div>
+            <div className="field field--wide"><label htmlFor="line1">{english ? "Address" : "Adresse"}</label><AddressAutocomplete id="line1" defaultValue={account?.address?.line1} countryCode={countryCode} locale={locale} /></div>
             <div className="field field--wide"><label htmlFor="line2">{english ? "Address line 2" : "Complément"}</label><input id="line2" name="line2" defaultValue={account?.address?.line2} autoComplete="address-line2" /></div>
             <div className="field"><label htmlFor="postalCode">{english ? "Postcode" : "Code postal"}</label><input id="postalCode" name="postalCode" defaultValue={account?.address?.postalCode} required autoComplete="postal-code" /></div>
             <div className="field"><label htmlFor="city">{english ? "City" : "Ville"}</label><input id="city" name="city" defaultValue={account?.address?.city} required autoComplete="address-level2" /></div>

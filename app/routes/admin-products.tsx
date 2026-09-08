@@ -86,6 +86,11 @@ export async function action({ request }: ActionFunctionArgs) {
       active: true,
     }, { onConflict: "variant_id,audience" });
     if (offerError) return { ok: false, message: offerError.message };
+    const { error: professionalOfferError } = await client.from("variant_offers")
+      .update({ price_cents: row.internalCostCents })
+      .eq("variant_id", row.variantId)
+      .eq("audience", "professional");
+    if (professionalOfferError) return { ok: false, message: professionalOfferError.message };
   }
   await client.from("audit_log").insert({ actor_id: admin.id, action: "product.stock_updated", entity_type: "products", entity_id: stockRows[0].productId, after_data: { products: stockRows } });
   return { ok: true, message: `${stockRows.length} stock${stockRows.length > 1 ? "s" : ""} café et ${variantRows.length} variante${variantRows.length > 1 ? "s" : ""} enregistrés.` };

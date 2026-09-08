@@ -774,7 +774,7 @@ export async function action({ request }: ActionFunctionArgs) {
       retailPriceCents: parsed.data.internalCostCents,
       productProfessionalEnabled: false,
       professionalRequested,
-      professionalPriceCents: parsed.data.proPriceCents ?? previousOffers.find((offer) => offer.audience === "professional")?.price_cents,
+      professionalPriceCents: parsed.data.internalCostCents,
       professionalMinimumQuantity: parsed.data.proMinimumQuantity,
     }).map((offer) => {
       const previousOffer = previousOffers.find((candidate) => candidate.audience === offer.audience);

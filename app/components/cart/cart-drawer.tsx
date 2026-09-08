@@ -1,7 +1,8 @@
 import { CheckCircle2, Minus, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
+import { ProductPackArtwork } from "~/components/product-thumbnail-label";
 import { formatMoney } from "~/domain/money";
 import type { Audience, Locale } from "~/domain/types";
 
@@ -16,6 +17,9 @@ type PreviewLine = {
   unitPriceCents: number;
   availableStock: number;
   imageUrl: string;
+  thumbnailLabelUrl?: string | null;
+  thumbnailBackgroundColor?: string;
+  tastingNotes?: readonly string[];
 };
 
 type PreviewResponse = {
@@ -28,6 +32,13 @@ type PreviewResponse = {
 
 const lineKey = (line: Pick<PreviewLine, "variantId" | "audience">) => `${line.variantId}:${line.audience}`;
 const CART_DRAWER_ANIMATION_MS = 280;
+
+function CartDrawerProductImage({ line }: { line: PreviewLine }) {
+  if (!line.thumbnailLabelUrl) return <img src={line.imageUrl} alt="" width="88" height="88" />;
+  return <span className="cart-drawer-line__product-image" style={{ "--product-thumbnail-color": line.thumbnailBackgroundColor } as CSSProperties}>
+    <ProductPackArtwork packClassName="cart-drawer-line__product-pack" labelClassName="cart-drawer-line__product-label" labelUrl={line.thumbnailLabelUrl} alt="" loading="lazy" />
+  </span>;
+}
 
 export function CartDrawer({ open, locale, onClose }: { open: boolean; locale: Locale; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -65,12 +76,6 @@ export function CartDrawer({ open, locale, onClose }: { open: boolean; locale: L
   useEffect(() => {
     if (!open || !hydrated) return;
     if (lines.length === 0) {
-      setPreview((current) => ({ ...current, ok: true, lines: [], unavailableKeys: [] }));
-      setLoading(false);
-      setError("");
-      return;
-    }
-    if (lines.every((line) => line.preview)) {
       setPreview((current) => ({ ...current, ok: true, lines: [], unavailableKeys: [] }));
       setLoading(false);
       setError("");
@@ -146,8 +151,8 @@ export function CartDrawer({ open, locale, onClose }: { open: boolean; locale: L
           {!loading && !error && lines.length === 0 ? <div className="cart-drawer__empty"><p>{english ? "Your cart is waiting for a great coffee." : "Votre panier attend un bon café."}</p><Link className="button button--light" to={paths.shop} onClick={onClose}>{english ? "Browse coffees" : "Voir les cafés"}</Link></div> : null}
           <div className="cart-drawer__lines" aria-live="polite">
             {displayedLines.map((line) => <article className="cart-drawer-line" key={lineKey(line)}>
-              <Link to={`${paths.product}${line.productSlug}`} onClick={onClose} tabIndex={-1} aria-hidden="true"><img src={line.imageUrl} alt="" width="88" height="88" /></Link>
-              <div><Link className="cart-drawer-line__name" to={`${paths.product}${line.productSlug}`} onClick={onClose}>{line.productName} – {line.variantLabel}</Link><div className="cart-drawer-line__quantity"><span>{english ? "Quantity" : "Quantité"}</span><div className="quantity-stepper"><button type="button" onClick={() => updateQuantity(line.variantId, line.audience, line.quantity - 1)} aria-label={english ? `Decrease quantity of ${line.productName}` : `Diminuer la quantité de ${line.productName}`}><Minus aria-hidden="true" /></button><span className="quantity-stepper__value">{line.quantity}</span><button type="button" onClick={() => updateQuantity(line.variantId, line.audience, line.quantity + 1)} aria-label={english ? `Increase quantity of ${line.productName}` : `Augmenter la quantité de ${line.productName}`} disabled={line.quantity >= Math.min(100, line.availableStock)}><Plus aria-hidden="true" /></button></div></div>{line.quantity > line.availableStock ? <p className="cart-drawer-line__warning">{english ? `Only ${line.availableStock} available.` : `Seulement ${line.availableStock} disponible${line.availableStock > 1 ? "s" : ""}.`}</p> : null}<strong>{formatMoney(line.unitPriceCents * line.quantity, locale)}</strong></div>
+              <Link to={`${paths.product}${line.productSlug}`} onClick={onClose} tabIndex={-1} aria-hidden="true"><CartDrawerProductImage line={line} /></Link>
+              <div><Link className="cart-drawer-line__name" to={`${paths.product}${line.productSlug}`} onClick={onClose}>{line.productName} – {line.variantLabel}</Link>{line.tastingNotes?.length ? <p className="cart-drawer-line__tasting-notes">{line.tastingNotes.join(" · ")}</p> : null}<div className="cart-drawer-line__quantity"><span>{english ? "Quantity" : "Quantité"}</span><div className="quantity-stepper"><button type="button" onClick={() => updateQuantity(line.variantId, line.audience, line.quantity - 1)} aria-label={english ? `Decrease quantity of ${line.productName}` : `Diminuer la quantité de ${line.productName}`}><Minus aria-hidden="true" /></button><span className="quantity-stepper__value">{line.quantity}</span><button type="button" onClick={() => updateQuantity(line.variantId, line.audience, line.quantity + 1)} aria-label={english ? `Increase quantity of ${line.productName}` : `Augmenter la quantité de ${line.productName}`} disabled={line.quantity >= Math.min(100, line.availableStock)}><Plus aria-hidden="true" /></button></div></div>{line.quantity > line.availableStock ? <p className="cart-drawer-line__warning">{english ? `Only ${line.availableStock} available.` : `Seulement ${line.availableStock} disponible${line.availableStock > 1 ? "s" : ""}.`}</p> : null}<strong>{formatMoney(line.unitPriceCents * line.quantity, locale)}</strong></div>
               <button className="cart-drawer-line__remove" type="button" onClick={() => removeItem(line.variantId, line.audience)} aria-label={english ? `Remove ${line.productName}` : `Supprimer ${line.productName}`}><Trash2 aria-hidden="true" /></button>
             </article>)}
             {unavailableKeys.map((key) => {

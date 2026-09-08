@@ -20,7 +20,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const approved = professionalStatus === "approved";
   const admin = viewer?.profile?.role === "admin";
   const [content, connectedContent, sampleSet] = await Promise.all([
-    viewer ? Promise.resolve(null) : getContentPage("professionnel", locale),
+    approved || admin ? Promise.resolve(null) : getContentPage("professionnel", locale),
     approved || admin ? getContentPage("professionnel-connecte", locale) : Promise.resolve(null),
     approved || admin ? getSampleSetProduct() : Promise.resolve(null),
   ]);

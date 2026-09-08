@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Menu, MonitorSmartphone, ShoppingBag, X } from "lucide-react";
+import { Check, ChevronDown, Menu, MonitorSmartphone, Search, ShoppingBag, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { AccountDrawer } from "~/components/account/account-drawer";
@@ -108,8 +108,8 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
   const embeddedMobilePreview = new URLSearchParams(location.search).get("mobilePreview") === "1";
   const { itemCount, drawerOpen, openDrawer, closeDrawer } = useCart();
   const paths = locale === "fr-FR"
-    ? { home: "/", shop: "/boutique", professional: "/professionnel", advice: "/blog", about: "/a-propos", cart: "/panier", account: "/mon-compte" }
-    : { home: "/en", shop: "/en/shop", professional: "/en/professional", advice: "/en/blog", about: "/en/about-us", cart: "/en/cart", account: "/en/my-account" };
+    ? { home: "/", shop: "/boutique", professional: "/professionnel", advice: "/blog", about: "/a-propos", cart: "/panier", search: "/recherche", account: "/mon-compte" }
+    : { home: "/en", shop: "/en/shop", professional: "/en/professional", advice: "/en/blog", about: "/en/about-us", cart: "/en/cart", search: "/en/search", account: "/en/my-account" };
   const closeMenu = () => setMenuOpen(false);
   const openAccountDrawer = () => {
     closeMenu();
@@ -168,6 +168,7 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
             return item.paths ? <Link onClick={closeMenu} to={item.paths[locale]} key={key}>{siteNavigationLabel(key, locale, "menu")}</Link> : null;
           })}
           {signedIn ? <button className="mobile-account-link is-signed-in" type="button" onClick={openAccountDrawer} aria-expanded={accountDrawerOpen} aria-controls="account-drawer"><AccountLinkContent signedIn label={accountLabel} initials={accountInitials} /></button> : <Link className="mobile-account-link" onClick={closeMenu} to={paths.account}><AccountLinkContent signedIn={false} label={accountLabel} initials={null} /></Link>}
+          <div className="mobile-language-selector"><LanguageSelector locale={locale} frenchPath={frenchPath} englishPath={englishPath} /></div>
         </nav>
         <Logo home={paths.home} />
         <div className="header-actions">
@@ -175,6 +176,7 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
           <button className="icon-button cart-button" type="button" onClick={() => { closeMenu(); openDrawer(); }} aria-label={`${t.cart} (${itemCount})`} aria-expanded={drawerOpen} aria-controls="cart-drawer">
             <ShoppingBag aria-hidden="true" /><span>{itemCount}</span>
           </button>
+          <Link className="icon-button search-button" to={paths.search} aria-label={locale === "fr-FR" ? "Rechercher sur le site" : "Search the site"}><Search aria-hidden="true" /></Link>
           {admin && !embeddedMobilePreview ? <button className={`admin-mobile-preview-button${mobilePreview ? " is-active" : ""}`} type="button" onClick={toggleMobilePreview} aria-pressed={mobilePreview} aria-label={mobilePreview ? "Désactiver l’aperçu mobile" : "Activer l’aperçu mobile"} title={mobilePreview ? "Désactiver l’aperçu mobile" : "Aperçu mobile"}><MonitorSmartphone aria-hidden="true" /><span>Mobile</span></button> : null}
           {signedIn ? <button className="account-button is-signed-in" type="button" onClick={openAccountDrawer} aria-label={accountLabel} aria-expanded={accountDrawerOpen} aria-controls="account-drawer"><AccountLinkContent signedIn label={accountLabel} initials={accountInitials} /></button> : <Link className="account-button" to={paths.account} aria-label={accountLabel}><AccountLinkContent signedIn={false} label={accountLabel} initials={null} /></Link>}
         </div>

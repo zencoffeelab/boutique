@@ -297,7 +297,15 @@ function safeProductProjection(
         internalCostCents: 0,
         offers: variant.offers.filter(
           (offer) => offer.audience === audience && offer.active,
-        ),
+        ).map((offer) => {
+          // Professional prices are now calculated from the public tariff at
+          // checkout. Keep historical pro offer rows from surfacing a stale
+          // amount in the professional catalogue.
+          const retailOffer = variant.offers.find((candidate) => candidate.audience === "retail" && candidate.active);
+          return audience === "professional" && retailOffer
+            ? { ...offer, price: retailOffer.price }
+            : offer;
+        }),
       }))
       .filter(
         (variant) =>
@@ -377,7 +385,12 @@ export async function getProfessionalCartProducts(): Promise<Product[]> {
       variants: product.variants.map((variant) => ({
         ...variant,
         internalCostCents: 0,
-        offers: variant.offers.filter((offer) => offer.active),
+        offers: variant.offers.filter((offer) => offer.active).map((offer) => {
+          const retailOffer = variant.offers.find((candidate) => candidate.audience === "retail" && candidate.active);
+          return offer.audience === "professional" && retailOffer
+            ? { ...offer, price: retailOffer.price }
+            : offer;
+        }),
       })),
     }));
 }
@@ -393,6 +406,22 @@ export async function getSampleSetProduct(): Promise<Product | null> {
     return (frenchName.includes("set") && frenchName.includes("echantillon")) || (englishName.includes("sample") && englishName.includes("set"));
   });
   return product ? safeProductProjection(product, "retail") : null;
+}
+
+/**
+ * The sample set stays available to approved professional accounts even while
+ * it is kept as a draft in the public catalogue. It is always sold at its
+ * retail offer, which is why it is appended separately from the professional
+ * catalogue.
+ */
+export async function getProfessionalCartProductsWithSampleSet(): Promise<Product[]> {
+  const [products, sampleSet] = await Promise.all([
+    getProfessionalCartProducts(),
+    getSampleSetProduct(),
+  ]);
+  return sampleSet && !products.some((product) => product.id === sampleSet.id)
+    ? [...products, sampleSet]
+    : products;
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
@@ -489,6 +518,12 @@ export async function resolveCartLines(
       product.status === "published" ||
       (authorizedAudience === "professional" && product.status === "published_pro"),
     );
+  if (authorizedAudience === "professional") {
+    const sampleSet = await getSampleSetProduct();
+    if (sampleSet && !products.some((product) => product.id === sampleSet.id)) {
+      products.push(sampleSet);
+    }
+  }
   const productsById = new Map(
     products.map((product) => [product.id, product]),
   );

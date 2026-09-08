@@ -3,7 +3,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { cartLineSchema } from "~/domain/schemas";
 import type { Audience } from "~/domain/types";
 import { getAudience } from "~/lib/auth.server";
-import { getProducts, getProfessionalCartProducts } from "~/lib/catalog.server";
+import { getProducts, getProfessionalCartProductsWithSampleSet } from "~/lib/catalog.server";
 import { getFreeShippingThresholds } from "~/services/site-settings.server";
 
 const previewSchema = z.object({
@@ -20,7 +20,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const requestedAudiences = [...new Set(parsed.data.lines.map((line) => line.audience))]
     .filter((audience): audience is Audience => audience === "retail" || authorizedAudience === "professional");
   const professionalCartProducts = authorizedAudience === "professional"
-    ? await getProfessionalCartProducts()
+    ? await getProfessionalCartProductsWithSampleSet()
     : null;
   const catalogs = await Promise.all(requestedAudiences.map(async (audience) => ({
     audience,
@@ -44,6 +44,9 @@ export async function action({ request }: ActionFunctionArgs) {
       unitPriceCents: offer.price.amount,
       availableStock: variant.stockOnHand - variant.stockReserved,
       imageUrl: product.media[0]?.url ?? "",
+      thumbnailLabelUrl: product.thumbnailLabelUrl,
+      thumbnailBackgroundColor: product.thumbnailBackgroundColor,
+      tastingNotes: product.translations[parsed.data.locale].tastingNotes,
     }];
   });
   const resolvedKeys = new Set(lines.map((line) => `${line.variantId}:${line.audience}`));
