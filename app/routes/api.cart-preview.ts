@@ -3,7 +3,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { cartLineSchema } from "~/domain/schemas";
 import type { Audience } from "~/domain/types";
 import { getAudience } from "~/lib/auth.server";
-import { getProducts, getProfessionalProducts } from "~/lib/catalog.server";
+import { getProducts, getProfessionalCartProducts } from "~/lib/catalog.server";
 import { getFreeShippingThresholds } from "~/services/site-settings.server";
 
 const previewSchema = z.object({
@@ -19,11 +19,12 @@ export async function action({ request }: ActionFunctionArgs) {
   const authorizedAudience = await getAudience(request);
   const requestedAudiences = [...new Set(parsed.data.lines.map((line) => line.audience))]
     .filter((audience): audience is Audience => audience === "retail" || authorizedAudience === "professional");
+  const professionalCartProducts = authorizedAudience === "professional"
+    ? await getProfessionalCartProducts()
+    : null;
   const catalogs = await Promise.all(requestedAudiences.map(async (audience) => ({
     audience,
-    products: audience === "professional"
-      ? await getProfessionalProducts()
-      : await getProducts({ status: "published", audience }),
+    products: professionalCartProducts ?? await getProducts({ status: "published", audience }),
   })));
   const productsByAudience = new Map(catalogs.map(({ audience, products }) => [audience, new Map(products.map((product) => [product.id, product]))]));
 

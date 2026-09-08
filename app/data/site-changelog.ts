@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-08-professional-cart-retail-sample-set",
+    date: "2026-09-08",
+    kind: "Correction",
+    title: "Set d’échantillons conservé dans le panier professionnel",
+    description: "Le panier d’un compte professionnel résout maintenant aussi les lignes au tarif public, notamment le set d’échantillons, tout en gardant les tarifs professionnels pour les cafés concernés.",
+  },
+  {
     id: "2026-09-08-professional-only-product-canonical-url",
     date: "2026-09-08",
     kind: "Correction",

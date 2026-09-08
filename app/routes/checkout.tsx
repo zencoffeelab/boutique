@@ -8,7 +8,7 @@ import { EU_SHIPPING_COUNTRY_CODES, NON_EU_SHIPPING_COUNTRY_CODES, shippingCount
 import { supportsPickupDelivery } from "~/domain/shipping-zones";
 import type { PickupPoint, ShippingRate } from "~/domain/types";
 import { getViewer } from "~/lib/auth.server";
-import { getProducts, getProfessionalProducts } from "~/lib/catalog.server";
+import { getProducts, getProfessionalCartProducts } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
 import { createRequestSupabase } from "~/lib/supabase.server";
@@ -33,7 +33,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       } : null,
     } : null,
     pickupConfigured: pickupPointsConfigured(),
-    products: audience === "professional" ? await getProfessionalProducts() : await getProducts({ status: "published", audience }),
+    products: audience === "professional" ? await getProfessionalCartProducts() : await getProducts({ status: "published", audience }),
   };
 }
 
@@ -84,7 +84,10 @@ export default function Checkout() {
     setCartId(id);
   }, []);
 
-  const validLines = useMemo(() => lines.filter((line) => line.audience === audience), [audience, lines]);
+  const validLines = useMemo(
+    () => lines.filter((line) => line.audience === "retail" || audience === "professional"),
+    [audience, lines],
+  );
   const resolved = useMemo(() => validLines.map((line) => {
     const product = products.find((item) => item.id === line.productId); const variant = product?.variants.find((item) => item.id === line.variantId);
     const offer = variant?.offers.find((item) => item.audience === line.audience);

@@ -4,7 +4,7 @@ import { Link, useLoaderData } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
 import { formatMoney } from "~/domain/money";
 import { getViewer } from "~/lib/auth.server";
-import { getProducts, getProfessionalProducts, getSampleSetProduct } from "~/lib/catalog.server";
+import { getProducts, getProfessionalCartProducts, getSampleSetProduct } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
 
@@ -13,7 +13,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const canUseProfessionalSampleSet = viewer?.profile?.professional_status === "approved" || viewer?.profile?.role === "admin";
   const audience = canUseProfessionalSampleSet ? "professional" : "retail";
   const [products, sampleSet] = await Promise.all([
-    canUseProfessionalSampleSet ? getProfessionalProducts() : getProducts({ status: "published", audience }),
+    canUseProfessionalSampleSet ? getProfessionalCartProducts() : getProducts({ status: "published", audience }),
     canUseProfessionalSampleSet ? getSampleSetProduct() : Promise.resolve(null),
   ]);
   return { locale: getLocale(request), products: sampleSet && !products.some((product) => product.id === sampleSet.id) ? [...products, sampleSet] : products };

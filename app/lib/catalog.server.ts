@@ -360,6 +360,28 @@ export async function getProfessionalProducts(
     .filter((product) => !options.availableOnly || product.variants.length > 0);
 }
 
+/**
+ * Resolves a professional account's cart without exposing internal costs.
+ * A professional cart may legitimately contain a retail-priced sample set as
+ * well as professional-priced coffees.
+ */
+export async function getProfessionalCartProducts(): Promise<Product[]> {
+  const products = await getRawProducts(true);
+  return products
+    .filter(
+      (product) =>
+        product.status === "published" || product.status === "published_pro",
+    )
+    .map((product) => ({
+      ...product,
+      variants: product.variants.map((variant) => ({
+        ...variant,
+        internalCostCents: 0,
+        offers: variant.offers.filter((offer) => offer.active),
+      })),
+    }));
+}
+
 export async function getSampleSetProduct(): Promise<Product | null> {
   const normalizeName = (value: string) => value
     .normalize("NFD")
