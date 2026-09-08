@@ -24,9 +24,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const previewId = url.searchParams.get("preview");
   const preview = Boolean(previewId);
   const wantsProfessional = url.searchParams.get("audience") === "professional";
-  const authorizedAudience = wantsProfessional
-    ? await getAudience(request)
-    : "retail";
+  const authorizedAudience = await getAudience(request);
   let audience: Audience =
     wantsProfessional && authorizedAudience === "professional"
       ? "professional"

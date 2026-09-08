@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-08-professional-product-url-session-check",
+    date: "2026-09-08",
+    kind: "Correction",
+    title: "Session professionnelle reconnue sur les liens de fiches",
+    description: "Les fiches de cafés publiés pro vérifient désormais systématiquement la session connectée, y compris sur leur URL habituelle sans paramètre professionnel. Le set d’échantillons est ainsi accessible aux professionnels et administrateurs autorisés.",
+  },
+  {
     id: "2026-09-08-professional-cart-retail-sample-set",
     date: "2026-09-08",
     kind: "Correction",
