@@ -1,11 +1,9 @@
-import { Check, ChevronDown, FileText, Menu, MonitorSmartphone, ShoppingBag, X } from "lucide-react";
+import { Check, ChevronDown, Menu, MonitorSmartphone, ShoppingBag, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { AccountDrawer } from "~/components/account/account-drawer";
 import { CartDrawer } from "~/components/cart/cart-drawer";
 import { useCart } from "~/components/cart/cart-provider";
-import { QuoteCartDrawer } from "~/components/professional-quote/quote-cart-drawer";
-import { useQuoteCart } from "~/components/professional-quote/quote-cart-provider";
 import { Logo } from "~/components/logo";
 import { alternatePath, dictionary } from "~/lib/i18n";
 import type { Locale } from "~/domain/types";
@@ -109,7 +107,6 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
   const [mobilePreview, setMobilePreview] = useState(false);
   const embeddedMobilePreview = new URLSearchParams(location.search).get("mobilePreview") === "1";
   const { itemCount, drawerOpen, openDrawer, closeDrawer } = useCart();
-  const quoteCart = useQuoteCart();
   const paths = locale === "fr-FR"
     ? { home: "/", shop: "/boutique", professional: "/professionnel", advice: "/blog", about: "/a-propos", cart: "/panier", account: "/mon-compte" }
     : { home: "/en", shop: "/en/shop", professional: "/en/professional", advice: "/en/blog", about: "/en/about-us", cart: "/en/cart", account: "/en/my-account" };
@@ -117,7 +114,6 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
   const openAccountDrawer = () => {
     closeMenu();
     closeDrawer();
-    quoteCart.closeDrawer();
     setAccountDrawerOpen(true);
   };
   const closeAccountDrawer = () => setAccountDrawerOpen(false);
@@ -176,7 +172,6 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
         <Logo home={paths.home} />
         <div className="header-actions">
           <LanguageSelector locale={locale} frenchPath={frenchPath} englishPath={englishPath} />
-          {professional ? <button className="icon-button quote-cart-button" type="button" onClick={() => { closeMenu(); quoteCart.openDrawer(); }} aria-label={`${locale === "fr-FR" ? "Panier de devis" : "Quote basket"} (${quoteCart.totalKilograms} kg)`} aria-expanded={quoteCart.drawerOpen} aria-controls="quote-cart-drawer"><FileText aria-hidden="true" /><span>{quoteCart.totalKilograms}</span></button> : null}
           <button className="icon-button cart-button" type="button" onClick={() => { closeMenu(); openDrawer(); }} aria-label={`${t.cart} (${itemCount})`} aria-expanded={drawerOpen} aria-controls="cart-drawer">
             <ShoppingBag aria-hidden="true" /><span>{itemCount}</span>
           </button>
@@ -185,7 +180,6 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
         </div>
       </header>
       <CartDrawer open={drawerOpen} locale={locale} onClose={closeDrawer} />
-      {professional ? <QuoteCartDrawer locale={locale} /> : null}
       {signedIn ? <AccountDrawer open={accountDrawerOpen} locale={locale} onClose={closeAccountDrawer} /> : null}
       {admin && mobilePreview && !embeddedMobilePreview ? <div className="admin-mobile-preview" role="dialog" aria-modal="true" aria-label="Aperçu mobile du site">
         <div className="admin-mobile-preview__toolbar">

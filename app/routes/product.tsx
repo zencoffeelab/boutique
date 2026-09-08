@@ -6,10 +6,9 @@ import { ProductCard } from "~/components/product-card";
 import { ProductPurchase } from "~/components/product-purchase";
 import { ProductPackArtwork } from "~/components/product-thumbnail-label";
 import { ProductRibbons } from "~/components/product-ribbons";
-import { ProfessionalQuoteAdd } from "~/components/professional-quote/professional-quote-add";
 import type { Audience, Locale, Product, ProductEditorialBlock } from "~/domain/types";
 import { getAudience, requireAdmin } from "~/lib/auth.server";
-import { getAdminProducts, getProducts, hasPurchasableVariant } from "~/lib/catalog.server";
+import { getAdminProducts, getProducts, getProfessionalProducts, hasPurchasableVariant } from "~/lib/catalog.server";
 import { getFaqItemByFrenchQuestion } from "~/lib/content.server";
 import { getLocale } from "~/lib/i18n";
 import { getRelatedProducts } from "~/lib/product-recommendations";
@@ -35,7 +34,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (preview) await requireAdmin(request);
   const products = preview
     ? await getAdminProducts()
-    : await getProducts({ audience });
+    : audience === "professional"
+      ? await getProfessionalProducts()
+      : await getProducts({ audience });
   const product =
     products.find((item) =>
       preview
@@ -46,6 +47,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     !product ||
     (!preview &&
       product.status !== "published" &&
+      product.status !== "published_pro" &&
       product.status !== "archived") ||
     (!preview &&
       product.status === "published" &&
@@ -59,7 +61,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const archived = product.status === "archived";
   const relatedProducts = getRelatedProducts(
     product,
-    products.filter((candidate) => candidate.status === "published" && hasPurchasableVariant(candidate, audience)),
+    products.filter((candidate) => (candidate.status === "published" || candidate.status === "published_pro") && hasPurchasableVariant(candidate, audience)),
     locale,
   );
   const freshnessFaq = product.status !== "archived"
@@ -173,6 +175,7 @@ function ProductFreshnessFaq({
   locale: Locale;
 }) {
   const english = locale === "en-GB";
+  const title = english ? item.question_en : item.question_fr.replace(/peut-on commencer à\s*/i, "");
   const answer = english ? item.answer_en : item.answer_fr;
   const recommendationStart = answer.search(english ? /we recommend/i : /nous recommandons/i);
   const betweenStart = english ? answer.search(/between/i) : -1;
@@ -190,11 +193,15 @@ function ProductFreshnessFaq({
         aromaPeakStart > recommendationStart ? answer.slice(aromaPeakStart) : "",
       ]
     : [answer, "", ""];
+  const visibleLines = lines.filter(Boolean);
   return (
-    <section className="product-freshness-faq" aria-labelledby="product-freshness-faq-title">
+    <section className={`product-freshness-faq${english ? "" : " product-freshness-faq--french"}`} aria-labelledby="product-freshness-faq-title">
       <div>
-        <h2 id="product-freshness-faq-title">{english ? item.question_en : item.question_fr}</h2>
-        <p>{lines.filter(Boolean).map((line, index) => <span className="product-freshness-faq__line" key={index}>{line}</span>)}</p>
+        <h2 id="product-freshness-faq-title">{title}</h2>
+        {english ? <p>{visibleLines.map((line, index) => <span className="product-freshness-faq__line" key={index}>{line}</span>)}</p> : <p>
+          {visibleLines[0] ? <span className="product-freshness-faq__line product-freshness-faq__line--intro">{visibleLines[0]}</span> : null}
+          {visibleLines.length > 1 ? <span className="product-freshness-faq__line product-freshness-faq__line--recommendation">{visibleLines.slice(1).join(" ")}</span> : null}
+        </p>}
       </div>
     </section>
   );
@@ -303,7 +310,7 @@ export default function ProductDetail() {
           </section> : archived ? <section className="product-archive-notice" aria-label={english ? "Archived coffee" : "Café archivé"}>
             <p className="eyebrow">{english ? "Coffee archives" : "Archives café"}</p>
             <p>{english ? "This limited lot is no longer available for purchase, but its complete story remains available to read." : "Ce lot éphémère n’est plus disponible à l’achat, mais son histoire complète reste accessible."}</p>
-          </section> : audience === "professional" ? <ProfessionalQuoteAdd product={product} locale={locale} /> : <ProductPurchase product={product} locale={locale} audience={audience} />}
+          </section> : audience === "professional" ? <Link className="button button--dark" to={english ? "/en/contact" : "/contact"}>{english ? "Contact us for a quote" : "Nous contacter pour un devis"}</Link> : <ProductPurchase product={product} locale={locale} audience={audience} />}
         </div>
       </article>
       {t.tastingNotes.length > 0 ? (

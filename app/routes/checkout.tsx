@@ -8,14 +8,14 @@ import { EU_SHIPPING_COUNTRY_CODES, NON_EU_SHIPPING_COUNTRY_CODES, shippingCount
 import { supportsPickupDelivery } from "~/domain/shipping-zones";
 import type { PickupPoint, ShippingRate } from "~/domain/types";
 import { getViewer } from "~/lib/auth.server";
-import { getProducts } from "~/lib/catalog.server";
+import { getProducts, getProfessionalProducts } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
 import { createRequestSupabase } from "~/lib/supabase.server";
 import { pickupPointsConfigured } from "~/services/pickup-points.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const locale = getLocale(request); const viewer = await getViewer(request); const audience = viewer?.profile?.professional_status === "approved" ? "professional" : "retail";
+  const locale = getLocale(request); const viewer = await getViewer(request); const audience = viewer?.profile?.professional_status === "approved" || viewer?.profile?.role === "admin" ? "professional" : "retail";
   const requestSupabase = viewer ? createRequestSupabase(request) : null;
   const savedAddress = requestSupabase
     ? (await requestSupabase.client.from("addresses").select("first_name,last_name,company,line1,line2,postal_code,city,country_code,phone").eq("profile_id", viewer!.user.id).order("created_at").limit(1).maybeSingle()).data
@@ -33,7 +33,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       } : null,
     } : null,
     pickupConfigured: pickupPointsConfigured(),
-    products: await getProducts({ status: "published", audience }),
+    products: audience === "professional" ? await getProfessionalProducts() : await getProducts({ status: "published", audience }),
   };
 }
 

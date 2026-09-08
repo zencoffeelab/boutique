@@ -97,5 +97,7 @@ export async function requireAdmin(request: Request) {
 
 export async function getAudience(request: Request): Promise<"retail" | "professional"> {
   const viewer = await getViewer(request);
-  return viewer?.profile?.professional_status === "approved" ? "professional" : "retail";
+  return viewer?.profile?.professional_status === "approved" || viewer?.profile?.role === "admin"
+    ? "professional"
+    : "retail";
 }

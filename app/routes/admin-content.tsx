@@ -84,6 +84,18 @@ const seoPageSchema = z.object({
   seoDescriptionFr: z.string().trim().min(10),
   seoDescriptionEn: z.string().trim().min(10),
 });
+const blogPageSchema = z.object({
+  intent: z.literal("save_blog_page"),
+  pageKey: z.literal("conseils"),
+  titleFr: z.string().trim().min(2).max(140),
+  titleEn: z.string().trim().min(2).max(140),
+  subtitleFr: z.string().trim().min(2).max(600),
+  subtitleEn: z.string().trim().min(2).max(600),
+  seoTitleFr: z.string().trim().min(2),
+  seoTitleEn: z.string().trim().min(2),
+  seoDescriptionFr: z.string().trim().min(10),
+  seoDescriptionEn: z.string().trim().min(10),
+});
 const navigationSchema = z.object({
   intent: z.literal("save_navigation"),
   configuration: z.string().min(2).max(20_000),
@@ -149,6 +161,27 @@ function uploadedFile(form: FormData, name: string) {
 
 function aboutBlock(translation: ContentTranslation | undefined, type: string) {
   return translation?.blocks.find((block) => block.type === type)?.content as Record<string, unknown> | undefined;
+}
+
+function blogSubtitle(translation: ContentTranslation | undefined) {
+  const content = translation?.blocks.find((block) => block.type === "blogHero")?.content;
+  return content && typeof content === "object" && typeof (content as { subtitle?: unknown }).subtitle === "string"
+    ? (content as { subtitle: string }).subtitle
+    : undefined;
+}
+
+function withBlogSubtitle(blocks: unknown, subtitle: string) {
+  const current = Array.isArray(blocks) ? blocks : [];
+  const index = current.findIndex((block) => block && typeof block === "object" && (block as { type?: unknown }).type === "blogHero");
+  const nextBlock = (block?: unknown) => ({
+    ...(block && typeof block === "object" ? block : {}),
+    type: "blogHero",
+    content: {
+      ...(block && typeof block === "object" && (block as { content?: unknown }).content && typeof (block as { content?: unknown }).content === "object" ? (block as { content: Record<string, unknown> }).content : {}),
+      subtitle,
+    },
+  });
+  return index === -1 ? [...current, nextBlock()] : current.map((block, currentIndex) => currentIndex === index ? nextBlock(block) : block);
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -292,6 +325,38 @@ export async function action({ request }: ActionFunctionArgs) {
       after_data: parsedSeoPage.data,
     });
     return { ok: true, message: "Référencement du site enregistré." };
+  }
+
+  if (fields.intent === "save_blog_page") {
+    const parsedBlogPage = blogPageSchema.safeParse(fields);
+    if (!parsedBlogPage.success) return { ok: false, message: "Complétez le titre, le sous-titre et le référencement du Blog dans les deux langues." };
+    const client = createServiceSupabase();
+    if (!client) return { ok: false, message: "Base indisponible." };
+    const { data: page, error } = await client
+      .from("content_pages")
+      .upsert({ page_key: parsedBlogPage.data.pageKey, status: "published", updated_at: new Date().toISOString() }, { onConflict: "page_key" })
+      .select("id")
+      .single();
+    if (error || !page) return { ok: false, message: error?.message ?? "Page Blog non enregistrée." };
+    const { data: existingTranslations, error: existingTranslationsError } = await client
+      .from("content_page_translations")
+      .select("locale,blocks")
+      .eq("page_id", page.id);
+    if (existingTranslationsError) return { ok: false, message: existingTranslationsError.message };
+    const existingBlocksFor = (locale: "fr-FR" | "en-GB") => existingTranslations?.find((translation) => translation.locale === locale)?.blocks;
+    const { error: translationError } = await client.from("content_page_translations").upsert([
+      { page_id: page.id, locale: "fr-FR", title: parsedBlogPage.data.titleFr, seo_title: parsedBlogPage.data.seoTitleFr, seo_description: parsedBlogPage.data.seoDescriptionFr, blocks: withBlogSubtitle(existingBlocksFor("fr-FR"), parsedBlogPage.data.subtitleFr) },
+      { page_id: page.id, locale: "en-GB", title: parsedBlogPage.data.titleEn, seo_title: parsedBlogPage.data.seoTitleEn, seo_description: parsedBlogPage.data.seoDescriptionEn, blocks: withBlogSubtitle(existingBlocksFor("en-GB"), parsedBlogPage.data.subtitleEn) },
+    ], { onConflict: "page_id,locale" });
+    if (translationError) return { ok: false, message: translationError.message };
+    await client.from("audit_log").insert({
+      actor_id: admin.id,
+      action: "blog_page.updated",
+      entity_type: "content_page",
+      entity_id: page.id,
+      after_data: parsedBlogPage.data,
+    });
+    return { ok: true, message: "Page Blog enregistrée." };
   }
 
   const parsed = pageSchema.safeParse(fields);
@@ -626,6 +691,34 @@ function SiteSeoForm({ page, demo }: { page?: ContentPage; demo: boolean }) {
   </Form>;
 }
 
+function BlogPageForm({ page, demo }: { page?: ContentPage; demo: boolean }) {
+  const fr = page?.content_page_translations.find((translation) => translation.locale === "fr-FR");
+  const en = page?.content_page_translations.find((translation) => translation.locale === "en-GB");
+  return <Form method="post" className="admin-content-page__seo">
+    <input type="hidden" name="intent" value="save_blog_page" />
+    <input type="hidden" name="pageKey" value="conseils" />
+    <h3>Page Blog et référencement</h3>
+    <p className="admin-muted">Modifiez le titre et le sous-titre affichés sur le Blog, ainsi que les métadonnées utilisées par les moteurs de recherche.</p>
+    <div className="admin-content-columns">
+      <fieldset>
+        <legend>Français</legend>
+        <div className="field"><label>Titre du Blog<input name="titleFr" defaultValue={fr?.title ?? "Préparer avec intention"} required disabled={demo} /></label></div>
+        <div className="field"><label>Sous-titre<textarea name="subtitleFr" defaultValue={blogSubtitle(fr) ?? "Des conseils pratiques et précis pour révéler ce qui se trouve déjà dans le grain."} required disabled={demo} /></label></div>
+        <div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? "Blog café | Zen Coffee Lab"} required disabled={demo} /></label></div>
+        <div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? "Recettes et guides pratiques pour mieux préparer le café."} required disabled={demo} /></label></div>
+      </fieldset>
+      <fieldset>
+        <legend>English</legend>
+        <div className="field"><label>Blog title<input name="titleEn" defaultValue={en?.title ?? "Brew with intention"} required disabled={demo} /></label></div>
+        <div className="field"><label>Subtitle<textarea name="subtitleEn" defaultValue={blogSubtitle(en) ?? "Practical, precise advice to reveal what is already in the bean."} required disabled={demo} /></label></div>
+        <div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? "Coffee blog | Zen Coffee Lab"} required disabled={demo} /></label></div>
+        <div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? "Recipes and practical guides for better coffee."} required disabled={demo} /></label></div>
+      </fieldset>
+    </div>
+    <button className="ui-button ui-button--default" type="submit" disabled={demo}>Enregistrer la page Blog</button>
+  </Form>;
+}
+
 function HomeFields({ language, statement, values, heroImage }: { language: "Français" | "English"; statement: string; values: readonly (readonly [string, string])[]; heroImage: { url?: string; path?: string; alt?: string } }) {
   const suffix = language === "Français" ? "Fr" : "En";
   return <fieldset className="admin-home-fields">
@@ -694,6 +787,7 @@ export default function AdminContent() {
             <summary><strong>Blog</strong><span className="ui-badge">Blog</span></summary>
             <div className="admin-content-page__journal">
               <p>Gérez la page Blog et les articles déjà publiés.</p>
+              <BlogPageForm page={page} demo={demo} />
               <div className="admin-content-page__actions"><Link className="ui-button ui-button--ghost" to="/admin/conseils">Gérer le blog</Link><Link className="ui-button ui-button--default" to="/admin/conseils?new=1">Nouveau blog</Link></div>
               {adviceArticles.length ? <ul>{adviceArticles.map((article) => <li key={article.id}><Link to={`/admin/conseils?article=${article.id}`}>{article.advice_translations.find((translation) => translation.locale === "fr-FR")?.title ?? article.slug}</Link><span>{article.status} · {new Date(article.published_at).toLocaleDateString("fr-FR")}</span></li>)}</ul> : <p className="admin-muted">Aucun article n’est encore enregistré.</p>}
             </div>

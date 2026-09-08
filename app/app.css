@@ -1945,6 +1945,26 @@ button:disabled {
   display: block;
   white-space: nowrap;
 }
+.product-freshness-faq:not(.product-freshness-faq--french) .product-freshness-faq__line:first-child {
+  margin-bottom: 0.8rem;
+}
+.product-freshness-faq--french p {
+  max-width: 55rem;
+  margin-inline: auto;
+}
+.product-freshness-faq--french .product-freshness-faq__line {
+  white-space: normal;
+  text-wrap: balance;
+}
+.product-freshness-faq--french .product-freshness-faq__line--intro {
+  max-inline-size: 65ch;
+  margin-inline: auto;
+  margin-bottom: 0.8rem;
+}
+.product-freshness-faq--french .product-freshness-faq__line--recommendation {
+  max-inline-size: 68ch;
+  margin-inline: auto;
+}
 @media (max-width: 1100px) {
   .product-freshness-faq__line {
     white-space: normal;
@@ -3217,16 +3237,14 @@ body.advice-detail-overflow-hidden {
   font-size: 0.75rem;
 }
 .contact-hero {
-  background:
-    radial-gradient(circle at 86% 18%, color-mix(in srgb, var(--yellow) 38%, transparent) 0 8%, transparent 22%),
-    linear-gradient(180deg, var(--cream) 0%, color-mix(in srgb, var(--cream-dark) 45%, var(--cream)) 100%);
+  background: linear-gradient(180deg, var(--cream) 0%, color-mix(in srgb, var(--cream-dark) 45%, var(--cream)) 100%);
 }
 .contact-layout {
   display: grid;
   grid-template-columns: minmax(250px, 0.75fr) minmax(0, 1.35fr);
   align-items: start;
   gap: clamp(2rem, 7vw, 7rem);
-  padding-block: clamp(3rem, 7vw, 7rem) clamp(5rem, 10vw, 10rem);
+  padding-block: clamp(1.5rem, 3vw, 3rem) clamp(5rem, 10vw, 10rem);
 }
 .contact-details {
   position: sticky;
@@ -4198,6 +4216,7 @@ body.advice-detail-overflow-hidden {
   background: var(--green-deep);
   color: white;
   text-align: center;
+  border-bottom: clamp(3rem, 6vw, 6rem) solid #fff;
 }
 .professional-banner h2 {
   margin-bottom: 1rem;
@@ -4216,15 +4235,30 @@ body.advice-detail-overflow-hidden {
   height: 1.1rem;
 }
 .professional-hero + .cms-content {
+  max-width: 70rem;
   padding-top: 2rem;
   padding-bottom: clamp(1rem, 2vw, 1.5rem);
+  text-align: center;
+}
+.professional-hero + .cms-content .rich-text-content p {
+  text-wrap: balance;
+  white-space: pre-line;
+}
+
+.professional-hero + .cms-content .rich-text-hard-break {
+  display: block;
+  height: 1.5rem;
+}
+
+.professional-hero + .cms-content .rich-text-hard-break br {
+  display: none;
 }
 .professional-application-layout {
   display: grid;
   grid-template-columns: minmax(250px, 0.65fr) minmax(0, 1.35fr);
   align-items: start;
   gap: clamp(2rem, 6vw, 6rem);
-  padding-block: clamp(1.5rem, 3vw, 2.5rem) clamp(5rem, 9vw, 9rem);
+  padding-block: clamp(0.75rem, 1.5vw, 1.25rem) clamp(3rem, 6vw, 6rem);
 }
 .steps {
   display: grid;
@@ -4297,27 +4331,26 @@ body.advice-detail-overflow-hidden {
   padding-bottom: clamp(0.5rem, 1vw, 1rem);
 }
 .professional-connected-layout {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: clamp(2.5rem, 5vw, 4.5rem);
+  display: grid;
+  grid-template-columns: minmax(250px, 0.65fr) minmax(0, 1.35fr);
+  align-items: start;
+  gap: clamp(2rem, 6vw, 6rem);
   padding-block: clamp(0.75rem, 1.5vw, 1.25rem) clamp(3rem, 6vw, 6rem);
 }
 .professional-connected-steps {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  width: 100%;
-  gap: 1rem;
+  grid-template-columns: 1fr;
+  position: sticky;
+  top: calc(88px + 2rem);
+  width: auto;
+  gap: 0;
   margin: 0;
   padding: 0;
 }
 .professional-connected-steps article {
-  padding: clamp(2rem, 3.5vw, 3rem);
-  border: 1px solid var(--line);
-}
-.professional-connected-steps h3 {
-  margin-bottom: 0.8rem;
-  white-space: nowrap;
+  padding: 1.5rem 0;
+  border: 0;
+  border-top: 1px solid var(--ink);
 }
 .professional-connected-steps span {
   color: var(--orange);
@@ -4325,39 +4358,49 @@ body.advice-detail-overflow-hidden {
 }
 .professional-connected-actions {
   display: grid;
-  width: min(100%, 760px);
+  width: 100%;
+  grid-auto-rows: 1fr;
   gap: 1.2rem;
 }
 .professional-connected-actions article {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16rem;
+  align-items: flex-start;
   gap: 1.25rem;
   padding: clamp(1.5rem, 3vw, 2.5rem);
   border: 1px solid var(--line);
   background: var(--paper);
-  text-align: center;
+  text-align: left;
 }
 .professional-connected-actions article h3 {
+  grid-column: 1;
   font: 400 clamp(1.7rem, 2.8vw, 2.65rem)/0.98 var(--display);
   font-weight: 400;
   letter-spacing: -0.035em;
   padding-bottom: 0.5rem;
   text-wrap: balance;
 }
-.professional-connected-actions__question {
-  max-inline-size: 48ch;
-  white-space: normal;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.18em;
-  text-wrap: balance;
-}
 .professional-connected-actions article p {
+  grid-column: 1;
   margin: 0;
   font: inherit;
+  white-space: normal;
   text-wrap: balance;
-  white-space: pre-wrap;
+}
+.professional-connected-actions article:first-child .professional-connected-actions__question {
+  max-inline-size: 55ch;
+}
+.professional-connected-actions article .button {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  width: 100%;
+  white-space: nowrap;
+  place-self: center;
+}
+.professional-connected-actions article .button svg {
+  flex: 0 0 1rem;
+  width: 1rem;
+  height: 1rem;
 }
 .professional-connected-content {
   max-width: none;
@@ -5653,9 +5696,6 @@ body.advice-detail-overflow-hidden {
 .admin-thumbnail-form {
   display: grid;
   gap: 1.25rem;
-}
-.professional-banner--connected {
-  border-bottom: clamp(3rem, 6vw, 6rem) solid #fff;
 }
 .admin-thumbnail-form__export {
   display: grid;
@@ -7651,6 +7691,15 @@ body.advice-detail-overflow-hidden {
   }
   .professional-connected-steps {
     position: static;
+  }
+  .professional-connected-actions article {
+    grid-template-columns: 1fr;
+  }
+  .professional-connected-actions article .button {
+    grid-column: 1;
+    grid-row: auto;
+    width: auto;
+    justify-self: start;
   }
   .admin-navigation-palette {
     grid-template-columns: 1fr;

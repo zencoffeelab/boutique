@@ -4,7 +4,7 @@ export type Locale = (typeof locales)[number];
 export const audiences = ["retail", "professional"] as const;
 export type Audience = (typeof audiences)[number];
 
-export const productStatuses = ["draft", "published", "archived"] as const;
+export const productStatuses = ["draft", "published", "published_pro", "archived"] as const;
 export type ProductStatus = (typeof productStatuses)[number];
 
 export const professionalApplicationStatuses = [
@@ -105,8 +105,6 @@ export type Product = Readonly<{
   ribbonNew: boolean;
   ribbonBackSoon: boolean;
   professionalEnabled: boolean;
-  professionalStockKg: number;
-  professionalStockReservedKg: number;
   thumbnailLabelUrl: string | null;
   thumbnailBackgroundColor: string;
   hoverImageUrl: string | null;

@@ -10,7 +10,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const locale = raw && typeof raw === "object" && (raw as Record<string, unknown>).locale === "en-GB" ? "en-GB" : "fr-FR";
   const parsed = checkoutSchema.safeParse(raw);
   if (!parsed.success) return Response.json({ ok: false, message: "Invalid checkout request.", errors: parsed.error.flatten().fieldErrors }, { status: 422 });
-  const viewer = await getViewer(request); const audience = viewer?.profile?.professional_status === "approved" ? "professional" : "retail";
+  const viewer = await getViewer(request); const audience = viewer?.profile?.professional_status === "approved" || viewer?.profile?.role === "admin" ? "professional" : "retail";
   let profileId = viewer?.user.id;
   const responseHeaders = new Headers({ "cache-control": "no-store" });
   if (!viewer && parsed.data.createAccount) {

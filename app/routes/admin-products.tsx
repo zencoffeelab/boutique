@@ -94,10 +94,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request); const products = await getAdminProducts(); const variants = products.flatMap((product) => product.variants);
-  return { demo: admin.demo, products, stats: { products: products.length, published: products.filter((product) => product.status === "published").length, archived: products.filter((product) => product.status === "archived").length, variants: variants.length, lowStock: variants.filter((variant) => variant.stockOnHand - variant.stockReserved <= variant.lowStockThreshold).length } };
+  return { demo: admin.demo, products, stats: { products: products.length, published: products.filter((product) => product.status === "published").length, publishedPro: products.filter((product) => product.status === "published_pro").length, archived: products.filter((product) => product.status === "archived").length, variants: variants.length, lowStock: variants.filter((variant) => variant.stockOnHand - variant.stockReserved <= variant.lowStockThreshold).length } };
 }
 export const meta: MetaFunction = () => [{ title: "Produits | Administration Zen Coffee Lab" }, { name: "robots", content: "noindex,nofollow" }];
-const statusLabels: Record<ProductStatus, string> = { draft: "Brouillon", published: "Publié", archived: "Archivé" };
+const statusLabels: Record<ProductStatus, string> = { draft: "Brouillon", published: "Publié", published_pro: "Publié pro", archived: "Archivé" };
 type ProductGroup = Readonly<{ id: string; name: string; products: readonly Product[] }>;
 
 function adminCoffeeId(value: string) {
@@ -136,7 +136,7 @@ function ProductTable({ products, emptyMessage, label }: { products: readonly Pr
         </TableHeader>
         <TableBody>
           {products.flatMap((product) => product.variants.length === 0
-            ? [<TableRow key={product.id}><TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>Ouvrir la fiche</Link></TableCell><TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell><TableCell colSpan={3}><span className="admin-muted">Aucune variante — ouvrez la fiche pour en ajouter une.</span></TableCell></TableRow>]
+            ? [<TableRow key={product.id}><TableCell><Link className="text-link" to={`/admin/produits/${product.id}`}>Ouvrir la fiche</Link></TableCell><TableCell><Badge>{statusLabels[product.status]}</Badge></TableCell><TableCell><span className="admin-muted">Aucune variante</span></TableCell><TableCell><span className={product.stockOnHandGrams - product.stockReservedGrams <= product.lowStockThresholdGrams ? "admin-stock-warning" : undefined}>{Math.max(0, product.stockOnHandGrams - product.stockReservedGrams)} g</span><br /><small>Réservé : {product.stockReservedGrams} g · seuil {product.lowStockThresholdGrams} g</small></TableCell><TableCell><div className="admin-quick-form"><input type="hidden" name="productId" value={product.id} /><label><span>Stock total du café (g)</span><input name="stockOnHandGrams" type="number" min="0" step="1" defaultValue={product.stockOnHandGrams} /></label><label><span>Seuil d’alerte (g)</span><input name="lowStockThresholdGrams" type="number" min="0" step="1" defaultValue={product.lowStockThresholdGrams} /></label><small className="admin-muted">Ajoutez les variantes depuis la fiche.</small></div></TableCell></TableRow>]
             : [...product.variants].sort((left, right) => left.weightGrams - right.weightGrams || left.label.localeCompare(right.label, "fr-FR")).map((variant, index) => {
               const availableGrams = Math.max(0, product.stockOnHandGrams - product.stockReservedGrams);
               const availableUnits = Math.floor(availableGrams / variant.weightGrams);
@@ -332,6 +332,12 @@ export default function AdminProducts() {
           </Card>
           <Card>
             <CardContent>
+              <p className="stat-label">Publiés pro</p>
+              <p className="stat-value">{stats.publishedPro}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
               <p className="stat-label">Variantes</p>
               <p className="stat-value">{stats.variants}</p>
             </CardContent>
@@ -358,7 +364,7 @@ export default function AdminProducts() {
             <PackageOpen aria-hidden="true" />
             <div>
               <h2 id="current-products-title">Catalogue actuel</h2>
-              <p>Produits publiés et brouillons en cours de préparation.</p>
+              <p>Produits publiés, publiés pro et brouillons en cours de préparation.</p>
             </div>
             <Badge>
               {currentProducts.length} produit
@@ -372,7 +378,7 @@ export default function AdminProducts() {
           />
           <CoffeeTabs
             products={currentProducts}
-            label="Cafés publiés et brouillons"
+            label="Cafés publiés, publiés pro et brouillons"
             emptyMessage="Aucun produit actif ou brouillon dans le catalogue."
           />
         </section>

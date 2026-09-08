@@ -15,7 +15,6 @@ import {
 import { CartProvider } from "~/components/cart/cart-provider";
 import { PublicCaptchaMount } from "~/components/public-captcha";
 import { ComingSoonPage } from "~/components/coming-soon-page";
-import { QuoteCartProvider } from "~/components/professional-quote/quote-cart-provider";
 import { CookieConsent } from "~/components/cookie-consent";
 import { SiteFooter } from "~/components/site-footer";
 import { SiteHeader } from "~/components/site-header";
@@ -127,14 +126,12 @@ export default function App() {
       </head>
       <body className={isAdmin ? "admin-body" : isPasswordSetup ? "password-setup-body" : constructionMode ? "coming-soon-body" : undefined}>
         {constructionMode ? <ComingSoonPage title={comingSoon.title} message={comingSoon.message} locale={locale} /> : <CartProvider locale={locale}>
-          <QuoteCartProvider key={professionalUserId ?? "guest"} storageNamespace={professionalUserId ?? "guest"}>
             {shellHidden ? null : <SiteHeader signedIn={signedIn} professional={professional} accountInitials={accountInitials} admin={admin} announcement={announcement ?? undefined} navigation={navigation} />}
             <main id="main-content" tabIndex={-1}>
               <Outlet />
             </main>
             {shellHidden ? null : <SiteFooter products={footerProducts} admin={admin} navigation={navigation} instagramUrl={instagramUrl} />}
             {shellHidden ? null : <CookieConsent measurementId={gaMeasurementId} />}
-          </QuoteCartProvider>
         </CartProvider>}
         <ScrollRestoration />
         <Scripts />

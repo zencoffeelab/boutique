@@ -1,6 +1,6 @@
 export type ProductRibbon = "new" | "last-stock" | "sold-out" | "back-soon" | "archived";
 
-export function isProductSoldOut(stockOnHandGrams: number, status: "draft" | "published" | "archived") {
+export function isProductSoldOut(stockOnHandGrams: number, status: "draft" | "published" | "published_pro" | "archived") {
   return status !== "archived" && stockOnHandGrams <= 0;
 }
 

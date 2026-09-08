@@ -7,7 +7,7 @@ import { formatMoney } from "~/domain/money";
 
 export function ProfessionalQuoteAdd({ product, locale }: { product: Product; locale: Locale }) {
   const selection = getProfessionalQuoteVariant(product);
-  const availableKilograms = Math.max(0, Math.floor(product.professionalStockKg - product.professionalStockReservedKg));
+  const availableKilograms = Math.max(0, Math.floor((product.stockOnHandGrams - product.stockReservedGrams) / 1_000));
   const [kilograms, setKilograms] = useState(1);
   const { addLine, hydrated, openDrawer } = useQuoteCart();
   const english = locale === "en-GB";

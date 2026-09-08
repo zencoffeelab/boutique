@@ -36,13 +36,12 @@ const productSchema = z.object({
     .string()
     .trim()
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  status: z.enum(["draft", "published", "archived"]),
+  status: z.enum(["draft", "published", "published_pro", "archived"]),
   altitudeMeters: z.coerce.number().int().min(0).max(10_000),
   featured: z.string().optional().transform(Boolean),
   ribbonNew: z.string().optional().transform(Boolean),
   ribbonBackSoon: z.string().optional().transform(Boolean),
   professionalEnabled: z.string().optional().transform(Boolean),
-  professionalStockKg: z.coerce.number().min(0).max(1_000_000),
   nameFr: optionalText(180), nameEn: optionalText(180),
   shortFr: optionalText(8_000), shortEn: optionalText(8_000),
   producerFr: optionalText(180), producerEn: optionalText(180),
@@ -332,8 +331,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         ribbonNew: false,
         ribbonBackSoon: false,
         professionalEnabled: false,
-        professionalStockKg: 0,
-        professionalStockReservedKg: 0,
         thumbnailLabelUrl: null,
         thumbnailBackgroundColor: "#d9ddd3",
         hoverImageUrl: null,
@@ -1017,7 +1014,6 @@ export async function action({ request }: ActionFunctionArgs) {
     ribbon_new: parsed.data.ribbonNew,
     ribbon_back_soon: parsed.data.ribbonBackSoon,
     professional_enabled: parsed.data.professionalEnabled,
-    professional_stock_kg: parsed.data.professionalStockKg + Number(before.data?.professional_stock_reserved_kg ?? 0),
     updated_at: new Date().toISOString(),
   };
   const { ribbon_new: _ribbonNew, ribbon_back_soon: _ribbonBackSoon, ...legacyProductMutation } = productMutation;
@@ -2016,27 +2012,13 @@ export default function AdminProduct() {
               >
                 <option value="draft">Brouillon</option>
                 <option value="published">Publié</option>
+                <option value="published_pro">Publié pro</option>
                 <option value="archived">Archivé</option>
               </select>
               {isNew ? (
                 <input type="hidden" name="status" value="draft" />
               ) : null}
             </label>
-          </div>
-          <div className="field">
-            <label>
-              Stock professionnel disponible (kg)
-              <input
-                name="professionalStockKg"
-                type="number"
-                min="0"
-                step="0.01"
-                defaultValue={Math.max(0, product.professionalStockKg - product.professionalStockReservedKg)}
-              />
-            </label>
-            {product.professionalStockReservedKg > 0 ? (
-              <small>{product.professionalStockReservedKg} kg supplémentaires sont actuellement réservés par des devis.</small>
-            ) : null}
           </div>
           <label>
             <input

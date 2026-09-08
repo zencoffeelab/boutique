@@ -187,8 +187,6 @@ export const demoProducts: Product[] = inputs.map((input) => {
     ribbonNew: false,
     ribbonBackSoon: false,
     professionalEnabled: true,
-    professionalStockKg: 60,
-    professionalStockReservedKg: 0,
     stockOnHandGrams: 4800,
     stockReservedGrams: 0,
     lowStockThresholdGrams: 1000,

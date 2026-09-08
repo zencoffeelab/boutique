@@ -1,9 +1,13 @@
 import { ArrowRight, CircleCheck, LogIn } from "lucide-react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
-import { Link, useFetcher, useLoaderData } from "react-router";
+import { Link, useFetcher, useLoaderData, useNavigate } from "react-router";
+import { useCart } from "~/components/cart/cart-provider";
 import { ContentBlocks } from "~/components/content-blocks";
+import { buildProductCartLine } from "~/domain/cart";
+import type { Product } from "~/domain/types";
 import { SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
 import { getViewer } from "~/lib/auth.server";
+import { getSampleSetProduct } from "~/lib/catalog.server";
 import { getContentPage } from "~/lib/content.server";
 import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
@@ -15,11 +19,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const professionalStatus = viewer?.profile?.professional_status ?? null;
   const approved = professionalStatus === "approved";
   const admin = viewer?.profile?.role === "admin";
-  const [content, connectedContent] = await Promise.all([
+  const [content, connectedContent, sampleSet] = await Promise.all([
     viewer ? Promise.resolve(null) : getContentPage("professionnel", locale),
     approved || admin ? getContentPage("professionnel-connecte", locale) : Promise.resolve(null),
+    approved || admin ? getSampleSetProduct() : Promise.resolve(null),
   ]);
-  return { locale, approved, admin, signedIn: Boolean(viewer), accountEmail: viewer?.user.email ?? null, professionalStatus, content, connectedContent };
+  return { locale, approved, admin, signedIn: Boolean(viewer), accountEmail: viewer?.user.email ?? null, professionalStatus, content, connectedContent, sampleSet };
 }
 export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(data?.locale === "en-GB" ? "Coffee for professionals | Zen Coffee Lab" : "Café pour professionnels | Zen Coffee Lab", data?.locale === "en-GB" ? "Specialty coffee and support for cafés, restaurants and resellers." : "Cafés de spécialité et accompagnement pour coffee shops, restaurants et revendeurs.", data?.locale === "en-GB" ? "/en/professional" : "/professionnel");
 
@@ -61,30 +66,50 @@ function ProfessionalConnectedAction({ text, button, to }: { text: string; butto
   return <article><h3>{heading}</h3>{question ? <p className="professional-connected-actions__question">{question}</p> : null}{detail ? <p>{detail}</p> : null}<Link className="button button--dark" to={to}>{button}<ArrowRight aria-hidden="true" /></Link></article>;
 }
 
-function ProfessionalConnectedPage({ english, content }: { english: boolean; content: { blocks: Array<{ type?: unknown; content?: unknown }> } | null }) {
+function ProfessionalSampleSetAction({ text, button, sampleSet, english }: { text: string; button: string; sampleSet: Product | null; english: boolean }) {
+  const lines = text.split(/\r?\n/);
+  const headingIndex = lines.findIndex((line) => line.trim());
+  const heading = headingIndex === -1 ? text : lines[headingIndex].trim();
+  const descriptionLines = headingIndex === -1 ? [] : lines.slice(headingIndex + 1);
+  const questionIndex = descriptionLines.findIndex((line) => line.trim());
+  const question = questionIndex === -1 ? "" : descriptionLines[questionIndex].trim();
+  const detail = questionIndex === -1 ? "" : descriptionLines.slice(questionIndex + 1).join("\n").trim();
+  const { addItem, hydrated } = useCart();
+  const navigate = useNavigate();
+  const variant = sampleSet?.variants.find((item) => item.offers.some((offer) => offer.audience === "retail" && offer.active));
+  const offer = variant?.offers.find((item) => item.audience === "retail" && item.active);
+  const addSampleSet = () => {
+    if (!sampleSet || !variant || !offer) return;
+    addItem(buildProductCartLine({ product: sampleSet, variant, offer, audience: "retail", quantity: Math.max(1, offer.minimumQuantity) }));
+    navigate(english ? "/en/cart" : "/panier");
+  };
+  return <article><h3>{heading}</h3>{question ? <p className="professional-connected-actions__question">{question}</p> : null}{detail ? <p>{detail}</p> : null}<button className="button button--dark" type="button" onClick={addSampleSet} disabled={!hydrated || !sampleSet || !variant || !offer}>{button}<ArrowRight aria-hidden="true" /></button></article>;
+}
+
+function ProfessionalConnectedPage({ english, content, sampleSet }: { english: boolean; content: { blocks: Array<{ type?: unknown; content?: unknown }> } | null; sampleSet: Product | null }) {
   const copy = getProfessionalConnectedPageContent(english ? "en-GB" : "fr-FR", content?.blocks);
   return <>
     <header className="page-hero professional-hero professional-hero--connected"><p className="eyebrow">{copy.eyebrow}</p><h1>{copy.title}</h1><p className="lede">{copy.lede}</p></header>
     <section className="professional-connected-layout page-shell" aria-label={english ? "Professional next steps" : "Prochaines étapes professionnelles"}>
       <section className="steps professional-connected-steps" aria-label={english ? "Professional account steps" : "Étapes du compte professionnel"}>{copy.steps.map((step, index) => <article key={index}><span>{String(index + 1).padStart(2, "0")}</span><h3>{step.title}</h3><p>{step.text}</p></article>)}</section>
-      <section className="professional-connected-actions"><ProfessionalConnectedAction text={copy.shopText} button={copy.shopButton} to={english ? "/en/shop" : "/boutique"} /><ProfessionalConnectedAction text={copy.contactText} button={copy.contactButton} to={english ? "/en/contact" : "/contact"} /><ProfessionalConnectedAction text={copy.sampleText} button={copy.sampleButton} to={english ? "/en/professional/quote" : "/professionnel/devis"} /></section>
+      <section className="professional-connected-actions"><ProfessionalConnectedAction text={copy.shopText} button={copy.shopButton} to={english ? "/en/shop" : "/boutique"} /><ProfessionalConnectedAction text={copy.contactText} button={copy.contactButton} to={english ? "/en/contact" : "/contact"} /><ProfessionalSampleSetAction text={copy.sampleText} button={copy.sampleButton} sampleSet={sampleSet} english={english} /></section>
     </section>
     <aside className="professional-banner professional-banner--connected"><p className="eyebrow">{copy.bannerEyebrow}</p><h2>{copy.bannerTitle}</h2><p>{copy.bannerText}</p></aside>
   </>;
 }
 
 export default function Professional() {
-  const { locale, approved, admin, signedIn, accountEmail, content, connectedContent } = useLoaderData<typeof loader>();
+  const { locale, approved, admin, signedIn, accountEmail, content, connectedContent, sampleSet } = useLoaderData<typeof loader>();
   const english = locale === "en-GB";
   const fetcher = useFetcher<ApplicationResponse>();
   const professionalPath = english ? "/en/professional" : "/professionnel";
   const accountPath = english ? "/en/my-account" : "/mon-compte";
   const loginPath = `${accountPath}?next=${encodeURIComponent(professionalPath)}`;
   const pageContent = getProfessionalPageContent(english ? "en-GB" : "fr-FR", content?.blocks);
-  if (approved || admin) return <ProfessionalConnectedPage english={english} content={connectedContent} />;
+  if (approved || admin) return <ProfessionalConnectedPage english={english} content={connectedContent} sampleSet={sampleSet} />;
   return <>
     <header className="page-hero professional-hero"><p className="eyebrow">{pageContent.eyebrow}</p><h1>{content?.title ?? (english ? "Coffee made for your business" : "Du café pensé pour votre établissement")}</h1><p className="lede">{pageContent.lede}</p><ProfessionalLoginLink signedIn={signedIn} english={english} loginPath={loginPath} content={pageContent} /></header>
-    {signedIn ? null : <ContentBlocks blocks={content?.blocks} />}
+    <ContentBlocks blocks={content?.blocks} />
     <div className="professional-application-layout page-shell">
       <section className="steps professional-application-steps" aria-label={english ? "Professional account steps" : "Étapes du compte professionnel"}>{pageContent.steps.map((step, index) => <article key={index}><span>{String(index + 1).padStart(2, "0")}</span><h3>{step.title}</h3><p>{step.text}</p></article>)}</section>
       {fetcher.data?.ok ? <ProfessionalApplicationSuccess english={english} signedIn={signedIn} accountPath={accountPath} content={pageContent} /> : <fetcher.Form className="form-card professional-application-form" method="post" action="/api/pro-applications">

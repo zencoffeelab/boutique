@@ -64,8 +64,6 @@ function mapDatabaseProduct(row: any): Product {
     ribbonNew: Boolean(row.ribbon_new),
     ribbonBackSoon: Boolean(row.ribbon_back_soon),
     professionalEnabled: row.professional_enabled ?? false,
-    professionalStockKg: Number(row.professional_stock_kg ?? 0),
-    professionalStockReservedKg: Number(row.professional_stock_reserved_kg ?? 0),
     thumbnailLabelUrl: row.thumbnail_label_public_url ? publicMediaDeliveryUrl(row.thumbnail_label_public_url) : null,
     thumbnailBackgroundColor: row.thumbnail_background_color ?? "#d9ddd3",
     hoverImageUrl: row.hover_image_public_url ? publicMediaDeliveryUrl(row.hover_image_public_url) : null,
@@ -126,11 +124,15 @@ function mapDatabaseProduct(row: any): Product {
   };
 }
 
-async function databaseProducts(includeDrafts = false): Promise<Product[]> {
-  const client = includeDrafts ? createServiceSupabase() : (createPublicSupabase() ?? createServiceSupabase());
+async function databaseProducts(includeDrafts = false, includeProfessionalPublished = false): Promise<Product[]> {
+  const client = includeDrafts || includeProfessionalPublished
+    ? createServiceSupabase()
+    : (createPublicSupabase() ?? createServiceSupabase());
   if (!client) throw new Error("Supabase service configuration is incomplete.");
   const statuses = includeDrafts
-    ? ["draft", "published", "archived"]
+    ? ["draft", "published", "published_pro", "archived"]
+    : includeProfessionalPublished
+      ? ["published", "published_pro", "archived"]
     : ["published", "archived"];
   let { data, error } = await client
     .from("products")
@@ -254,13 +256,13 @@ function applyDemoStockModel(product: Product): Product {
   return { ...product, variants: product.variants.map((variant) => ({ ...variant, stockOnHand: Math.floor(product.stockOnHandGrams / variant.weightGrams), stockReserved: Math.max(0, Math.floor(product.stockOnHandGrams / variant.weightGrams) - Math.floor(availableGrams / variant.weightGrams)), lowStockThreshold: Math.floor(product.lowStockThresholdGrams / variant.weightGrams) })) };
 }
 
-async function getRawProducts(): Promise<Product[]> {
+async function getRawProducts(includeProfessionalPublished = false): Promise<Product[]> {
   if (!hasSupabaseConfig()) {
     if (env().ALLOW_DEMO_DATA) return demoProducts.map(applyDemoStockModel);
     throw new Error("Catalog database is not configured.");
   }
   try {
-    return await databaseProducts();
+    return await databaseProducts(false, includeProfessionalPublished);
   } catch (error) {
     if (env().ALLOW_DEMO_DATA) return demoProducts.map(applyDemoStockModel);
     throw error;
@@ -339,6 +341,36 @@ export async function getAdminProducts(): Promise<Product[]> {
       variant.offers.some((offer) => offer.active),
     ),
   }));
+}
+
+/** Catalogue réservé aux comptes professionnels validés et aux administrateurs. */
+export async function getProfessionalProducts(
+  options: { availableOnly?: boolean } = {},
+): Promise<Product[]> {
+  const products = await getRawProducts(true);
+  return products
+    .filter(
+      (product) =>
+        product.status === "published_pro" ||
+        (product.status === "published" && product.professionalEnabled),
+    )
+    .map((product) =>
+      safeProductProjection(product, "professional", options.availableOnly),
+    )
+    .filter((product) => !options.availableOnly || product.variants.length > 0);
+}
+
+export async function getSampleSetProduct(): Promise<Product | null> {
+  const normalizeName = (value: string) => value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const product = (await getAdminProducts()).find((item) => {
+    const frenchName = normalizeName(item.translations["fr-FR"].name);
+    const englishName = normalizeName(item.translations["en-GB"].name);
+    return (frenchName.includes("set") && frenchName.includes("echantillon")) || (englishName.includes("sample") && englishName.includes("set"));
+  });
+  return product ? safeProductProjection(product, "retail") : null;
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
@@ -430,9 +462,11 @@ export async function resolveCartLines(
   locale: Locale,
   authorizedAudience: Audience,
 ): Promise<ResolvedCartLine[]> {
-  const products = (await getRawProducts()).filter(
-    (product) => product.status === "published",
-  );
+  const products = (await getRawProducts(authorizedAudience === "professional"))
+    .filter((product) =>
+      product.status === "published" ||
+      (authorizedAudience === "professional" && product.status === "published_pro"),
+    );
   const productsById = new Map(
     products.map((product) => [product.id, product]),
   );

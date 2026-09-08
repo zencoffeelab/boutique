@@ -54,7 +54,7 @@ function renderNode(node: RichTextNode, index: number, accordionState?: Accordio
     case "listItem": return <li key={key}>{children}</li>;
     case "codeBlock": return <pre key={key}><code>{children}</code></pre>;
     case "horizontalRule": return <hr key={key} />;
-    case "hardBreak": return <br key={key} />;
+    case "hardBreak": return <span className="rich-text-hard-break" key={key}><br /></span>;
     case "contentTable": {
       const rows = Array.isArray(node.attrs?.rows) ? node.attrs.rows : [];
       return <table className="rich-text-table" key={key}><tbody>{rows.map((row, rowIndex) => <tr key={`${key}-row-${rowIndex}`}>{(Array.isArray(row) ? row : []).map((cell, cellIndex) => rowIndex === 0 ? <th key={`${key}-${rowIndex}-${cellIndex}`}>{renderTableCell(String(cell ?? ""), `${key}-${rowIndex}-${cellIndex}`, tableLineBreaks)}</th> : <td key={`${key}-${rowIndex}-${cellIndex}`}>{renderTableCell(String(cell ?? ""), `${key}-${rowIndex}-${cellIndex}`, tableLineBreaks)}</td>)}</tr>)}</tbody></table>;

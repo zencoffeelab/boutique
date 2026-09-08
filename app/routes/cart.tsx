@@ -3,12 +3,21 @@ import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Link, useLoaderData } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
 import { formatMoney } from "~/domain/money";
-import { getAudience } from "~/lib/auth.server";
-import { getProducts } from "~/lib/catalog.server";
+import { getViewer } from "~/lib/auth.server";
+import { getProducts, getProfessionalProducts, getSampleSetProduct } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
 
-export async function loader({ request }: LoaderFunctionArgs) { const audience = await getAudience(request); return { locale: getLocale(request), products: await getProducts({ status: "published", audience }) }; }
+export async function loader({ request }: LoaderFunctionArgs) {
+  const viewer = await getViewer(request);
+  const canUseProfessionalSampleSet = viewer?.profile?.professional_status === "approved" || viewer?.profile?.role === "admin";
+  const audience = canUseProfessionalSampleSet ? "professional" : "retail";
+  const [products, sampleSet] = await Promise.all([
+    canUseProfessionalSampleSet ? getProfessionalProducts() : getProducts({ status: "published", audience }),
+    canUseProfessionalSampleSet ? getSampleSetProduct() : Promise.resolve(null),
+  ]);
+  return { locale: getLocale(request), products: sampleSet && !products.some((product) => product.id === sampleSet.id) ? [...products, sampleSet] : products };
+}
 export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(data?.locale === "en-GB" ? "Your cart | Zen Coffee Lab" : "Votre panier | Zen Coffee Lab", data?.locale === "en-GB" ? "Review your specialty coffee order." : "Vérifiez votre commande de cafés de spécialité.", data?.locale === "en-GB" ? "/en/cart" : "/panier");
 
 export default function Cart() {
@@ -20,7 +29,7 @@ export default function Cart() {
     const variant = product?.variants.find((item) => item.id === line.variantId);
     const offer = variant?.offers.find((item) => item.audience === line.audience);
     if (!product || !variant || !offer) return null;
-    const availableStock = variant.stockOnHand - variant.stockReserved;
+    const availableStock = Math.max(0, Math.floor((product.stockOnHandGrams - product.stockReservedGrams) / variant.weightGrams));
     const stockIssue = line.quantity > availableStock || line.quantity < offer.minimumQuantity;
     return { line, product, variant, offer, availableStock, stockIssue };
   }).filter((line): line is NonNullable<typeof line> => Boolean(line));
