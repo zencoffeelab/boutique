@@ -27,22 +27,30 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const authorizedAudience = wantsProfessional
     ? await getAudience(request)
     : "retail";
-  const audience: Audience =
+  let audience: Audience =
     wantsProfessional && authorizedAudience === "professional"
       ? "professional"
       : "retail";
   if (preview) await requireAdmin(request);
-  const products = preview
+  let products = preview
     ? await getAdminProducts()
     : audience === "professional"
       ? await getProfessionalProducts()
       : await getProducts({ audience });
-  const product =
+  let product =
     products.find((item) =>
       preview
         ? item.id === previewId && item.slug === params.slug
         : item.slug === params.slug,
     ) ?? null;
+  // Professional-only products use the same canonical product URL as public
+  // coffees. A signed-in professional must therefore still reach the product
+  // when opening that URL without the optional audience query parameter.
+  if (!preview && !product && authorizedAudience === "professional") {
+    audience = "professional";
+    products = await getProfessionalProducts();
+    product = products.find((item) => item.slug === params.slug) ?? null;
+  }
   if (
     !product ||
     (!preview &&

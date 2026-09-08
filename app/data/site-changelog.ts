@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-08-professional-only-product-canonical-url",
+    date: "2026-09-08",
+    kind: "Correction",
+    title: "Fiches « Publié pro » accessibles par leur URL habituelle",
+    description: "Un professionnel connecté ou un administrateur peut désormais ouvrir une fiche publiée pro depuis son URL habituelle, même lorsque le paramètre professionnel n’est pas présent dans le lien. Les visiteurs publics restent exclus.",
+  },
+  {
     id: "2026-09-08-professional-only-product-status",
     date: "2026-09-08",
     kind: "Fonctionnalité",
