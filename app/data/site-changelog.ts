@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-08-admin-professional-detail-mail-filter",
+    date: "2026-09-08",
+    kind: "Correction",
+    title: "Fiche professionnelle compatible avec les e-mails archivés",
+    description: "Le filtrage des e-mails envoyés est désormais traité de manière sûre par l'application, ce qui évite une erreur de base de données lors de l'ouverture d'une fiche professionnelle.",
+  },
+  {
     id: "2026-09-08-admin-professional-detail",
     date: "2026-09-08",
     kind: "Fonctionnalité",

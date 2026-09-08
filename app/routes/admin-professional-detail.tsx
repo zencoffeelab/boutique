@@ -20,6 +20,7 @@ function uniqueById<T extends { id: string }>(items: T[]) { return [...new Map(i
 function formatDate(value: string | null) { return value ? dateFormatter.format(new Date(value)) : "—"; }
 function formatAddress(address: Address | null) { if (!address?.line1) return "Non renseignée"; const recipient = [address.firstName, address.lastName].filter(Boolean).join(" "); return [recipient, address.line1, [address.postalCode, address.city].filter(Boolean).join(" "), address.countryCode].filter(Boolean).join(" · "); }
 function statusLabel(status: string) { return ({ approved: "Validée", rejected: "Refusée", suspended: "Suspendue", pending: "En attente" } as Record<string, string>)[status] ?? status; }
+function hasRecipient(message: MailMessage, email: string) { return Array.isArray(message.recipients) && message.recipients.some((recipient) => recipient && typeof recipient === "object" && "address" in recipient && typeof recipient.address === "string" && recipient.address.toLocaleLowerCase("en-US") === email); }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   await requireAdmin(request);
@@ -42,13 +43,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     client.from("orders").select(orderColumns).eq("profile_id", profile.id).order("created_at", { ascending: false }).limit(100),
     client.from("orders").select(orderColumns).eq("email", email).order("created_at", { ascending: false }).limit(100),
     client.from("admin_mail_messages").select(mailColumns).eq("sender_address", email).order("created_at", { ascending: false }).limit(100),
-    client.from("admin_mail_messages").select(mailColumns).eq("direction", "outbound").contains("recipients", [{ address: email }]).order("created_at", { ascending: false }).limit(100),
+    client.from("admin_mail_messages").select(mailColumns).eq("direction", "outbound").order("created_at", { ascending: false }).limit(500),
   ]);
   const error = memberApplications.error ?? emailApplications.error ?? profileOrders.error ?? emailOrders.error ?? receivedMessages.error ?? sentMessages.error;
   if (error) throw new Response(error.message, { status: 500 });
   const applications = uniqueById([...(memberApplications.data ?? []), ...(emailApplications.data ?? [])] as Application[]).toSorted((left, right) => right.created_at.localeCompare(left.created_at));
   const orders = uniqueById([...(profileOrders.data ?? []), ...(emailOrders.data ?? [])]).toSorted((left, right) => right.created_at.localeCompare(left.created_at));
-  const messages = uniqueById([...(receivedMessages.data ?? []), ...(sentMessages.data ?? [])] as MailMessage[]).toSorted((left, right) => right.created_at.localeCompare(left.created_at));
+  const messages = uniqueById([...(receivedMessages.data ?? []), ...(sentMessages.data ?? []).filter((message) => hasRecipient(message as MailMessage, email))] as MailMessage[]).toSorted((left, right) => right.created_at.localeCompare(left.created_at));
   return { profile, email, applications, orders, messages };
 }
 
