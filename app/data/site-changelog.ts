@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-08-professional-product-variant-cart-actions",
+    date: "2026-09-08",
+    kind: "Correction",
+    title: "Ajout des variantes au panier rétabli pour les professionnels",
+    description: "Les fiches produits professionnelles affichent de nouveau leurs variantes et leur bouton d’ajout au panier. Lorsqu’aucun tarif professionnel actif n’existe, comme pour le set d’échantillons, le tarif public actif est utilisé.",
+  },
+  {
     id: "2026-09-08-professional-product-url-session-check",
     date: "2026-09-08",
     kind: "Correction",

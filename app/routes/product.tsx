@@ -8,7 +8,7 @@ import { ProductPackArtwork } from "~/components/product-thumbnail-label";
 import { ProductRibbons } from "~/components/product-ribbons";
 import type { Audience, Locale, Product, ProductEditorialBlock } from "~/domain/types";
 import { getAudience, requireAdmin } from "~/lib/auth.server";
-import { getAdminProducts, getProducts, getProfessionalProducts, hasPurchasableVariant } from "~/lib/catalog.server";
+import { getAdminProducts, getProducts, getProfessionalCartProducts, hasPurchasableVariant } from "~/lib/catalog.server";
 import { getFaqItemByFrenchQuestion } from "~/lib/content.server";
 import { getLocale } from "~/lib/i18n";
 import { getRelatedProducts } from "~/lib/product-recommendations";
@@ -33,7 +33,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   let products = preview
     ? await getAdminProducts()
     : audience === "professional"
-      ? await getProfessionalProducts()
+      ? await getProfessionalCartProducts()
       : await getProducts({ audience });
   let product =
     products.find((item) =>
@@ -46,7 +46,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   // when opening that URL without the optional audience query parameter.
   if (!preview && !product && authorizedAudience === "professional") {
     audience = "professional";
-    products = await getProfessionalProducts();
+    products = await getProfessionalCartProducts();
     product = products.find((item) => item.slug === params.slug) ?? null;
   }
   if (
@@ -316,7 +316,7 @@ export default function ProductDetail() {
           </section> : archived ? <section className="product-archive-notice" aria-label={english ? "Archived coffee" : "Café archivé"}>
             <p className="eyebrow">{english ? "Coffee archives" : "Archives café"}</p>
             <p>{english ? "This limited lot is no longer available for purchase, but its complete story remains available to read." : "Ce lot éphémère n’est plus disponible à l’achat, mais son histoire complète reste accessible."}</p>
-          </section> : audience === "professional" ? <Link className="button button--dark" to={english ? "/en/contact" : "/contact"}>{english ? "Contact us for a quote" : "Nous contacter pour un devis"}</Link> : <ProductPurchase product={product} locale={locale} audience={audience} />}
+          </section> : <ProductPurchase product={product} locale={locale} audience={audience} />}
         </div>
       </article>
       {t.tastingNotes.length > 0 ? (
