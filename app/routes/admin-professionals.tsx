@@ -23,7 +23,7 @@ const memberActionSchema = z.object({
 
 type ActionResponse = { ok?: boolean; message?: string; activationUrl?: string };
 type ProfessionalApplication = {
-  id: string; company_name: string; first_name: string; last_name: string; email: string; phone: string; comment?: string | null;
+  id: string; company_name: string; country_code?: string | null; first_name: string; last_name: string; email: string; company_registration_number?: string | null; vat_number?: string | null; phone: string | null; electronic_billing_address?: string | null; billing_address?: { line1?: string; postalCode?: string; city?: string } | null; delivery_address?: { firstName?: string; lastName?: string; line1?: string; postalCode?: string; city?: string } | null; comment?: string | null;
   business_type: string; monthly_volume: string; locale: "fr-FR" | "en-GB"; status: "pending" | "approved" | "rejected" | "suspended";
   decision_note: string | null; decided_at: string | null; invited_user_id: string | null; created_at: string;
 };
@@ -76,7 +76,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const client = createServiceSupabase();
   if (!client) throw new Response("Base de données indisponible.", { status: 503 });
   const [applicationResult, profileResult, userResult] = await Promise.all([
-    client.from("professional_applications").select("id,company_name,first_name,last_name,email,phone,comment,business_type,monthly_volume,locale,status,decision_note,decided_at,invited_user_id,created_at").order("created_at", { ascending: false }).limit(500),
+    client.from("professional_applications").select("id,company_name,country_code,first_name,last_name,email,company_registration_number,vat_number,phone,electronic_billing_address,billing_address,delivery_address,comment,business_type,monthly_volume,locale,status,decision_note,decided_at,invited_user_id,created_at").order("created_at", { ascending: false }).limit(500),
     client.from("profiles").select("id,role,professional_status,first_name,last_name,phone,created_at,updated_at").in("professional_status", ["approved", "suspended"]).limit(1_000),
     client.auth.admin.listUsers({ page: 1, perPage: 1_000 }),
   ]);
@@ -87,7 +87,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const applications = (applicationResult.data ?? []) as ProfessionalApplication[];
   const allMembers = buildProfessionalMembers(profileResult.data ?? [], applications, userResult.data.users);
 
-  const applicationMatches = (application: ProfessionalApplication) => includesSearch([application.company_name, application.first_name, application.last_name, application.email, application.phone], query);
+  const applicationMatches = (application: ProfessionalApplication) => includesSearch([application.company_name, application.first_name, application.last_name, application.email, application.company_registration_number, application.vat_number, application.phone, application.electronic_billing_address, application.billing_address?.line1, application.billing_address?.postalCode, application.billing_address?.city, application.delivery_address?.firstName, application.delivery_address?.lastName, application.delivery_address?.line1, application.delivery_address?.postalCode, application.delivery_address?.city], query);
   const memberMatches = (member: (typeof allMembers)[number]) => includesSearch([member.company, member.firstName, member.lastName, member.email, member.phone], query) && (memberStatus === "all" || member.status === memberStatus);
   return {
     demo: false,
@@ -230,7 +230,7 @@ function ProfessionalDecision({ application }: { application: ProfessionalApplic
   const deleteFetcher = useFetcher<ActionResponse>();
   const handled = Boolean(fetcher.data?.ok);
   return <article className="admin-application admin-professional-request">
-    <div><strong>{application.company_name}</strong><p>{application.first_name} {application.last_name} · {application.business_type} · {application.monthly_volume}</p><p><a href={`mailto:${application.email}`}>{application.email}</a> · <a href={`tel:${application.phone}`}>{application.phone}</a></p>{application.comment ? <p><strong>Commentaire :</strong> {application.comment}</p> : null}<small>Demande reçue le {formatDate(application.created_at)}</small></div>
+    <div><strong>{application.company_name}</strong><p>{application.first_name} {application.last_name} · {application.business_type} · {application.monthly_volume}</p><p><a href={`mailto:${application.email}`}>{application.email}</a>{application.phone ? <> · <a href={`tel:${application.phone}`}>{application.phone}</a></> : null}</p><p><strong>{application.country_code === "FR" ? "SIRET" : "Company registration number"} :</strong> {application.company_registration_number}</p>{application.vat_number ? <p><strong>N° de TVA intracommunautaire :</strong> {application.vat_number}</p> : null}{application.electronic_billing_address ? <p><strong>Adresse de facturation électronique :</strong> {application.electronic_billing_address}</p> : null}{application.billing_address?.line1 ? <p><strong>Facturation :</strong> {application.billing_address.line1}, {application.billing_address.postalCode} {application.billing_address.city}</p> : null}{application.delivery_address?.line1 ? <p><strong>Livraison :</strong> {application.delivery_address.firstName} {application.delivery_address.lastName} · {application.delivery_address.line1}, {application.delivery_address.postalCode} {application.delivery_address.city}</p> : null}{application.comment ? <p><strong>Information complémentaire :</strong> {application.comment}</p> : null}<small>Demande reçue le {formatDate(application.created_at)}</small></div>
     <fetcher.Form method="post" action={`/api/admin/pro-applications/${application.id}/decision`}>
       <label className="admin-application__note">Note facultative<input name="note" maxLength={1_000} placeholder="Visible dans l’e-mail en cas de refus" /></label>
       <button className="ui-button ui-button--default ui-button--sm" name="decision" value="approved" disabled={fetcher.state !== "idle" || handled}>Approuver et créer l’accès</button>

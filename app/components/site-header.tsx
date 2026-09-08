@@ -104,6 +104,8 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
   const t = dictionary[locale];
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(() => new URLSearchParams(location.search).get("account") === "welcome");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [mobilePreview, setMobilePreview] = useState(false);
   const embeddedMobilePreview = new URLSearchParams(location.search).get("mobilePreview") === "1";
   const { itemCount, drawerOpen, openDrawer, closeDrawer } = useCart();
@@ -117,6 +119,15 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
     setAccountDrawerOpen(true);
   };
   const closeAccountDrawer = () => setAccountDrawerOpen(false);
+  const openSearch = () => {
+    closeMenu();
+    closeDrawer();
+    setAccountDrawerOpen(false);
+    setSearchOpen((open) => {
+      if (!open) window.requestAnimationFrame(() => searchInputRef.current?.focus());
+      return !open;
+    });
+  };
   const accountLabel = signedIn
     ? (locale === "fr-FR" ? "Mon compte" : "My account")
     : (locale === "fr-FR" ? "Connexion" : "Sign in");
@@ -143,6 +154,9 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
     document.addEventListener("click", preservePreviewOnNavigation, true);
     return () => document.removeEventListener("click", preservePreviewOnNavigation, true);
   }, [embeddedMobilePreview]);
+  useEffect(() => {
+    setSearchOpen(false);
+  }, [location.pathname, location.search]);
   const toggleMobilePreview = () => {
     const next = !mobilePreview;
     setMobilePreview(next);
@@ -176,7 +190,10 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
           <button className="icon-button cart-button" type="button" onClick={() => { closeMenu(); openDrawer(); }} aria-label={`${t.cart} (${itemCount})`} aria-expanded={drawerOpen} aria-controls="cart-drawer">
             <ShoppingBag aria-hidden="true" /><span>{itemCount}</span>
           </button>
-          <Link className="icon-button search-button" to={paths.search} aria-label={locale === "fr-FR" ? "Rechercher sur le site" : "Search the site"}><Search aria-hidden="true" /></Link>
+          <div className="header-search">
+            <button className="icon-button search-button" type="button" onClick={openSearch} aria-label={locale === "fr-FR" ? "Rechercher sur le site" : "Search the site"} aria-expanded={searchOpen} aria-controls="header-search-form"><Search aria-hidden="true" /></button>
+            {searchOpen ? <form id="header-search-form" className="header-search__form" action={paths.search} method="get" role="search"><label className="sr-only" htmlFor="header-search-query">{locale === "fr-FR" ? "Rechercher sur le site" : "Search the site"}</label><input ref={searchInputRef} id="header-search-query" name="q" type="search" placeholder={locale === "fr-FR" ? "Rechercher…" : "Search…"} /><button type="submit" aria-label={locale === "fr-FR" ? "Lancer la recherche" : "Search"}><Search aria-hidden="true" /></button></form> : null}
+          </div>
           {admin && !embeddedMobilePreview ? <button className={`admin-mobile-preview-button${mobilePreview ? " is-active" : ""}`} type="button" onClick={toggleMobilePreview} aria-pressed={mobilePreview} aria-label={mobilePreview ? "Désactiver l’aperçu mobile" : "Activer l’aperçu mobile"} title={mobilePreview ? "Désactiver l’aperçu mobile" : "Aperçu mobile"}><MonitorSmartphone aria-hidden="true" /><span>Mobile</span></button> : null}
           {signedIn ? <button className="account-button is-signed-in" type="button" onClick={openAccountDrawer} aria-label={accountLabel} aria-expanded={accountDrawerOpen} aria-controls="account-drawer"><AccountLinkContent signedIn label={accountLabel} initials={accountInitials} /></button> : <Link className="account-button" to={paths.account} aria-label={accountLabel}><AccountLinkContent signedIn={false} label={accountLabel} initials={null} /></Link>}
         </div>

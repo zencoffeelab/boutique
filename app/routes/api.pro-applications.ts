@@ -20,7 +20,9 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const client = createServiceSupabase();
   if (client) {
     const email = parsed.data.email.toLowerCase();
-    const applicationValues = { company_name: parsed.data.companyName, country_code: parsed.data.countryCode, comment: parsed.data.comment, last_name: parsed.data.lastName, first_name: parsed.data.firstName, email, phone: parsed.data.phone, business_type: parsed.data.businessType, monthly_volume: parsed.data.monthlyVolume, locale: parsed.data.locale, status: "pending" as const, invited_user_id: viewer?.user.id ?? null };
+    const billingAddress = { line1: parsed.data.billingLine1, postalCode: parsed.data.billingPostalCode, city: parsed.data.billingCity, countryCode: parsed.data.countryCode };
+    const deliveryAddress = parsed.data.deliveryLine1 ? { lastName: parsed.data.deliveryLastName, firstName: parsed.data.deliveryFirstName, line1: parsed.data.deliveryLine1, postalCode: parsed.data.deliveryPostalCode, city: parsed.data.deliveryCity, countryCode: parsed.data.countryCode } : null;
+    const applicationValues = { company_name: parsed.data.companyName, country_code: parsed.data.countryCode, comment: parsed.data.comment, last_name: parsed.data.lastName, first_name: parsed.data.firstName, email, company_registration_number: parsed.data.companyRegistrationNumber, vat_number: parsed.data.vatNumber, phone: parsed.data.phone, electronic_billing_address: parsed.data.electronicBillingAddress, billing_address: billingAddress, delivery_address: deliveryAddress, business_type: parsed.data.businessType, monthly_volume: parsed.data.monthlyVolume, locale: parsed.data.locale, status: "pending" as const, invited_user_id: viewer?.user.id ?? null };
     let { data: application, error } = await client.from("professional_applications").insert(applicationValues).select("id,status").single();
     if (error) {
       if (error.code !== "23505") return Response.json({ ok: false, message: english ? "The application could not be saved." : "La demande n’a pas pu être enregistrée." }, { status: 500 });

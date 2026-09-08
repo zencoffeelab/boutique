@@ -18,7 +18,7 @@ const defaults: Record<"fr-FR" | "en-GB", ProfessionalPageContent> = {
   "fr-FR": {
     eyebrow: "B2B · Zen Coffee Lab", lede: "Des cafés traçables, des profils constants et un accompagnement direct par le torréfacteur.", loginLabel: "Connexion",
     steps: [{ title: "Présentez votre activité", text: "Complétez le formulaire en quelques minutes." }, { title: "Validation manuelle", text: "Nous étudions chaque demande et revenons vers vous." }, { title: "Accès sécurisé", text: "Définissez votre mot de passe et accédez aux conditions pro." }],
-    applicationTitle: "Demander un compte", applicationIntro: "Tous les champs sont obligatoires.", submitLabel: "Envoyer la demande", sendingLabel: "Envoi…",
+    applicationTitle: "Demander un accès", applicationIntro: "", submitLabel: "Envoyer la demande", sendingLabel: "Envoi…",
     fieldLabels: { company: "Votre raison sociale", country: "Pays", lastName: "Nom", firstName: "Prénom", email: "Email", phone: "Téléphone", business: "Business", volume: "Volume mensuel", choose: "Choisir", privacy: "J’accepte que mes données soient utilisées pour traiter cette demande." },
     banner: { eyebrow: "Une vraie relation", title: "Le café n’est que le début.", text: "Recettes, calibrage, accompagnement des équipes et recommandations de saison." },
     success: { eyebrow: "Demande envoyée", title: "Merci, votre demande a bien été prise en compte.", text: "Notre équipe va maintenant l’étudier. Vous recevrez un e-mail dès qu’une décision aura été prise.", accountLabel: "Voir mon compte", shopLabel: "Découvrir nos cafés" },
@@ -27,7 +27,7 @@ const defaults: Record<"fr-FR" | "en-GB", ProfessionalPageContent> = {
   "en-GB": {
     eyebrow: "B2B · Zen Coffee Lab", lede: "Traceable coffees, consistent profiles and direct support from the roaster.", loginLabel: "Sign in",
     steps: [{ title: "Tell us about your business", text: "Complete the form in a few minutes." }, { title: "Manual review", text: "We review every request and get back to you." }, { title: "Secure access", text: "Set your password and access professional terms." }],
-    applicationTitle: "Apply for an account", applicationIntro: "All fields are required.", submitLabel: "Send application", sendingLabel: "Sending…",
+    applicationTitle: "Request access", applicationIntro: "", submitLabel: "Send application", sendingLabel: "Sending…",
     fieldLabels: { company: "Company name", country: "Country", lastName: "Last name", firstName: "First name", email: "Email", phone: "Phone", business: "Business", volume: "Monthly volume", choose: "Choose", privacy: "I agree that my data will be used to process this application." },
     banner: { eyebrow: "A real relationship", title: "Coffee is only the beginning.", text: "Recipes, calibration, team guidance and seasonal recommendations." },
     success: { eyebrow: "Application sent", title: "Thank you, we have received your application.", text: "Our team will review it. You will receive an email as soon as a decision has been made.", accountLabel: "View my account", shopLabel: "Discover our coffees" },

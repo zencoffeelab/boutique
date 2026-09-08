@@ -4,11 +4,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 
 vi.mock("~/lib/auth.server", () => ({ getViewer: vi.fn() }));
-vi.mock("~/lib/catalog.server", () => ({ getProducts: vi.fn() }));
+vi.mock("~/lib/catalog.server", () => ({ getProducts: vi.fn(), getSampleSetProduct: vi.fn() }));
 vi.mock("~/lib/content.server", () => ({ getContentPage: vi.fn() }));
 
 import { getViewer } from "~/lib/auth.server";
-import { getProducts } from "~/lib/catalog.server";
+import { getProducts, getSampleSetProduct } from "~/lib/catalog.server";
 import { getContentPage } from "~/lib/content.server";
 import { loader, ProfessionalApplicationSuccess, ProfessionalCatalogHeading, ProfessionalLoginLink } from "~/routes/professional";
 
@@ -22,6 +22,7 @@ describe("professional page modes", () => {
       responseHeaders: new Headers(),
     } as never);
     vi.mocked(getProducts).mockResolvedValue([]);
+    vi.mocked(getSampleSetProduct).mockResolvedValue(null);
 
     const result = await loader({ request: new Request("https://example.test/professionnel"), params: {}, context: {} } as never);
 
@@ -45,8 +46,8 @@ describe("professional page modes", () => {
     vi.mocked(getViewer).mockResolvedValue({ user: { id: "retail-user", email: "client@example.com" }, profile: { professional_status: null }, responseHeaders: new Headers() } as never);
     vi.mocked(getContentPage).mockResolvedValue({ title: "Professionnels", blocks: [] } as never);
     const result = await loader({ request: new Request("https://example.test/professionnel"), params: {}, context: {} } as never);
-    expect(result).toMatchObject({ approved: false, signedIn: true, accountEmail: "client@example.com", content: null });
-    expect(getContentPage).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ approved: false, signedIn: true, accountEmail: "client@example.com", content: { title: "Professionnels" } });
+    expect(getContentPage).toHaveBeenCalledWith("professionnel", "fr-FR");
   });
 
   it("hides the login action from a signed-in retail customer", () => {

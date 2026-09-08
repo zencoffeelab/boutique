@@ -1,4 +1,5 @@
 import { ArrowRight, CircleCheck, LogIn } from "lucide-react";
+import { useState } from "react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Link, useFetcher, useLoaderData, useNavigate } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
@@ -29,6 +30,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(data?.locale === "en-GB" ? "Coffee for professionals | Zen Coffee Lab" : "Café pour professionnels | Zen Coffee Lab", data?.locale === "en-GB" ? "Specialty coffee and support for cafés, restaurants and resellers." : "Cafés de spécialité et accompagnement pour coffee shops, restaurants et revendeurs.", data?.locale === "en-GB" ? "/en/professional" : "/professionnel");
 
 type ApplicationResponse = { ok?: boolean; message?: string; errors?: Record<string, string[]> };
+
+function RequiredMark() {
+  return <span className="required-mark" aria-hidden="true">*</span>;
+}
 
 export function ProfessionalApplicationSuccess({ english, signedIn, accountPath, content: providedContent }: { english: boolean; signedIn: boolean; accountPath: string; content?: ReturnType<typeof getProfessionalPageContent> }) {
   const content = providedContent ?? getProfessionalPageContent(english ? "en-GB" : "fr-FR");
@@ -102,6 +107,8 @@ export default function Professional() {
   const { locale, approved, admin, signedIn, accountEmail, content, connectedContent, sampleSet } = useLoaderData<typeof loader>();
   const english = locale === "en-GB";
   const fetcher = useFetcher<ApplicationResponse>();
+  const [countryCode, setCountryCode] = useState("FR");
+  const [deliveryAddressOpen, setDeliveryAddressOpen] = useState(false);
   const professionalPath = english ? "/en/professional" : "/professionnel";
   const accountPath = english ? "/en/my-account" : "/mon-compte";
   const loginPath = `${accountPath}?next=${encodeURIComponent(professionalPath)}`;
@@ -113,21 +120,30 @@ export default function Professional() {
     <div className="professional-application-layout page-shell">
       <section className="steps professional-application-steps" aria-label={english ? "Professional account steps" : "Étapes du compte professionnel"}>{pageContent.steps.map((step, index) => <article key={index}><span>{String(index + 1).padStart(2, "0")}</span><h3>{step.title}</h3><p>{step.text}</p></article>)}</section>
       {fetcher.data?.ok ? <ProfessionalApplicationSuccess english={english} signedIn={signedIn} accountPath={accountPath} content={pageContent} /> : <fetcher.Form className="form-card professional-application-form" method="post" action="/api/pro-applications">
-        <h2>{pageContent.applicationTitle}</h2><p>{pageContent.applicationIntro}</p>
+        <h2>{english ? "Request access" : "Demander un accès"}</h2>
+        <p className="professional-application-required-note"><RequiredMark />{english ? "required fields" : "champs obligatoires"}</p>
         {fetcher.data?.message ? <p className={fetcher.data.ok ? "form-message" : "form-message form-error"} role="status">{fetcher.data.message}</p> : null}
         <input type="hidden" name="locale" value={locale} /><div className="sr-only" aria-hidden="true"><label>Website<input name="website" tabIndex={-1} autoComplete="off" /></label></div>
         <div className="form-grid">
-          <div className="field"><label htmlFor="companyName">{pageContent.fieldLabels.company}</label><input id="companyName" name="companyName" required autoComplete="organization" /></div>
-          <div className="field"><label htmlFor="countryCode">{pageContent.fieldLabels.country}</label><select id="countryCode" name="countryCode" required autoComplete="country" defaultValue="FR"><option value="" disabled>{pageContent.fieldLabels.choose}</option>{[...SHIPPING_COUNTRY_CODES].toSorted((first, second) => shippingCountryLabel(first, locale).localeCompare(shippingCountryLabel(second, locale), locale)).map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</select></div>
-          <div className="field"><label htmlFor="lastName">{pageContent.fieldLabels.lastName}</label><input id="lastName" name="lastName" required autoComplete="family-name" /></div>
-          <div className="field"><label htmlFor="firstName">{pageContent.fieldLabels.firstName}</label><input id="firstName" name="firstName" required autoComplete="given-name" /></div>
-          {accountEmail ? null : <div className="field"><label htmlFor="email">{pageContent.fieldLabels.email}</label><input id="email" name="email" type="email" required autoComplete="email" /></div>}
-          <div className="field"><label htmlFor="phone">{pageContent.fieldLabels.phone}</label><input id="phone" name="phone" type="tel" required autoComplete="tel" /></div>
-          <div className="field"><label htmlFor="businessType">{pageContent.fieldLabels.business}</label><select id="businessType" name="businessType" required defaultValue=""><option value="" disabled>{pageContent.fieldLabels.choose}</option><option>Coffee shop</option><option>Restaurant</option><option>Revendeur</option><option>Distributeur</option><option>Autre</option></select></div>
-          <div className="field"><label htmlFor="monthlyVolume">{pageContent.fieldLabels.volume}</label><select id="monthlyVolume" name="monthlyVolume" required defaultValue=""><option value="" disabled>{pageContent.fieldLabels.choose}</option><option>1-10 kg</option><option>11-50 kg</option><option>51-100 kg</option><option>100+ kg</option></select></div>
+          <p className="professional-application-section-heading field--wide">{english ? "Identity" : "Identité"}</p>
+          <div className="field"><label htmlFor="countryCode">{pageContent.fieldLabels.country}<RequiredMark /></label><select id="countryCode" name="countryCode" required autoComplete="country" value={countryCode} onChange={(event) => setCountryCode(event.currentTarget.value)}><option value="" disabled>{pageContent.fieldLabels.choose}</option>{[...SHIPPING_COUNTRY_CODES].toSorted((first, second) => shippingCountryLabel(first, locale).localeCompare(shippingCountryLabel(second, locale), locale)).map((code) => <option key={code} value={code}>{shippingCountryLabel(code, locale)}</option>)}</select></div>
+          <div className="field"><label htmlFor="companyRegistrationNumber">{countryCode === "FR" ? "SIRET" : "Company registration number"}<RequiredMark /></label><input id="companyRegistrationNumber" name="companyRegistrationNumber" required maxLength={80} autoComplete="off" /></div>
+          <div className="field"><label htmlFor="companyName">{pageContent.fieldLabels.company}<RequiredMark /></label><input id="companyName" name="companyName" required autoComplete="organization" /></div>
+          <div className="field"><label htmlFor="vatNumber">{english ? "VAT number" : "N° de TVA Intracommunautaire"}</label><input id="vatNumber" name="vatNumber" maxLength={40} autoComplete="off" /></div>
+          <div className="field"><label htmlFor="businessType">{pageContent.fieldLabels.business}<RequiredMark /></label><select id="businessType" name="businessType" required defaultValue=""><option value="" disabled>{pageContent.fieldLabels.choose}</option><option>Coffee shop</option><option>Restaurant</option><option>Revendeur</option><option>Distributeur</option><option>Autre</option></select></div>
+          <div className="field"><label htmlFor="monthlyVolume">{pageContent.fieldLabels.volume}<RequiredMark /></label><select id="monthlyVolume" name="monthlyVolume" required defaultValue=""><option value="" disabled>{pageContent.fieldLabels.choose}</option><option>1-10 kg</option><option>11-50 kg</option><option>51-100 kg</option><option>100+ kg</option></select></div>
+          <div className="field field--wide professional-application-address"><p>{english ? "Billing address" : "Adresse de facturation"}</p><div className="form-grid"><div className="field"><label htmlFor="lastName">{pageContent.fieldLabels.lastName}<RequiredMark /></label><input id="lastName" name="lastName" required autoComplete="family-name" /></div><div className="field"><label htmlFor="firstName">{pageContent.fieldLabels.firstName}<RequiredMark /></label><input id="firstName" name="firstName" required autoComplete="given-name" /></div><div className="field field--wide"><label htmlFor="billingLine1">{english ? "Number and street" : "Numéro et voie"}<RequiredMark /></label><input id="billingLine1" name="billingLine1" required autoComplete="address-line1" /></div><div className="field"><label htmlFor="billingPostalCode">{english ? "Postcode" : "Code postal"}<RequiredMark /></label><input id="billingPostalCode" name="billingPostalCode" required autoComplete="postal-code" /></div><div className="field"><label htmlFor="billingCity">{english ? "City" : "Ville"}<RequiredMark /></label><input id="billingCity" name="billingCity" required autoComplete="address-level2" /></div></div></div>
         </div>
-        <div className="field professional-application-comment"><label htmlFor="comment">{english ? "Comment (optional)" : "Commentaire (facultatif)"}</label><textarea id="comment" name="comment" rows={4} maxLength={2_000} /><small>{english ? "(if you have questions, a specific budget, a set date, etc.)" : "(si vous avez des questions, un budget précis, une date déterminée, etc.)"}</small></div>
-        <label className="field--wide professional-application-privacy"><input name="privacyConsent" type="checkbox" value="true" required /> {pageContent.fieldLabels.privacy}</label>
+        <button className="button button--dark professional-delivery-address-toggle" type="button" onClick={() => setDeliveryAddressOpen((open) => !open)} aria-expanded={deliveryAddressOpen}>{deliveryAddressOpen ? (english ? "Use billing address for delivery" : "Utiliser l'adresse de facturation pour la livraison") : (english ? "Add a delivery address" : "Ajouter une adresse de livraison")}</button>
+        {deliveryAddressOpen ? <section className="professional-application-address professional-application-delivery-address"><p>{english ? "Delivery address" : "Adresse de livraison"}<RequiredMark /></p><div className="form-grid"><div className="field"><label htmlFor="deliveryLastName">{pageContent.fieldLabels.lastName}<RequiredMark /></label><input id="deliveryLastName" name="deliveryLastName" required autoComplete="shipping family-name" /></div><div className="field"><label htmlFor="deliveryFirstName">{pageContent.fieldLabels.firstName}<RequiredMark /></label><input id="deliveryFirstName" name="deliveryFirstName" required autoComplete="shipping given-name" /></div><div className="field field--wide"><label htmlFor="deliveryLine1">{english ? "Number and street" : "Numéro et voie"}<RequiredMark /></label><input id="deliveryLine1" name="deliveryLine1" required autoComplete="shipping address-line1" /></div><div className="field"><label htmlFor="deliveryPostalCode">{english ? "Postcode" : "Code postal"}<RequiredMark /></label><input id="deliveryPostalCode" name="deliveryPostalCode" required autoComplete="shipping postal-code" /></div><div className="field"><label htmlFor="deliveryCity">{english ? "City" : "Ville"}<RequiredMark /></label><input id="deliveryCity" name="deliveryCity" required autoComplete="shipping address-level2" /></div></div></section> : null}
+        <div className="form-grid professional-application-contact">
+          <p className="professional-application-section-heading professional-application-section-heading--separated field--wide">{english ? "Contact" : "Contact"}</p>
+          {accountEmail ? null : <div className="field"><label htmlFor="email">{pageContent.fieldLabels.email}<RequiredMark /></label><input id="email" name="email" type="email" required autoComplete="email" /></div>}
+          <div className="field"><label htmlFor="electronicBillingAddress">{english ? "Electronic invoicing address" : "Adresse de facturation électronique"}</label><input id="electronicBillingAddress" name="electronicBillingAddress" maxLength={254} autoComplete="off" /></div>
+          <div className="field"><label htmlFor="phone">{pageContent.fieldLabels.phone}</label><input id="phone" name="phone" type="tel" autoComplete="tel" /></div>
+        </div>
+        <div className="field professional-application-comment professional-application-section-heading--separated"><label htmlFor="comment">{english ? "Additional information" : "Information complémentaire"}</label><textarea id="comment" name="comment" rows={4} maxLength={2_000} /><small>{english ? "(if you have questions, a specific budget, a set date, etc.)" : "(si vous avez des questions, un budget précis, une date déterminée, etc.)"}</small></div>
+        <label className="field--wide professional-application-privacy"><input name="privacyConsent" type="checkbox" value="true" required /> {pageContent.fieldLabels.privacy}<RequiredMark /></label>
         <button className="button button--dark" type="submit" disabled={fetcher.state !== "idle"}>{fetcher.state === "idle" ? pageContent.submitLabel : pageContent.sendingLabel}</button>
       </fetcher.Form>}
     </div>

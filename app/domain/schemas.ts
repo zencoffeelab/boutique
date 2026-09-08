@@ -57,12 +57,30 @@ export const professionalApplicationSchema = z.object({
   lastName: z.string().trim().min(1).max(80),
   firstName: z.string().trim().min(1).max(80),
   email: z.email(),
-  phone: z.string().trim().min(6).max(30),
+  companyRegistrationNumber: z.string().trim().min(2).max(80),
+  vatNumber: z.string().trim().max(40).optional().default(""),
+  phone: z.string().trim().max(30).optional().default(""),
+  electronicBillingAddress: z.string().trim().max(254).optional().default(""),
+  billingLine1: z.string().trim().min(3).max(160),
+  billingPostalCode: z.string().trim().min(2).max(16),
+  billingCity: z.string().trim().min(2).max(100),
+  deliveryLastName: z.string().trim().max(80).optional().default(""),
+  deliveryFirstName: z.string().trim().max(80).optional().default(""),
+  deliveryLine1: z.string().trim().max(160).optional().default(""),
+  deliveryPostalCode: z.string().trim().max(16).optional().default(""),
+  deliveryCity: z.string().trim().max(100).optional().default(""),
   businessType: z.enum(["Coffee shop", "Restaurant", "Revendeur", "Distributeur", "Autre"]),
   monthlyVolume: z.enum(["1-10 kg", "11-50 kg", "51-100 kg", "100+ kg"]),
   locale: z.enum(["fr-FR", "en-GB"]),
   privacyConsent: z.literal(true),
   website: z.string().max(500).optional(),
+}).superRefine((value, context) => {
+  const delivery = [value.deliveryLastName, value.deliveryFirstName, value.deliveryLine1, value.deliveryPostalCode, value.deliveryCity];
+  if (delivery.some(Boolean) && delivery.some((part) => !part)) {
+    for (const field of ["deliveryLastName", "deliveryFirstName", "deliveryLine1", "deliveryPostalCode", "deliveryCity"] as const) {
+      if (!value[field]) context.addIssue({ code: "custom", path: [field], message: "Complete delivery address required." });
+    }
+  }
 });
 
 export const professionalDecisionSchema = z.object({
