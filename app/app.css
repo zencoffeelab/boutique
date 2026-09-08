@@ -6448,6 +6448,82 @@ body.advice-detail-overflow-hidden {
   margin: 0.2rem 0 0;
   font: 650 1.45rem/1.1 var(--sans);
 }
+.admin-professional-detail__heading {
+  align-items: flex-start;
+}
+.admin-professional-detail__heading > div > p:last-child {
+  margin: 0.45rem 0 0;
+}
+.admin-professional-detail__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(12rem, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.admin-professional-detail__grid .card {
+  margin: 0;
+}
+.admin-professional-detail__grid .card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.admin-professional-detail__grid .card-header h2 {
+  margin: 0;
+}
+.admin-professional-detail__grid .card-header svg {
+  color: var(--orange);
+}
+.admin-professional-detail__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem 1.25rem;
+  margin: 0;
+}
+.admin-professional-detail__list div {
+  min-width: 0;
+}
+.admin-professional-detail__list dt {
+  margin-bottom: 0.2rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.admin-professional-detail__list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.admin-professional-detail__count {
+  margin: 0 0 0.45rem;
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+}
+.admin-professional-detail__timeline {
+  display: grid;
+  gap: 0;
+}
+.admin-professional-detail__timeline article {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--line);
+}
+.admin-professional-detail__timeline article:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.admin-professional-detail__timeline article > div {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+.admin-professional-detail__timeline time {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.admin-professional-detail__timeline p,
+.admin-professional-detail__timeline small {
+  margin: 0;
+}
 .admin-professional-filter {
   grid-template-columns: minmax(260px, 1fr) 220px auto;
 }
@@ -8036,6 +8112,10 @@ body.advice-detail-overflow-hidden {
   }
   .admin-professional-filter {
     grid-template-columns: 1fr 220px auto;
+  }
+  .admin-professional-detail__grid,
+  .admin-professional-detail__list {
+    grid-template-columns: 1fr;
   }
   .admin-customer-filter {
     grid-template-columns: 1fr 220px auto;

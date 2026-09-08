@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-08-admin-professional-detail",
+    date: "2026-09-08",
+    kind: "Fonctionnalité",
+    title: "Fiche complète pour chaque compte professionnel",
+    description: "Un clic sur le nom d'un membre professionnel ouvre désormais sa fiche avec ses coordonnées, besoins, demandes, commandes et e-mails échangés.",
+  },
+  {
     id: "2026-09-08-professional-application-section-color",
     date: "2026-09-08",
     kind: "Design",
