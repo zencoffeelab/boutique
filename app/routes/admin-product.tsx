@@ -1,4 +1,4 @@
-import { Pencil, Plus, Save, Trash2, Upload, X } from "lucide-react";
+import { Download, Pencil, Plus, Save, Trash2, Upload, X } from "lucide-react";
 import { z } from "zod";
 import type {
   ActionFunctionArgs,
@@ -21,13 +21,66 @@ import { AdminProductThumbnailForm } from "~/components/admin-product-thumbnail-
 import { AdminSeoAnalysis } from "~/components/admin-seo-analysis";
 import { formatMoney } from "~/domain/money";
 import { buildVariantOffers } from "~/domain/professional-quote";
-import type { ProductEditorialBlock, ProductVariant } from "~/domain/types";
+import type { Product, ProductEditorialBlock, ProductVariant } from "~/domain/types";
 import { requireAdmin } from "~/lib/auth.server";
 import { getAdminProducts } from "~/lib/catalog.server";
 import { PUBLIC_MEDIA_CACHE_SECONDS, PUBLIC_MEDIA_MAX_UPLOAD_BYTES } from "~/lib/public-media";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
 const optionalText = (max: number) => z.string().trim().max(max).optional().default("");
+
+const googleMerchantXmlEscape = (value: string) => value
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&apos;");
+
+type GoogleMerchantExportProduct = Pick<Product, "slug" | "media" | "hoverImageUrl" | "thumbnailLabelUrl" | "translations" | "variants">;
+
+function googleMerchantXml(product: GoogleMerchantExportProduct) {
+  const translation = product.translations["fr-FR"];
+  const imageUrl = product.media[0]?.url ?? product.hoverImageUrl ?? product.thumbnailLabelUrl;
+  const productUrl = `https://www.zencoffeelab.com/boutique/${product.slug}`;
+  const items = product.variants.flatMap((variant) => variant.offers
+    .filter((offer) => offer.audience === "retail" && offer.active)
+    .map((offer) => {
+      const description = translation.shortDescription || translation.body;
+      const title = product.variants.length > 1 ? `${translation.name} - ${variant.label}` : translation.name;
+      const availability = variant.stockOnHand - variant.stockReserved > 0 ? "in_stock" : "out_of_stock";
+      const fields = [
+        ["g:id", variant.sku],
+        ["g:title", title],
+        ["g:description", description],
+        ["g:link", productUrl],
+        ...(imageUrl ? [["g:image_link", imageUrl]] : []),
+        ["g:condition", "new"],
+        ["g:availability", availability],
+        ["g:price", `${(offer.price.amount / 100).toFixed(2)} EUR`],
+        ["g:brand", "Zen Coffee Lab"],
+      ];
+      return `    <item>\n${fields.map(([tag, value]) => `      <${tag}>${googleMerchantXmlEscape(value)}</${tag}>`).join("\n")}\n    </item>`;
+    }));
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">\n  <channel>\n    <title>Zen Coffee Lab</title>\n    <link>https://www.zencoffeelab.com/</link>\n    <description>Flux produit Google Merchant</description>\n${items.join("\n")}\n  </channel>\n</rss>\n`;
+}
+
+function GoogleMerchantXmlDownload({ product }: { product: GoogleMerchantExportProduct }) {
+  const hasRetailOffer = product.variants.some((variant) => variant.offers.some((offer) => offer.audience === "retail" && offer.active));
+  const download = () => {
+    const blob = new Blob([googleMerchantXml(product)], { type: "application/xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${product.slug || "produit"}-google-merchant.xml`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return <button className="ui-button ui-button--outline" type="button" onClick={download} disabled={!hasRetailOffer} title={hasRetailOffer ? undefined : "Ajoutez d’abord une variante avec une offre boutique active."}>
+    <Download aria-hidden="true" /> Télécharger le XML
+  </button>;
+}
 
 const productSchema = z.object({
   intent: z.literal("save_product"),
@@ -1967,6 +2020,7 @@ export default function AdminProduct() {
               {product.status === "draft" ? "Aperçu du brouillon" : "Voir la fiche"}
             </Link>
           ) : null}
+          {!isNew ? <GoogleMerchantXmlDownload product={product} /> : null}
           <AdminProductSaveControl
             demo={demo}
             modifying={modifying}

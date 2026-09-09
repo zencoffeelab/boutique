@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-09-admin-product-google-merchant-xml-export",
+    date: "2026-09-09",
+    kind: "Fonctionnalité",
+    title: "Export XML Google Merchant depuis chaque fiche produit",
+    description: "Chaque fiche produit du backoffice propose désormais le téléchargement d’un fichier XML prêt pour Google Merchant. Les variantes et offres boutique actives y reprennent automatiquement le nom, la description, le lien, l’image, le prix et la disponibilité réels du produit.",
+  },
+  {
     id: "2026-09-09-professional-account-confirmation-repeat",
     date: "2026-09-09",
     kind: "Correction",
