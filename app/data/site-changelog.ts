@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-09-password-reset-isolated-recovery",
+    date: "2026-09-09",
+    kind: "Sécurité",
+    title: "Réinitialisation isolée de la session du compte",
+    description: "Le lien de mot de passe oublié utilise désormais une session de récupération isolée, valable uniquement pour enregistrer le nouveau mot de passe et sans connexion automatique à l’espace privé.",
+  },
+  {
     id: "2026-09-09-password-reset-requires-sign-in",
     date: "2026-09-09",
     kind: "Sécurité",

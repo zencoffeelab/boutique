@@ -8,7 +8,7 @@ import { getViewer } from "~/lib/auth.server";
 import { getLocale } from "~/lib/i18n";
 import { safeInternalPath } from "~/lib/redirects";
 import { pageMeta } from "~/lib/seo";
-import { authConfirmationUrl, createRequestSupabase, createServiceSupabase } from "~/lib/supabase.server";
+import { authConfirmationUrl, clearPasswordRecoveryCookie, createPublicSupabase, createRequestSupabase, createServiceSupabase, readPasswordRecoverySession } from "~/lib/supabase.server";
 import { SHIPPING_COUNTRY_CODES } from "~/domain/shipping-countries";
 import { professionalApplicationSchema } from "~/domain/schemas";
 
@@ -65,8 +65,8 @@ export function customerLoginDestination(locale: "fr-FR" | "en-GB", accountPath:
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const locale = getLocale(request); const accountPath = locale === "en-GB" ? "/en/my-account" : "/mon-compte"; const viewer = await getViewer(request); const url = new URL(request.url); const setPassword = url.searchParams.get("set-password") === "1"; const passwordResetComplete = url.searchParams.get("password-reset") === "complete"; const authError = url.searchParams.get("auth_error"); const next = safeInternalPath(url.searchParams.get("next"), accountPath);
-  if (!viewer) return { locale, viewer: null, orders: [], addresses: [], professionalQuotes: [], professionalApplication: null, setPassword, passwordResetComplete, authError, next, mfa: null };
+  const locale = getLocale(request); const accountPath = locale === "en-GB" ? "/en/my-account" : "/mon-compte"; const url = new URL(request.url); const passwordRecovery = url.searchParams.get("recover") === "1" && Boolean(readPasswordRecoverySession(request)); const viewer = passwordRecovery ? null : await getViewer(request); const setPassword = url.searchParams.get("set-password") === "1"; const passwordResetComplete = url.searchParams.get("password-reset") === "complete"; const authError = url.searchParams.get("auth_error"); const next = safeInternalPath(url.searchParams.get("next"), accountPath);
+  if (!viewer) return { locale, viewer: null, orders: [], addresses: [], professionalQuotes: [], professionalApplication: null, setPassword, passwordRecovery, passwordResetComplete, authError, next, mfa: null };
   const publicViewer = { user: { id: viewer.user.id, email: viewer.user.email }, profile: viewer.profile };
   const requestSupabase = createRequestSupabase(request);
   let mfa: { currentLevel: string | null; nextLevel: string | null; verifiedFactors: Array<{ id: string; friendlyName: string; createdAt: string }> } | null = null;
@@ -81,7 +81,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       verifiedFactors: (factorsResult.data?.totp ?? []).map((factor) => ({ id: factor.id, friendlyName: factor.friendly_name ?? "Authenticator", createdAt: factor.created_at })),
     };
     if (mfa.verifiedFactors.length > 0 && mfa.currentLevel !== "aal2") {
-      return { locale, viewer: publicViewer, orders: [], addresses: [], professionalQuotes: [], professionalApplication: null, setPassword, passwordResetComplete, authError, next, mfa };
+      return { locale, viewer: publicViewer, orders: [], addresses: [], professionalQuotes: [], professionalApplication: null, setPassword, passwordRecovery, passwordResetComplete, authError, next, mfa };
     }
   }
   const client = createServiceSupabase();
@@ -91,11 +91,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
     client && viewer.profile?.professional_status === "approved" ? client.from("professional_quotes").select("id,quote_number,status,total_weight_kg,total_cents,valid_until,paid_at,created_at").eq("profile_id", viewer.user.id).order("created_at", { ascending: false }).limit(50) : Promise.resolve({ data: [] }),
     client && viewer.profile?.professional_status === "approved" ? client.from("professional_applications").select("company_name,country_code,first_name,last_name,email,company_registration_number,vat_number,phone,electronic_billing_address,billing_address,delivery_address,business_type,monthly_volume,comment").eq("invited_user_id", viewer.user.id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  return { locale, viewer: publicViewer, orders: ordersResult.data ?? [], addresses: addressesResult.data ?? [], professionalQuotes: professionalQuotesResult.data ?? [], professionalApplication: professionalApplicationResult.data ?? null, setPassword, passwordResetComplete, authError, next, mfa };
+  return { locale, viewer: publicViewer, orders: ordersResult.data ?? [], addresses: addressesResult.data ?? [], professionalQuotes: professionalQuotesResult.data ?? [], professionalApplication: professionalApplicationResult.data ?? null, setPassword, passwordRecovery, passwordResetComplete, authError, next, mfa };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
   const locale = getLocale(request); const accountPath = locale === "en-GB" ? "/en/my-account" : "/mon-compte"; const form = await request.formData(); const intent = String(form.get("intent") ?? "login");
+  if (intent === "update_recovery_password") {
+    const password = z.string().min(10).max(200).safeParse(form.get("password")); const recovery = readPasswordRecoverySession(request); const client = createPublicSupabase();
+    if (!password.success || !recovery || !client) return { ok: false, message: locale === "en-GB" ? "This recovery link is invalid or has expired." : "Ce lien de récupération est invalide ou a expiré." };
+    const restored = await client.auth.setSession(recovery); if (restored.error) return { ok: false, message: locale === "en-GB" ? "This recovery link is invalid or has expired." : "Ce lien de récupération est invalide ou a expiré." };
+    const updated = await client.auth.updateUser({ password: password.data }); await client.auth.signOut();
+    if (updated.error) return { ok: false, message: updated.error.message };
+    return redirect(`${accountPath}?password-reset=complete`, { headers: { "Set-Cookie": clearPasswordRecoveryCookie(new URL(request.url).protocol === "https:") } });
+  }
   const supabase = createRequestSupabase(request);
   if (!supabase) return { ok: false, message: locale === "en-GB" ? "Authentication is not configured in this environment." : "L’authentification n’est pas configurée dans cet environnement." };
   if (intent === "update_password") { const parsed = z.string().min(10).max(200).safeParse(form.get("password")); if (!parsed.success) return { ok: false, message: locale === "en-GB" ? "Use at least 10 characters." : "Utilisez au moins 10 caractères." }; const { error } = await supabase.client.auth.updateUser({ password: parsed.data }); if (error) return { ok: false, message: error.message }; await supabase.client.auth.signOut(); return redirect(`${accountPath}?password-reset=complete`, { headers: supabase.responseHeaders }); }
@@ -220,12 +228,11 @@ export function MfaLoginGate({ email, mfa, next, english, message, messageIsErro
 
 export { AccountNavigation } from "~/components/account/account-dashboard";
 
-function PasswordRecoveryForm({ english, next }: { english: boolean; next: string }) {
+function PasswordRecoveryForm({ english }: { english: boolean }) {
   return <>
     <header className="page-hero account-welcome-hero"><AccountLanguageSwitch english={english} /><p className="eyebrow">{english ? "Password recovery" : "Réinitialisation du mot de passe"}</p><h1>{english ? "Choose a new password" : "Choisissez un nouveau mot de passe"}</h1><p className="lede">{english ? "Set your new password to sign in to your account." : "Définissez votre nouveau mot de passe pour vous connecter à votre compte."}</p></header>
     <Form method="post" className="form-card" aria-labelledby="password-recovery-title">
-      <input type="hidden" name="intent" value="update_password" />
-      <input type="hidden" name="next" value={next} />
+      <input type="hidden" name="intent" value="update_recovery_password" />
       <h2 id="password-recovery-title">{english ? "New password" : "Nouveau mot de passe"}</h2>
       <div className="field"><label htmlFor="recovery-password">{english ? "Choose a password" : "Choisissez un mot de passe"}<input id="recovery-password" name="password" type="password" minLength={10} maxLength={200} required autoComplete="new-password" /></label><small>{english ? "At least 10 characters." : "10 caractères minimum."}</small></div>
       <button className="button button--dark" type="submit">{english ? "Save my password" : "Enregistrer mon mot de passe"}</button>
@@ -234,9 +241,9 @@ function PasswordRecoveryForm({ english, next }: { english: boolean; next: strin
 }
 
 export default function Account() {
-  const { locale, viewer, orders, addresses, professionalQuotes, professionalApplication, setPassword, passwordResetComplete, authError, next, mfa } = useLoaderData<typeof loader>(); const result = useActionData<typeof action>(); const english = locale === "en-GB";
+  const { locale, viewer, orders, addresses, professionalQuotes, professionalApplication, setPassword, passwordRecovery, passwordResetComplete, authError, next, mfa } = useLoaderData<typeof loader>(); const result = useActionData<typeof action>(); const english = locale === "en-GB";
   const mfaResult = result && "scope" in result && result.scope === "mfa" ? result : null;
-  if (viewer && setPassword) return <PasswordRecoveryForm english={english} next={next} />;
+  if (passwordRecovery || (viewer && setPassword)) return <PasswordRecoveryForm english={english} />;
   if (viewer && mfa && mfa.verifiedFactors.length > 0 && mfa.currentLevel !== "aal2") {
     return <MfaLoginGate email={viewer.user.email ?? ""} mfa={mfa} next={next} english={english} message={mfaResult?.message} messageIsError={mfaResult?.ok === false} />;
   }

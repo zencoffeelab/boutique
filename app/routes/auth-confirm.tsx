@@ -4,7 +4,7 @@ import { redirect, useLoaderData } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { safeInternalPath } from "~/lib/redirects";
-import { createRequestSupabase } from "~/lib/supabase.server";
+import { createRequestSupabase, passwordRecoveryCookie } from "~/lib/supabase.server";
 
 const otpType = z.enum(["signup", "invite", "magiclink", "recovery", "email_change", "email"]);
 
@@ -34,6 +34,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     : await supabase.client.auth.verifyOtp({ token_hash: tokenHash!, type: type.data! });
   if (result.error) {
     return redirect(`${next.split("?")[0]}?auth_error=${encodeURIComponent(authConfirmationErrorMessage(result.error, next))}`, { headers: supabase.responseHeaders });
+  }
+  if (new URL(next, url.origin).searchParams.get("set-password") === "1") {
+    const session = result.data.session;
+    if (!session) return redirect(`${next.split("?")[0]}?auth_error=${encodeURIComponent(authConfirmationErrorMessage("Recovery session unavailable.", next))}`);
+    const accountPath = next.startsWith("/en/") ? "/en/my-account" : "/mon-compte";
+    return redirect(`${accountPath}?recover=1`, { headers: { "Set-Cookie": passwordRecoveryCookie(session, url.protocol === "https:") } });
   }
   return redirect(next, { headers: supabase.responseHeaders });
 }

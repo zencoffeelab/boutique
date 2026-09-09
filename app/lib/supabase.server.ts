@@ -2,6 +2,9 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { env } from "./env.server";
 
+export const passwordRecoveryCookieName = "zcl_password_recovery";
+type PasswordRecoverySession = { access_token: string; refresh_token: string };
+
 function parseCookies(header: string | null): Array<{ name: string; value: string }> {
   if (!header) return [];
   return header.split(";").flatMap((part) => {
@@ -20,6 +23,23 @@ function serializeCookie(name: string, value: string, options: CookieOptions): s
   if (options.secure) segments.push("Secure");
   if (options.httpOnly) segments.push("HttpOnly");
   return segments.join("; ");
+}
+
+export function readPasswordRecoverySession(request: Request): PasswordRecoverySession | null {
+  const value = parseCookies(request.headers.get("cookie")).find((cookie) => cookie.name === passwordRecoveryCookieName)?.value;
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+    return typeof parsed.access_token === "string" && typeof parsed.refresh_token === "string" ? parsed : null;
+  } catch { return null; }
+}
+
+export function passwordRecoveryCookie(session: PasswordRecoverySession, secure: boolean) {
+  return serializeCookie(passwordRecoveryCookieName, Buffer.from(JSON.stringify(session)).toString("base64url"), { path: "/", maxAge: 10 * 60, sameSite: "lax", secure, httpOnly: true });
+}
+
+export function clearPasswordRecoveryCookie(secure: boolean) {
+  return serializeCookie(passwordRecoveryCookieName, "", { path: "/", maxAge: 0, sameSite: "lax", secure, httpOnly: true });
 }
 
 export function authConfirmationUrl(request: Request, next: string) {
