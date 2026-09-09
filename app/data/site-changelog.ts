@@ -17,6 +17,7 @@ export const siteChangelog = [
     kind: "Correction",
     title: "Confirmation affichée après chaque enregistrement professionnel",
     description: "La fenêtre de confirmation se réinitialise désormais pour chaque sauvegarde réussie des informations professionnelles, y compris après avoir déjà été fermée.",
+    reference: "7519355",
   },
   {
     id: "2026-09-09-professional-admin-identity-editing",
@@ -24,6 +25,7 @@ export const siteChangelog = [
     kind: "Fonctionnalité",
     title: "Identité professionnelle modifiable par l’administration",
     description: "La fiche d’un compte professionnel dans le backoffice permet désormais à un administrateur de corriger les six champs d’identité. La fenêtre de confirmation côté client utilise une typographie plus compacte et harmonisée.",
+    reference: "7519355",
   },
   {
     id: "2026-09-09-professional-account-identity-lock-visuals",
@@ -31,6 +33,7 @@ export const siteChangelog = [
     kind: "Design",
     title: "Champs d’identité professionnelle visuellement verrouillés",
     description: "Les six champs d’identité non modifiables sont maintenant grisés et la confirmation d’enregistrement apparaît dans une fenêtre plus compacte.",
+    reference: "7519355",
   },
   {
     id: "2026-09-09-professional-account-identity-lock-and-confirmation",
@@ -38,6 +41,7 @@ export const siteChangelog = [
     kind: "Correction",
     title: "Identité professionnelle verrouillée et confirmation en pop-up",
     description: "Les six informations d’identité du compte professionnel sont désormais protégées contre toute modification, tandis que les autres coordonnées restent modifiables. La sauvegarde est confirmée dans une fenêtre dédiée.",
+    reference: "7519355",
   },
   {
     id: "2026-09-09-professional-account-pro-shop-tab-removed",
@@ -45,6 +49,7 @@ export const siteChangelog = [
     kind: "Design",
     title: "Onglet Boutique pro retiré de l’espace privé",
     description: "Les comptes professionnels utilisent désormais la boutique classique : l’onglet et la rubrique Boutique pro ne sont plus affichés dans leur espace privé.",
+    reference: "7519355",
   },
   {
     id: "2026-09-09-password-reset-spam-reminder",
@@ -52,6 +57,7 @@ export const siteChangelog = [
     kind: "Design",
     title: "Rappel de vérifier les spams après un mot de passe oublié",
     description: "La confirmation d’envoi du lien de réinitialisation invite désormais à consulter les spams si l’e-mail n’apparaît pas dans la boîte de réception.",
+    reference: "7519355",
   },
   {
     id: "2026-09-09-password-reset-language-switch",
@@ -59,6 +65,7 @@ export const siteChangelog = [
     kind: "Design",
     title: "Sélecteur de langue redondant retiré lors de la réinitialisation",
     description: "L’écran de choix du nouveau mot de passe n’affiche plus un second sélecteur de langue : le contrôle du header reste l’unique accès au changement de langue.",
+    reference: "7519355",
   },
   {
     id: "2026-09-09-password-reset-visibility",
@@ -66,6 +73,7 @@ export const siteChangelog = [
     kind: "Fonctionnalité",
     title: "Affichage du mot de passe lors de sa réinitialisation",
     description: "Le champ de choix du nouveau mot de passe propose désormais une icône permettant d’afficher ou de masquer la saisie.",
+    reference: "7519355",
   },
   {
     id: "2026-09-09-password-reset-credential-update",
@@ -73,6 +81,7 @@ export const siteChangelog = [
     kind: "Correction",
     title: "Nouveau mot de passe enregistré de façon fiable",
     description: "Le mot de passe défini après un lien de récupération est désormais validé par le serveur avant la fermeture de la session temporaire, afin de permettre une connexion immédiate avec les nouveaux identifiants.",
+    reference: "7519355", 
   },
   {
     id: "2026-09-09-password-reset-isolated-recovery",
