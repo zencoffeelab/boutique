@@ -65,8 +65,8 @@ export function customerLoginDestination(locale: "fr-FR" | "en-GB", accountPath:
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const locale = getLocale(request); const accountPath = locale === "en-GB" ? "/en/my-account" : "/mon-compte"; const viewer = await getViewer(request); const url = new URL(request.url); const setPassword = url.searchParams.get("set-password") === "1"; const authError = url.searchParams.get("auth_error"); const next = safeInternalPath(url.searchParams.get("next"), accountPath);
-  if (!viewer) return { locale, viewer: null, orders: [], addresses: [], professionalQuotes: [], professionalApplication: null, setPassword, authError, next, mfa: null };
+  const locale = getLocale(request); const accountPath = locale === "en-GB" ? "/en/my-account" : "/mon-compte"; const viewer = await getViewer(request); const url = new URL(request.url); const setPassword = url.searchParams.get("set-password") === "1"; const passwordResetComplete = url.searchParams.get("password-reset") === "complete"; const authError = url.searchParams.get("auth_error"); const next = safeInternalPath(url.searchParams.get("next"), accountPath);
+  if (!viewer) return { locale, viewer: null, orders: [], addresses: [], professionalQuotes: [], professionalApplication: null, setPassword, passwordResetComplete, authError, next, mfa: null };
   const publicViewer = { user: { id: viewer.user.id, email: viewer.user.email }, profile: viewer.profile };
   const requestSupabase = createRequestSupabase(request);
   let mfa: { currentLevel: string | null; nextLevel: string | null; verifiedFactors: Array<{ id: string; friendlyName: string; createdAt: string }> } | null = null;
@@ -81,7 +81,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       verifiedFactors: (factorsResult.data?.totp ?? []).map((factor) => ({ id: factor.id, friendlyName: factor.friendly_name ?? "Authenticator", createdAt: factor.created_at })),
     };
     if (mfa.verifiedFactors.length > 0 && mfa.currentLevel !== "aal2") {
-      return { locale, viewer: publicViewer, orders: [], addresses: [], professionalQuotes: [], professionalApplication: null, setPassword, authError, next, mfa };
+      return { locale, viewer: publicViewer, orders: [], addresses: [], professionalQuotes: [], professionalApplication: null, setPassword, passwordResetComplete, authError, next, mfa };
     }
   }
   const client = createServiceSupabase();
@@ -91,14 +91,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
     client && viewer.profile?.professional_status === "approved" ? client.from("professional_quotes").select("id,quote_number,status,total_weight_kg,total_cents,valid_until,paid_at,created_at").eq("profile_id", viewer.user.id).order("created_at", { ascending: false }).limit(50) : Promise.resolve({ data: [] }),
     client && viewer.profile?.professional_status === "approved" ? client.from("professional_applications").select("company_name,country_code,first_name,last_name,email,company_registration_number,vat_number,phone,electronic_billing_address,billing_address,delivery_address,business_type,monthly_volume,comment").eq("invited_user_id", viewer.user.id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  return { locale, viewer: publicViewer, orders: ordersResult.data ?? [], addresses: addressesResult.data ?? [], professionalQuotes: professionalQuotesResult.data ?? [], professionalApplication: professionalApplicationResult.data ?? null, setPassword, authError, next, mfa };
+  return { locale, viewer: publicViewer, orders: ordersResult.data ?? [], addresses: addressesResult.data ?? [], professionalQuotes: professionalQuotesResult.data ?? [], professionalApplication: professionalApplicationResult.data ?? null, setPassword, passwordResetComplete, authError, next, mfa };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
   const locale = getLocale(request); const accountPath = locale === "en-GB" ? "/en/my-account" : "/mon-compte"; const form = await request.formData(); const intent = String(form.get("intent") ?? "login");
   const supabase = createRequestSupabase(request);
   if (!supabase) return { ok: false, message: locale === "en-GB" ? "Authentication is not configured in this environment." : "L’authentification n’est pas configurée dans cet environnement." };
-  if (intent === "update_password") { const parsed = z.string().min(10).max(200).safeParse(form.get("password")); if (!parsed.success) return { ok: false, message: locale === "en-GB" ? "Use at least 10 characters." : "Utilisez au moins 10 caractères." }; const { error } = await supabase.client.auth.updateUser({ password: parsed.data }); if (error) return { ok: false, message: error.message }; return redirect(safeInternalPath(form.get("next"), accountPath), { headers: supabase.responseHeaders }); }
+  if (intent === "update_password") { const parsed = z.string().min(10).max(200).safeParse(form.get("password")); if (!parsed.success) return { ok: false, message: locale === "en-GB" ? "Use at least 10 characters." : "Utilisez au moins 10 caractères." }; const { error } = await supabase.client.auth.updateUser({ password: parsed.data }); if (error) return { ok: false, message: error.message }; await supabase.client.auth.signOut(); return redirect(`${accountPath}?password-reset=complete`, { headers: supabase.responseHeaders }); }
   if (intent === "mfa_enroll" || intent === "mfa_verify" || intent === "mfa_unenroll") {
     const { data: { user } } = await supabase.client.auth.getUser();
     if (!user) return { ok: false, scope: "mfa" as const, message: locale === "en-GB" ? "Sign in again before configuring MFA." : "Reconnectez-vous avant de configurer la MFA." };
@@ -234,7 +234,7 @@ function PasswordRecoveryForm({ english, next }: { english: boolean; next: strin
 }
 
 export default function Account() {
-  const { locale, viewer, orders, addresses, professionalQuotes, professionalApplication, setPassword, authError, next, mfa } = useLoaderData<typeof loader>(); const result = useActionData<typeof action>(); const english = locale === "en-GB";
+  const { locale, viewer, orders, addresses, professionalQuotes, professionalApplication, setPassword, passwordResetComplete, authError, next, mfa } = useLoaderData<typeof loader>(); const result = useActionData<typeof action>(); const english = locale === "en-GB";
   const mfaResult = result && "scope" in result && result.scope === "mfa" ? result : null;
   if (viewer && setPassword) return <PasswordRecoveryForm english={english} next={next} />;
   if (viewer && mfa && mfa.verifiedFactors.length > 0 && mfa.currentLevel !== "aal2") {
@@ -245,7 +245,7 @@ export default function Account() {
   }
   return <>
     <header className="page-hero account-welcome-hero"><AccountLanguageSwitch english={english} /><p className="eyebrow">{english ? "Private space" : "Espace privé"}</p><h1>{english ? "Your account" : "Votre compte"}</h1><p className="lede">{english ? "Find your orders, invoices, addresses and tracking." : "Retrouvez vos commandes, factures, adresses et suivis."}</p></header>
-    <Form method="post" className="form-card"><input type="hidden" name="next" value={next} /><h2>{english ? "Sign in" : "Se connecter"}</h2>{authError ? <p className="form-message form-error" role="alert">{authError}</p> : null}{result?.message && !((result as { scope?: string; ok?: boolean }).scope === "password_reset" && result.ok) ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}<div className="form-grid"><div className="field field--wide"><label htmlFor="account-email">Email</label><input id="account-email" name="email" type="email" required autoComplete="email" /></div><div className="field field--wide"><label htmlFor="account-password">{english ? "Password" : "Mot de passe"}</label><SignInPasswordInput english={english} /></div></div><div className="account-login-actions"><button className="button button--dark" name="intent" value="login" type="submit">{english ? "Sign in" : "Se connecter"}</button><button className="button button--ghost" name="intent" value="register" type="submit">{english ? "Create an account" : "Créer un compte"}</button><button className="button button--ghost" formNoValidate name="intent" value="reset" type="submit">{english ? "Reset password" : "Mot de passe oublié"}</button></div></Form>
+    <Form method="post" className="form-card"><input type="hidden" name="next" value={next} /><h2>{english ? "Sign in" : "Se connecter"}</h2>{passwordResetComplete ? <p className="form-message" role="status">{english ? "Password updated. Sign in with your new password." : "Mot de passe mis à jour. Connectez-vous avec votre nouveau mot de passe."}</p> : null}{authError ? <p className="form-message form-error" role="alert">{authError}</p> : null}{result?.message && !((result as { scope?: string; ok?: boolean }).scope === "password_reset" && result.ok) ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}<div className="form-grid"><div className="field field--wide"><label htmlFor="account-email">Email</label><input id="account-email" name="email" type="email" required autoComplete="email" /></div><div className="field field--wide"><label htmlFor="account-password">{english ? "Password" : "Mot de passe"}</label><SignInPasswordInput english={english} /></div></div><div className="account-login-actions"><button className="button button--dark" name="intent" value="login" type="submit">{english ? "Sign in" : "Se connecter"}</button><button className="button button--ghost" name="intent" value="register" type="submit">{english ? "Create an account" : "Créer un compte"}</button><button className="button button--ghost" formNoValidate name="intent" value="reset" type="submit">{english ? "Reset password" : "Mot de passe oublié"}</button></div></Form>
     {result && (result as { scope?: string; ok?: boolean }).scope === "password_reset" && result.ok ? <PasswordResetConfirmation english={english} message={result.message} /> : null}
   </>;
 }
