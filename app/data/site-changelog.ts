@@ -12,6 +12,20 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-09-password-reset-link-session",
+    date: "2026-09-09",
+    kind: "Correction",
+    title: "Liens de réinitialisation de mot de passe fiabilisés",
+    description: "La demande de mot de passe oublié conserve désormais les informations de session nécessaires pour ouvrir le lien reçu dans le même navigateur, sans faux message d’erreur de confirmation.",
+  },
+  {
+    id: "2026-09-09-professional-account-details-editing",
+    date: "2026-09-09",
+    kind: "Fonctionnalité",
+    title: "Informations professionnelles modifiables depuis l’espace privé",
+    description: "Les comptes professionnels validés peuvent désormais mettre à jour leur identité d’entreprise, leurs besoins, leurs coordonnées, leurs adresses de facturation et de livraison, ainsi que leur adresse e-mail de connexion.",
+  },
+  {
     id: "2026-09-09-sign-in-password-visibility",
     date: "2026-09-09",
     kind: "Fonctionnalité",

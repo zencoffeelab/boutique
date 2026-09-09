@@ -60,12 +60,30 @@ type AccountProfessionalQuote = {
   created_at: string;
 };
 
+type AccountProfessionalApplication = {
+  company_name: string;
+  country_code: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  company_registration_number: string;
+  vat_number?: string | null;
+  phone?: string | null;
+  electronic_billing_address?: string | null;
+  billing_address?: { line1?: string; postalCode?: string; city?: string; countryCode?: string } | null;
+  delivery_address?: { firstName?: string; lastName?: string; line1?: string; postalCode?: string; city?: string; countryCode?: string } | null;
+  business_type: string;
+  monthly_volume: string;
+  comment?: string | null;
+};
+
 export type AccountDashboardData = {
   locale: Locale;
   viewer: AccountViewer;
   orders: AccountOrder[];
   addresses: AccountAddress[];
   professionalQuotes: AccountProfessionalQuote[];
+  professionalApplication?: AccountProfessionalApplication | null;
   setPassword: boolean;
   next: string;
   mfa: AccountMfaState | null;
@@ -165,8 +183,36 @@ function AccountMfaPanel({ mfa, result, drawer, accountPath, english, prefix }: 
   </div>;
 }
 
+function ProfessionalAccountForm({ application, drawer, accountPath, locale }: { application: AccountProfessionalApplication; drawer: boolean; accountPath: string; locale: Locale }) {
+  const english = locale === "en-GB";
+  const countries = accountShippingCountryOptions(locale);
+  const billing = application.billing_address ?? {};
+  const delivery = application.delivery_address ?? {};
+  return <AccountMutationForm drawer={drawer} method="post" action={accountPath} className="account-panel account-form professional-account-form">
+    <input type="hidden" name="intent" value="update_professional_profile" />
+    <div className="account-form__heading"><div><p className="eyebrow">{english ? "Professional account" : "Compte professionnel"}</p><h3>{english ? "Your business details" : "Vos informations professionnelles"}</h3></div><UserRound aria-hidden="true" /></div>
+    <div className="form-grid">
+      <p className="professional-application-section-heading field--wide">{english ? "Identity" : "Identité"}</p>
+      <div className="field"><label>{english ? "Country" : "Pays"}<select name="countryCode" required defaultValue={application.country_code}>{countries.map((countryCode) => <option key={countryCode} value={countryCode}>{shippingCountryLabel(countryCode, locale)}</option>)}</select></label></div>
+      <div className="field"><label>{application.country_code === "FR" ? "SIRET" : "Company registration number"}<input name="companyRegistrationNumber" required maxLength={80} defaultValue={application.company_registration_number} /></label></div>
+      <div className="field"><label>{english ? "Company" : "Raison sociale"}<input name="companyName" required autoComplete="organization" defaultValue={application.company_name} /></label></div>
+      <div className="field"><label>{english ? "VAT number" : "N° de TVA intracommunautaire"}<input name="vatNumber" maxLength={40} defaultValue={application.vat_number ?? ""} /></label></div>
+      <div className="field"><label>{english ? "Business type" : "Activité"}<select name="businessType" required defaultValue={application.business_type}><option>Coffee shop</option><option>Restaurant</option><option>Revendeur</option><option>Distributeur</option><option>Autre</option></select></label></div>
+      <div className="field"><label>{english ? "Monthly volume" : "Volume mensuel"}<select name="monthlyVolume" required defaultValue={application.monthly_volume}><option>1-10 kg</option><option>11-50 kg</option><option>51-100 kg</option><option>100+ kg</option></select></label></div>
+      <div className="field field--wide professional-application-address"><p>{english ? "Billing address" : "Adresse de facturation"}</p><div className="form-grid"><div className="field"><label>{english ? "Last name" : "Nom"}<input name="lastName" required autoComplete="family-name" defaultValue={application.last_name} /></label></div><div className="field"><label>{english ? "First name" : "Prénom"}<input name="firstName" required autoComplete="given-name" defaultValue={application.first_name} /></label></div><div className="field field--wide"><label>{english ? "Number and street" : "Numéro et voie"}<input name="billingLine1" required autoComplete="address-line1" defaultValue={billing.line1 ?? ""} /></label></div><div className="field"><label>{english ? "Postcode" : "Code postal"}<input name="billingPostalCode" required autoComplete="postal-code" defaultValue={billing.postalCode ?? ""} /></label></div><div className="field"><label>{english ? "City" : "Ville"}<input name="billingCity" required autoComplete="address-level2" defaultValue={billing.city ?? ""} /></label></div></div></div>
+      <div className="field field--wide professional-application-address professional-application-delivery-address"><p>{english ? "Delivery address (leave blank to use billing address)" : "Adresse de livraison (laissez vide pour utiliser l’adresse de facturation)"}</p><div className="form-grid"><div className="field"><label>{english ? "Last name" : "Nom"}<input name="deliveryLastName" autoComplete="shipping family-name" defaultValue={delivery.lastName ?? ""} /></label></div><div className="field"><label>{english ? "First name" : "Prénom"}<input name="deliveryFirstName" autoComplete="shipping given-name" defaultValue={delivery.firstName ?? ""} /></label></div><div className="field field--wide"><label>{english ? "Number and street" : "Numéro et voie"}<input name="deliveryLine1" autoComplete="shipping address-line1" defaultValue={delivery.line1 ?? ""} /></label></div><div className="field"><label>{english ? "Postcode" : "Code postal"}<input name="deliveryPostalCode" autoComplete="shipping postal-code" defaultValue={delivery.postalCode ?? ""} /></label></div><div className="field"><label>{english ? "City" : "Ville"}<input name="deliveryCity" autoComplete="shipping address-level2" defaultValue={delivery.city ?? ""} /></label></div></div></div>
+      <p className="professional-application-section-heading professional-application-section-heading--separated field--wide">{english ? "Contact" : "Contact"}</p>
+      <div className="field"><label>Email<input name="email" type="email" required autoComplete="email" defaultValue={application.email} /></label></div>
+      <div className="field"><label>{english ? "Electronic invoicing address" : "Adresse de facturation électronique"}<input name="electronicBillingAddress" maxLength={254} defaultValue={application.electronic_billing_address ?? ""} /></label></div>
+      <div className="field"><label>{english ? "Phone" : "Téléphone"}<input name="phone" type="tel" autoComplete="tel" defaultValue={application.phone ?? ""} /></label></div>
+      <div className="field field--wide professional-application-comment professional-application-section-heading--separated"><label>{english ? "Additional information" : "Information complémentaire"}<textarea name="comment" rows={4} maxLength={2_000} defaultValue={application.comment ?? ""} /></label></div>
+    </div>
+    <button className="button button--dark" type="submit">{english ? "Save professional details" : "Enregistrer les informations professionnelles"}</button>
+  </AccountMutationForm>;
+}
+
 function AccountSections({ data, result, mode, activeSection, onNavigate }: { data: AccountDashboardData; result?: AccountActionFeedback | null; mode: "page" | "drawer"; activeSection: AccountSectionId; onNavigate?: () => void }) {
-  const { locale, viewer, orders, addresses, professionalQuotes, setPassword, next, mfa } = data;
+  const { locale, viewer, orders, addresses, professionalQuotes, professionalApplication, setPassword, next, mfa } = data;
   const english = locale === "en-GB";
   const drawer = mode === "drawer";
   const prefix = drawer ? "account-drawer" : "account";
@@ -192,6 +238,7 @@ function AccountSections({ data, result, mode, activeSection, onNavigate }: { da
     </section>
 
     <section className="account-section" id={`${prefix}-addresses`} aria-labelledby={drawer ? "account-drawer-tab-addresses" : `${prefix}-addresses-title`} role={drawer ? "tabpanel" : undefined} hidden={sectionVisibility(mode, activeSection, "addresses")}>
+      {professionalApplication ? <ProfessionalAccountForm application={professionalApplication} drawer={drawer} accountPath={accountPath} locale={locale} /> : null}
       <div className="account-section__heading"><div><p className="eyebrow">{english ? "Saved details" : "Coordonnées enregistrées"}</p><h2 id={`${prefix}-addresses-title`}>{english ? "Your addresses" : "Vos adresses"}</h2></div><span>{addresses.length} {english ? (addresses.length === 1 ? "address" : "addresses") : (addresses.length === 1 ? "adresse" : "adresses")}</span></div>
       {addresses.length ? <div className="account-address-grid">{addresses.map((address) => <article className="account-panel account-address-card" key={address.id}><div className="account-address-card__icon"><MapPin aria-hidden="true" /></div><div><p className="eyebrow">{address.label || (english ? "Delivery address" : "Adresse de livraison")}</p><h3>{address.first_name} {address.last_name}</h3><p>{address.company ? <>{address.company}<br /></> : null}{address.line1}<br />{address.line2 ? <>{address.line2}<br /></> : null}{address.postal_code} {address.city}<br />{address.country_code}{address.phone ? <> · {address.phone}</> : null}</p></div><AccountMutationForm drawer={drawer} method="post" action={accountPath}><input type="hidden" name="intent" value="delete_address" /><input type="hidden" name="addressId" value={address.id} /><button className="ui-button ui-button--ghost ui-button--sm" type="submit">{english ? "Delete" : "Supprimer"}</button></AccountMutationForm></article>)}</div> : null}
       <AccountMutationForm drawer={drawer} method="post" action={accountPath} className="account-panel account-form"><input type="hidden" name="intent" value="save_address" /><div className="account-form__heading"><div><p className="eyebrow">{english ? "New delivery address" : "Nouvelle adresse de livraison"}</p><h3>{english ? "Add an address" : "Ajouter une adresse"}</h3></div><MapPin aria-hidden="true" /></div><div className="form-grid"><div className="field"><label>{english ? "Label" : "Libellé"}<input name="label" placeholder={english ? "Home" : "Maison"} /></label></div><div className="field"><label>{english ? "Company" : "Société"}<input name="company" /></label></div><div className="field"><label>{english ? "First name" : "Prénom"}<input name="firstName" required autoComplete="given-name" /></label></div><div className="field"><label>{english ? "Last name" : "Nom"}<input name="lastName" required autoComplete="family-name" /></label></div><div className="field field--wide"><label>{english ? "Address" : "Adresse"}<AddressAutocomplete locale={locale} /></label></div><div className="field field--wide"><label>{english ? "Address line 2" : "Complément"}<input name="line2" autoComplete="address-line2" /></label></div><div className="field"><label>{english ? "Postcode" : "Code postal"}<input name="postalCode" required autoComplete="postal-code" /></label></div><div className="field"><label>{english ? "City" : "Ville"}<input name="city" required autoComplete="address-level2" /></label></div><div className="field"><label>{english ? "Country" : "Pays"}<select name="countryCode" defaultValue="FR" required autoComplete="country">{shippingCountries.map((countryCode) => <option key={countryCode} value={countryCode}>{shippingCountryLabel(countryCode, locale)}</option>)}</select></label></div><div className="field"><label>{english ? "Phone" : "Téléphone"}<input name="phone" type="tel" autoComplete="tel" /></label></div></div><button className="button button--dark" type="submit">{english ? "Save address" : "Enregistrer l’adresse"}</button></AccountMutationForm>

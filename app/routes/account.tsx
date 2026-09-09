@@ -10,6 +10,7 @@ import { safeInternalPath } from "~/lib/redirects";
 import { pageMeta } from "~/lib/seo";
 import { authConfirmationUrl, createRequestSupabase, createServiceSupabase } from "~/lib/supabase.server";
 import { SHIPPING_COUNTRY_CODES } from "~/domain/shipping-countries";
+import { professionalApplicationSchema } from "~/domain/schemas";
 
 const addressSchema = z.object({ label: z.string().trim().max(80).default(""), company: z.string().trim().max(120).default(""), firstName: z.string().trim().min(1).max(80), lastName: z.string().trim().min(1).max(80), line1: z.string().trim().min(3).max(160), line2: z.string().trim().max(160).default(""), postalCode: z.string().trim().min(2).max(20), city: z.string().trim().min(1).max(100), countryCode: z.enum(SHIPPING_COUNTRY_CODES), phone: z.string().trim().max(30).default("") });
 const mfaVerificationSchema = z.object({ factorId: z.uuid(), code: z.string().trim().regex(/^\d{6}$/), purpose: z.enum(["login", "setup"]).default("login") });
@@ -65,7 +66,7 @@ export function customerLoginDestination(locale: "fr-FR" | "en-GB", accountPath:
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request); const accountPath = locale === "en-GB" ? "/en/my-account" : "/mon-compte"; const viewer = await getViewer(request); const url = new URL(request.url); const setPassword = url.searchParams.get("set-password") === "1"; const authError = url.searchParams.get("auth_error"); const next = safeInternalPath(url.searchParams.get("next"), accountPath);
-  if (!viewer) return { locale, viewer: null, orders: [], addresses: [], professionalQuotes: [], setPassword, authError, next, mfa: null };
+  if (!viewer) return { locale, viewer: null, orders: [], addresses: [], professionalQuotes: [], professionalApplication: null, setPassword, authError, next, mfa: null };
   const publicViewer = { user: { id: viewer.user.id, email: viewer.user.email }, profile: viewer.profile };
   const requestSupabase = createRequestSupabase(request);
   let mfa: { currentLevel: string | null; nextLevel: string | null; verifiedFactors: Array<{ id: string; friendlyName: string; createdAt: string }> } | null = null;
@@ -80,16 +81,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
       verifiedFactors: (factorsResult.data?.totp ?? []).map((factor) => ({ id: factor.id, friendlyName: factor.friendly_name ?? "Authenticator", createdAt: factor.created_at })),
     };
     if (mfa.verifiedFactors.length > 0 && mfa.currentLevel !== "aal2") {
-      return { locale, viewer: publicViewer, orders: [], addresses: [], professionalQuotes: [], setPassword, authError, next, mfa };
+      return { locale, viewer: publicViewer, orders: [], addresses: [], professionalQuotes: [], professionalApplication: null, setPassword, authError, next, mfa };
     }
   }
   const client = createServiceSupabase();
-  const [ordersResult, addressesResult, professionalQuotesResult] = await Promise.all([
+  const [ordersResult, addressesResult, professionalQuotesResult, professionalApplicationResult] = await Promise.all([
     client ? client.from("orders").select("id,order_number,status,total_cents,created_at,paid_at,shipments(carrier,tracking_number,tracking_url,status)").eq("profile_id", viewer.user.id).neq("status", "pending_payment").order("created_at", { ascending: false }).limit(50) : Promise.resolve({ data: [] }),
     client ? client.from("addresses").select("*").eq("profile_id", viewer.user.id).order("created_at") : Promise.resolve({ data: [] }),
     client && viewer.profile?.professional_status === "approved" ? client.from("professional_quotes").select("id,quote_number,status,total_weight_kg,total_cents,valid_until,paid_at,created_at").eq("profile_id", viewer.user.id).order("created_at", { ascending: false }).limit(50) : Promise.resolve({ data: [] }),
+    client && viewer.profile?.professional_status === "approved" ? client.from("professional_applications").select("company_name,country_code,first_name,last_name,email,company_registration_number,vat_number,phone,electronic_billing_address,billing_address,delivery_address,business_type,monthly_volume,comment").eq("invited_user_id", viewer.user.id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  return { locale, viewer: publicViewer, orders: ordersResult.data ?? [], addresses: addressesResult.data ?? [], professionalQuotes: professionalQuotesResult.data ?? [], setPassword, authError, next, mfa };
+  return { locale, viewer: publicViewer, orders: ordersResult.data ?? [], addresses: addressesResult.data ?? [], professionalQuotes: professionalQuotesResult.data ?? [], professionalApplication: professionalApplicationResult.data ?? null, setPassword, authError, next, mfa };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -138,10 +140,36 @@ export async function action({ request }: ActionFunctionArgs) {
     const parsed = addressSchema.safeParse(Object.fromEntries(form)); if (!parsed.success) return { ok: false, message: locale === "en-GB" ? "Please complete the address." : "Veuillez compléter l’adresse." };
     const { error } = await supabase.client.from("addresses").insert({ profile_id: user.id, label: parsed.data.label, company: parsed.data.company, first_name: parsed.data.firstName, last_name: parsed.data.lastName, line1: parsed.data.line1, line2: parsed.data.line2, postal_code: parsed.data.postalCode, city: parsed.data.city, country_code: parsed.data.countryCode, phone: parsed.data.phone }); return { ok: !error, message: error?.message ?? (locale === "en-GB" ? "Address saved." : "Adresse enregistrée.") };
   }
+  if (intent === "update_professional_profile") {
+    const { data: { user } } = await supabase.client.auth.getUser();
+    if (!user) return { ok: false, message: locale === "en-GB" ? "Authentication required." : "Authentification requise." };
+    const parsed = professionalApplicationSchema.safeParse({ ...Object.fromEntries(form), locale, privacyConsent: true });
+    if (!parsed.success) return { ok: false, message: locale === "en-GB" ? "Please complete the professional account form." : "Veuillez compléter le formulaire du compte professionnel." };
+    const client = createServiceSupabase();
+    if (!client) return { ok: false, message: locale === "en-GB" ? "The database is unavailable." : "La base de données est indisponible." };
+    const { data: profile } = await client.from("profiles").select("professional_status").eq("id", user.id).maybeSingle();
+    if (profile?.professional_status !== "approved") return { ok: false, message: locale === "en-GB" ? "Professional access is required." : "Un accès professionnel est requis." };
+    const { data: application } = await client.from("professional_applications").select("id").eq("invited_user_id", user.id).maybeSingle();
+    if (!application) return { ok: false, message: locale === "en-GB" ? "Your professional account details could not be found." : "Les informations de votre compte professionnel sont introuvables." };
+    const email = parsed.data.email.toLowerCase();
+    if (email !== (user.email ?? "").toLowerCase()) {
+      const { error } = await supabase.client.auth.updateUser({ email });
+      if (error) return { ok: false, message: error.message };
+    }
+    const billingAddress = { line1: parsed.data.billingLine1, postalCode: parsed.data.billingPostalCode, city: parsed.data.billingCity, countryCode: parsed.data.countryCode };
+    const deliveryAddress = parsed.data.deliveryLine1 ? { lastName: parsed.data.deliveryLastName, firstName: parsed.data.deliveryFirstName, line1: parsed.data.deliveryLine1, postalCode: parsed.data.deliveryPostalCode, city: parsed.data.deliveryCity, countryCode: parsed.data.countryCode } : null;
+    const updatedAt = new Date().toISOString();
+    const { error } = await client.from("professional_applications").update({ company_name: parsed.data.companyName, country_code: parsed.data.countryCode, comment: parsed.data.comment, last_name: parsed.data.lastName, first_name: parsed.data.firstName, email, company_registration_number: parsed.data.companyRegistrationNumber, vat_number: parsed.data.vatNumber, phone: parsed.data.phone, electronic_billing_address: parsed.data.electronicBillingAddress, billing_address: billingAddress, delivery_address: deliveryAddress, business_type: parsed.data.businessType, monthly_volume: parsed.data.monthlyVolume, updated_at: updatedAt }).eq("id", application.id);
+    if (error) return { ok: false, message: error.message };
+    const { error: profileError } = await client.from("profiles").update({ first_name: parsed.data.firstName, last_name: parsed.data.lastName, phone: parsed.data.phone, updated_at: updatedAt }).eq("id", user.id);
+    if (profileError) return { ok: false, message: profileError.message };
+    const emailChanged = email !== (user.email ?? "").toLowerCase();
+    return { ok: true, message: emailChanged ? (locale === "en-GB" ? "Professional details saved. Confirm the email change from your inbox." : "Informations professionnelles enregistrées. Confirmez le changement d’e-mail depuis votre boîte de réception.") : (locale === "en-GB" ? "Professional details saved." : "Informations professionnelles enregistrées.") };
+  }
   if (intent === "logout") { await supabase.client.auth.signOut(); return redirect(safeInternalPath(form.get("next"), accountPath), { headers: supabase.responseHeaders }); }
   const email = String(form.get("email") ?? ""); const password = String(form.get("password") ?? "");
   if (intent === "register" && password.length < 10) return { ok: false, message: locale === "en-GB" ? "Use at least 10 characters to create an account." : "Utilisez au moins 10 caractères pour créer un compte." };
-  if (intent === "reset") { const next = safeInternalPath(form.get("next"), accountPath); const confirm = authConfirmationUrl(request, `${accountPath}?set-password=1&next=${encodeURIComponent(next)}`); const { error } = await supabase.client.auth.resetPasswordForEmail(email, { redirectTo: confirm }); return { ok: !error, scope: "password_reset" as const, message: error?.message ?? (locale === "en-GB" ? "Request confirmed. Check your inbox: the password change link has been sent." : "Demande confirmée. Consultez votre boîte de réception : le lien de modification du mot de passe a été envoyé.") }; }
+  if (intent === "reset") { const next = safeInternalPath(form.get("next"), accountPath); const confirm = authConfirmationUrl(request, `${accountPath}?set-password=1&next=${encodeURIComponent(next)}`); const { error } = await supabase.client.auth.resetPasswordForEmail(email, { redirectTo: confirm }); return data({ ok: !error, scope: "password_reset" as const, message: error?.message ?? (locale === "en-GB" ? "Request confirmed. Check your inbox: the password change link has been sent." : "Demande confirmée. Consultez votre boîte de réception : le lien de modification du mot de passe a été envoyé.") }, { headers: supabase.responseHeaders }); }
   const result = intent === "register" ? await supabase.client.auth.signUp({ email, password, options: { data: { signup_source: "account", welcome_drawer_pending: true }, emailRedirectTo: authConfirmationUrl(request, accountPath) } }) : await supabase.client.auth.signInWithPassword({ email, password });
   if (result.error) return { ok: false, message: result.error.message };
   if (intent === "register" && (!result.data.user || result.data.user.identities?.length === 0)) return { ok: false, message: locale === "en-GB" ? "An account already exists for this email. Sign in instead." : "Un compte existe déjà pour cet e-mail. Connectez-vous." };
@@ -193,13 +221,13 @@ export function MfaLoginGate({ email, mfa, next, english, message, messageIsErro
 export { AccountNavigation } from "~/components/account/account-dashboard";
 
 export default function Account() {
-  const { locale, viewer, orders, addresses, professionalQuotes, setPassword, authError, next, mfa } = useLoaderData<typeof loader>(); const result = useActionData<typeof action>(); const english = locale === "en-GB";
+  const { locale, viewer, orders, addresses, professionalQuotes, professionalApplication, setPassword, authError, next, mfa } = useLoaderData<typeof loader>(); const result = useActionData<typeof action>(); const english = locale === "en-GB";
   const mfaResult = result && "scope" in result && result.scope === "mfa" ? result : null;
   if (viewer && mfa && mfa.verifiedFactors.length > 0 && mfa.currentLevel !== "aal2") {
     return <MfaLoginGate email={viewer.user.email ?? ""} mfa={mfa} next={next} english={english} message={mfaResult?.message} messageIsError={mfaResult?.ok === false} />;
   }
   if (viewer) {
-    return <AccountDashboard data={{ locale, viewer, orders, addresses, professionalQuotes, setPassword, next, mfa }} result={result} />;
+    return <AccountDashboard data={{ locale, viewer, orders, addresses, professionalQuotes, professionalApplication, setPassword, next, mfa }} result={result} />;
   }
   return <>
     <header className="page-hero account-welcome-hero"><AccountLanguageSwitch english={english} /><p className="eyebrow">{english ? "Private space" : "Espace privé"}</p><h1>{english ? "Your account" : "Votre compte"}</h1><p className="lede">{english ? "Find your orders, invoices, addresses and tracking." : "Retrouvez vos commandes, factures, adresses et suivis."}</p></header>
