@@ -13,7 +13,6 @@ const accountData: AccountDashboardData = {
   viewer: { user: { id: "member", email: "membre@example.com" }, profile: { role: "customer", professional_status: null, first_name: "Camille", last_name: "Martin" } },
   orders: [],
   addresses: [],
-  professionalQuotes: [],
   setPassword: false,
   next: "/mon-compte",
   mfa: { currentLevel: "aal1", nextLevel: "aal1", verifiedFactors: [] },

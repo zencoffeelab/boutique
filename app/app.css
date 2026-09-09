@@ -4301,6 +4301,17 @@ body.advice-detail-overflow-hidden {
 }
 .account-password-reset-modal__card h2 { margin: 0 0 0.75rem; }
 .account-password-reset-modal__card p:not(.eyebrow) { margin: 0 0 1.5rem; line-height: 1.55; }
+.professional-profile-confirmation-modal__card {
+  width: min(100%, 24rem);
+  padding: clamp(1.25rem, 3vw, 1.75rem);
+}
+.professional-profile-confirmation-modal__card h2 {
+  overflow-wrap: anywhere;
+  font: 650 clamp(1.2rem, 4vw, 1.55rem)/1.15 var(--sans);
+}
+.professional-profile-confirmation-modal__card .eyebrow { font-size: 0.64rem; }
+.professional-profile-confirmation-modal__card p:not(.eyebrow) { font-size: 0.86rem; }
+.professional-profile-confirmation-modal__card p:not(.eyebrow) { margin-bottom: 1.1rem; }
 
 .cart-layout,
 .checkout-layout {
@@ -4643,6 +4654,14 @@ body.advice-detail-overflow-hidden {
 }
 .professional-application-section-heading {
   margin-bottom: 0;
+}
+.professional-application-identity-field input[readonly],
+.professional-application-identity-field select:disabled {
+  cursor: not-allowed;
+  color: color-mix(in srgb, var(--ink) 52%, var(--cream));
+  border-color: color-mix(in srgb, var(--line) 88%, var(--ink));
+  background: color-mix(in srgb, var(--line) 46%, var(--cream));
+  opacity: 1;
 }
 .professional-application-section-heading--separated {
   margin-top: 0;
@@ -6725,6 +6744,14 @@ body.advice-detail-overflow-hidden {
   margin: 0;
   overflow-wrap: anywhere;
 }
+.admin-professional-identity-form {
+  display: grid;
+  gap: 1rem;
+}
+.admin-professional-identity-form__grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.admin-professional-identity-form .button { justify-self: start; }
 .admin-professional-detail__count {
   margin: 0;
   font-family: var(--font-display);

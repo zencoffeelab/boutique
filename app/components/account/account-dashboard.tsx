@@ -1,13 +1,12 @@
-import { CircleAlert, CircleCheck, ChevronRight, MapPin, Package, ShieldCheck, ShoppingBag, UserRound } from "lucide-react";
-import type { FormEventHandler, PropsWithChildren } from "react";
+import { CircleAlert, CircleCheck, ChevronRight, MapPin, Package, ShieldCheck, UserRound } from "lucide-react";
+import { useEffect, useState, type FormEventHandler, type PropsWithChildren } from "react";
 import { Form, Link, useFetcher } from "react-router";
-import { ProfessionalQuotePreview } from "~/components/professional-quote/quote-preview-modal";
 import { AddressAutocomplete } from "~/components/address-autocomplete";
 import { formatMoney } from "~/domain/money";
 import { SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
 import type { Locale } from "~/domain/types";
 
-export type AccountSectionId = "orders" | "addresses" | "settings" | "professional-quotes";
+export type AccountSectionId = "orders" | "addresses" | "settings";
 
 export type AccountMfaState = {
   currentLevel: string | null;
@@ -49,17 +48,6 @@ type AccountAddress = {
   phone?: string | null;
 };
 
-type AccountProfessionalQuote = {
-  id: string;
-  quote_number: string;
-  status: string;
-  total_weight_kg: number | string;
-  total_cents: number;
-  valid_until: string;
-  paid_at?: string | null;
-  created_at: string;
-};
-
 type AccountProfessionalApplication = {
   company_name: string;
   country_code: string;
@@ -82,7 +70,6 @@ export type AccountDashboardData = {
   viewer: AccountViewer;
   orders: AccountOrder[];
   addresses: AccountAddress[];
-  professionalQuotes: AccountProfessionalQuote[];
   professionalApplication?: AccountProfessionalApplication | null;
   setPassword: boolean;
   next: string;
@@ -93,6 +80,7 @@ export type AccountActionFeedback = {
   ok?: boolean;
   message?: string;
   scope?: string;
+  confirmationId?: string;
   mfaEnrollment?: { factorId: string; qrCode: string; secret: string };
 };
 
@@ -108,12 +96,32 @@ function AccountMutationForm({ drawer, ...props }: AccountMutationFormProps & { 
   return drawer ? <fetcher.Form {...props} /> : <Form {...props} />;
 }
 
-export function AccountNavigation({ english, orderCount, addressCount, quoteCount, professional }: { english: boolean; orderCount: number; addressCount: number; quoteCount: number; professional: boolean }) {
+function ProfessionalProfileConfirmation({ english, message }: { english: boolean; message: string }) {
+  const [open, setOpen] = useState(true);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [open]);
+
+  if (!open) return null;
+  return <dialog className="account-password-reset-modal professional-profile-confirmation-modal" open aria-labelledby="professional-profile-confirmation-title">
+    <div className="account-password-reset-modal__card professional-profile-confirmation-modal__card">
+      <p className="eyebrow">Zen Coffee Lab</p>
+      <h2 id="professional-profile-confirmation-title">{english ? "Professional details saved." : "Informations professionnelles enregistrées."}</h2>
+      <p>{message}</p>
+      <button className="button button--dark" type="button" onClick={() => setOpen(false)}>{english ? "Close" : "Fermer"}</button>
+    </div>
+  </dialog>;
+}
+
+export function AccountNavigation({ english, orderCount, addressCount }: { english: boolean; orderCount: number; addressCount: number }) {
   return <nav className="account-anchor-nav" aria-label={english ? "My account sections" : "Sections de mon compte"}>
     <a href="#account-orders"><Package aria-hidden="true" /><span><strong>{english ? "Orders" : "Commandes"}</strong><small>{english ? "Invoices and tracking" : "Factures et suivis"}</small></span><em>{orderCount}</em><ChevronRight aria-hidden="true" /></a>
     <a href="#account-addresses"><MapPin aria-hidden="true" /><span><strong>{english ? "Addresses" : "Adresses"}</strong><small>{english ? "Saved delivery details" : "Coordonnées enregistrées"}</small></span><em>{addressCount}</em><ChevronRight aria-hidden="true" /></a>
     <a href="#account-settings"><ShieldCheck aria-hidden="true" /><span><strong>{english ? "Settings" : "Paramètres"}</strong><small>{english ? "Access and security" : "Accès et sécurité"}</small></span><ChevronRight aria-hidden="true" /></a>
-    {professional ? <a className="account-anchor-nav__professional" href="#account-professional-quotes"><ShoppingBag aria-hidden="true" /><span><strong>{english ? "Professional shop" : "Boutique pro"}</strong><small>{english ? "Quotes and payments" : "Devis et paiements"}</small></span><em>{quoteCount}</em><ChevronRight aria-hidden="true" /></a> : null}
   </nav>;
 }
 
@@ -126,16 +134,6 @@ function orderStatusLabel(status: string, english: boolean) {
   return labels[status]?.[english ? 1 : 0] ?? status;
 }
 
-function professionalQuoteStatusLabel(status: string, english: boolean) {
-  const labels: Record<string, [string, string]> = {
-    pending_payment: ["À régler", "Awaiting payment"],
-    bank_transfer_pending: ["Virement en attente", "Bank transfer pending"],
-    paid: ["Payé", "Paid"],
-    expired: ["Expiré", "Expired"],
-    canceled: ["Annulé", "Cancelled"],
-  };
-  return labels[status]?.[english ? 1 : 0] ?? status;
-}
 
 function sectionVisibility(mode: "page" | "drawer", activeSection: AccountSectionId, section: AccountSectionId) {
   return mode === "drawer" && activeSection !== section;
@@ -193,12 +191,12 @@ function ProfessionalAccountForm({ application, drawer, accountPath, locale }: {
     <div className="account-form__heading"><div><p className="eyebrow">{english ? "Professional account" : "Compte professionnel"}</p><h3>{english ? "Your business details" : "Vos informations professionnelles"}</h3></div><UserRound aria-hidden="true" /></div>
     <div className="form-grid">
       <p className="professional-application-section-heading field--wide">{english ? "Identity" : "Identité"}</p>
-      <div className="field"><label>{english ? "Country" : "Pays"}<select name="countryCode" required defaultValue={application.country_code}>{countries.map((countryCode) => <option key={countryCode} value={countryCode}>{shippingCountryLabel(countryCode, locale)}</option>)}</select></label></div>
-      <div className="field"><label>{application.country_code === "FR" ? "SIRET" : "Company registration number"}<input name="companyRegistrationNumber" required maxLength={80} defaultValue={application.company_registration_number} /></label></div>
-      <div className="field"><label>{english ? "Company" : "Raison sociale"}<input name="companyName" required autoComplete="organization" defaultValue={application.company_name} /></label></div>
-      <div className="field"><label>{english ? "VAT number" : "N° de TVA intracommunautaire"}<input name="vatNumber" maxLength={40} defaultValue={application.vat_number ?? ""} /></label></div>
-      <div className="field"><label>{english ? "Business type" : "Activité"}<select name="businessType" required defaultValue={application.business_type}><option>Coffee shop</option><option>Restaurant</option><option>Revendeur</option><option>Distributeur</option><option>Autre</option></select></label></div>
-      <div className="field"><label>{english ? "Monthly volume" : "Volume mensuel"}<select name="monthlyVolume" required defaultValue={application.monthly_volume}><option>1-10 kg</option><option>11-50 kg</option><option>51-100 kg</option><option>100+ kg</option></select></label></div>
+      <div className="field professional-application-identity-field"><label>{english ? "Country" : "Pays"}<select name="countryCode" required defaultValue={application.country_code} disabled>{countries.map((countryCode) => <option key={countryCode} value={countryCode}>{shippingCountryLabel(countryCode, locale)}</option>)}</select></label></div>
+      <div className="field professional-application-identity-field"><label>{application.country_code === "FR" ? "SIRET" : "Company registration number"}<input name="companyRegistrationNumber" required maxLength={80} readOnly defaultValue={application.company_registration_number} /></label></div>
+      <div className="field professional-application-identity-field"><label>{english ? "Company" : "Raison sociale"}<input name="companyName" required autoComplete="organization" readOnly defaultValue={application.company_name} /></label></div>
+      <div className="field professional-application-identity-field"><label>{english ? "VAT number" : "N° de TVA intracommunautaire"}<input name="vatNumber" maxLength={40} readOnly defaultValue={application.vat_number ?? ""} /></label></div>
+      <div className="field professional-application-identity-field"><label>{english ? "Business type" : "Activité"}<select name="businessType" required defaultValue={application.business_type} disabled><option>Coffee shop</option><option>Restaurant</option><option>Revendeur</option><option>Distributeur</option><option>Autre</option></select></label></div>
+      <div className="field professional-application-identity-field"><label>{english ? "Monthly volume" : "Volume mensuel"}<select name="monthlyVolume" required defaultValue={application.monthly_volume} disabled><option>1-10 kg</option><option>11-50 kg</option><option>51-100 kg</option><option>100+ kg</option></select></label></div>
       <div className="field field--wide professional-application-address"><p>{english ? "Billing address" : "Adresse de facturation"}</p><div className="form-grid"><div className="field"><label>{english ? "Last name" : "Nom"}<input name="lastName" required autoComplete="family-name" defaultValue={application.last_name} /></label></div><div className="field"><label>{english ? "First name" : "Prénom"}<input name="firstName" required autoComplete="given-name" defaultValue={application.first_name} /></label></div><div className="field field--wide"><label>{english ? "Number and street" : "Numéro et voie"}<input name="billingLine1" required autoComplete="address-line1" defaultValue={billing.line1 ?? ""} /></label></div><div className="field"><label>{english ? "Postcode" : "Code postal"}<input name="billingPostalCode" required autoComplete="postal-code" defaultValue={billing.postalCode ?? ""} /></label></div><div className="field"><label>{english ? "City" : "Ville"}<input name="billingCity" required autoComplete="address-level2" defaultValue={billing.city ?? ""} /></label></div></div></div>
       <div className="field field--wide professional-application-address professional-application-delivery-address"><p>{english ? "Delivery address (leave blank to use billing address)" : "Adresse de livraison (laissez vide pour utiliser l’adresse de facturation)"}</p><div className="form-grid"><div className="field"><label>{english ? "Last name" : "Nom"}<input name="deliveryLastName" autoComplete="shipping family-name" defaultValue={delivery.lastName ?? ""} /></label></div><div className="field"><label>{english ? "First name" : "Prénom"}<input name="deliveryFirstName" autoComplete="shipping given-name" defaultValue={delivery.firstName ?? ""} /></label></div><div className="field field--wide"><label>{english ? "Number and street" : "Numéro et voie"}<input name="deliveryLine1" autoComplete="shipping address-line1" defaultValue={delivery.line1 ?? ""} /></label></div><div className="field"><label>{english ? "Postcode" : "Code postal"}<input name="deliveryPostalCode" autoComplete="shipping postal-code" defaultValue={delivery.postalCode ?? ""} /></label></div><div className="field"><label>{english ? "City" : "Ville"}<input name="deliveryCity" autoComplete="shipping address-level2" defaultValue={delivery.city ?? ""} /></label></div></div></div>
       <p className="professional-application-section-heading professional-application-section-heading--separated field--wide">{english ? "Contact" : "Contact"}</p>
@@ -212,25 +210,19 @@ function ProfessionalAccountForm({ application, drawer, accountPath, locale }: {
 }
 
 function AccountSections({ data, result, mode, activeSection, onNavigate }: { data: AccountDashboardData; result?: AccountActionFeedback | null; mode: "page" | "drawer"; activeSection: AccountSectionId; onNavigate?: () => void }) {
-  const { locale, viewer, orders, addresses, professionalQuotes, professionalApplication, setPassword, next, mfa } = data;
+  const { locale, viewer, orders, addresses, professionalApplication, setPassword, next, mfa } = data;
   const english = locale === "en-GB";
   const drawer = mode === "drawer";
   const prefix = drawer ? "account-drawer" : "account";
   const accountPath = english ? "/en/my-account" : "/mon-compte";
-  const professionalPath = english ? "/en/professional" : "/professionnel";
   const professional = viewer.profile?.professional_status === "approved";
   const passwordResetResult = result?.scope === "password_reset" ? result : null;
+  const professionalProfileResult = result?.scope === "professional_profile" ? result : null;
   const shippingCountries = accountShippingCountryOptions(locale);
 
   return <main className="account-sections">
-    {result?.message && !passwordResetResult ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
-    {professional ? <section className="account-section" id={`${prefix}-professional-quotes`} aria-labelledby={drawer ? "account-drawer-tab-professional-quotes" : `${prefix}-professional-quotes-title`} role={drawer ? "tabpanel" : undefined} hidden={sectionVisibility(mode, activeSection, "professional-quotes")}>
-      <div className="account-section__heading"><div><p className="eyebrow">{english ? "Professional purchasing" : "Achats professionnels"}</p><h2 id={`${prefix}-professional-quotes-title`}>{english ? "Professional shop" : "Boutique pro"}</h2></div><div className="account-section__actions"><span>{professionalQuotes.length} {english ? (professionalQuotes.length === 1 ? "quote" : "quotes") : "devis"}</span><Link className="ui-button ui-button--outline" to={professionalPath} onClick={onNavigate}>{english ? "Open the pro shop" : "Voir la boutique pro"}</Link></div></div>
-      {professionalQuotes.length ? <div className="account-panel account-table-wrap"><table className="ui-table"><thead><tr><th>{english ? "Quote" : "Devis"}</th><th>Date</th><th>{english ? "Status" : "Statut"}</th><th>{english ? "Weight" : "Poids"}</th><th>Total</th><th>Documents</th></tr></thead><tbody>{professionalQuotes.map((quote) => {
-        const canPay = quote.status === "pending_payment" && new Date(quote.valid_until).getTime() > Date.now();
-        return <tr key={quote.id}><td><strong>{quote.quote_number}</strong></td><td>{new Date(quote.created_at).toLocaleDateString(locale)}</td><td><span className={`ui-badge account-quote-status account-quote-status--${quote.status}`}>{professionalQuoteStatusLabel(quote.status, english)}</span></td><td>{Number(quote.total_weight_kg).toLocaleString(locale, { maximumFractionDigits: 2 })} kg</td><td><strong>{formatMoney(quote.total_cents, locale)}</strong></td><td><div className="account-order-links"><ProfessionalQuotePreview quoteId={quote.id} locale={locale} /><a className="text-link" href={`/api/professional-quotes/${quote.id}/pdf`}>{english ? "Quote PDF" : "Devis PDF"}</a>{canPay ? <Link className="text-link" to={`${english ? "/en/quotes" : "/devis"}/${quote.id}/${english ? "payment" : "paiement"}`} onClick={onNavigate}>{english ? "Pay" : "Payer"}</Link> : null}</div></td></tr>;
-      })}</tbody></table></div> : <div className="account-panel account-empty-state"><ShoppingBag aria-hidden="true" /><div><h3>{english ? "No quotes yet" : "Aucun devis pour le moment"}</h3><p>{english ? "Select your coffees by the kilogram to generate your first quote." : "Sélectionnez vos cafés au kilo pour générer votre premier devis."}</p></div><Link className="button button--dark" to={professionalPath} onClick={onNavigate}>{english ? "Open the pro shop" : "Voir la boutique pro"}</Link></div>}
-    </section> : null}
+    {result?.message && !passwordResetResult && !(professionalProfileResult?.ok) ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
+    {professionalProfileResult?.ok && professionalProfileResult.message ? <ProfessionalProfileConfirmation key={professionalProfileResult.confirmationId ?? professionalProfileResult.message} english={english} message={professionalProfileResult.message} /> : null}
 
     <section className="account-section" id={`${prefix}-orders`} aria-labelledby={drawer ? "account-drawer-tab-orders" : `${prefix}-orders-title`} role={drawer ? "tabpanel" : undefined} hidden={sectionVisibility(mode, activeSection, "orders")}>
       <div className="account-section__heading"><div><p className="eyebrow">{english ? "History" : "Historique"}</p><h2 id={`${prefix}-orders-title`}>{english ? "Your orders" : "Vos commandes"}</h2></div><span>{orders.length} {english ? (orders.length === 1 ? "order" : "orders") : (orders.length === 1 ? "commande" : "commandes")}</span></div>
@@ -265,11 +257,10 @@ function AccountSections({ data, result, mode, activeSection, onNavigate }: { da
 }
 
 export function AccountDashboard({ data, result, mode = "page", activeSection = "orders", onNavigate }: { data: AccountDashboardData; result?: AccountActionFeedback | null; mode?: "page" | "drawer"; activeSection?: AccountSectionId; onNavigate?: () => void }) {
-  const { locale, viewer, orders, addresses, professionalQuotes } = data;
+  const { locale, viewer, orders, addresses } = data;
   const english = locale === "en-GB";
   const displayName = [viewer.profile?.first_name, viewer.profile?.last_name].filter(Boolean).join(" ");
   const initial = (viewer.profile?.first_name || viewer.user.email || "Z").slice(0, 1).toLocaleUpperCase(locale);
-  const professional = viewer.profile?.professional_status === "approved";
 
   if (mode === "drawer") return <AccountSections data={data} result={result} mode={mode} activeSection={activeSection} onNavigate={onNavigate} />;
 
@@ -278,7 +269,7 @@ export function AccountDashboard({ data, result, mode = "page", activeSection = 
     <div className="page-shell account-page-shell">
       <aside className="account-sidebar">
         <div className="account-profile-card"><span aria-hidden="true">{initial}</span><div><small>{english ? "Signed in as" : "Connecté en tant que"}</small><strong>{displayName || viewer.user.email}</strong>{displayName ? <small>{viewer.user.email}</small> : null}</div></div>
-        <AccountNavigation english={english} orderCount={orders.length} addressCount={addresses.length} quoteCount={professionalQuotes.length} professional={professional} />
+        <AccountNavigation english={english} orderCount={orders.length} addressCount={addresses.length} />
       </aside>
       <AccountSections data={data} result={result} mode={mode} activeSection={activeSection} />
     </div>

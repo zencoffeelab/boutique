@@ -16,7 +16,6 @@ const tabs: Array<{ id: AccountSectionId; fr: string; en: string }> = [
   { id: "orders", fr: "Commandes", en: "Orders" },
   { id: "addresses", fr: "Adresses", en: "Addresses" },
   { id: "settings", fr: "Paramètres", en: "Settings" },
-  { id: "professional-quotes", fr: "Boutique pro", en: "Pro shop" },
 ];
 
 export function AccountDrawer({ open, locale, onClose }: { open: boolean; locale: Locale; onClose: () => void }) {
@@ -31,9 +30,7 @@ export function AccountDrawer({ open, locale, onClose }: { open: boolean; locale
   const accountPath = english ? "/en/my-account" : "/mon-compte";
   const returnPath = `${location.pathname}${location.search}`;
   const data = accountFetcher.data;
-  const professional = data?.viewer?.profile?.professional_status === "approved";
   const mfaChallengeRequired = Boolean(data?.mfa?.verifiedFactors.length && data.mfa.currentLevel !== "aal2");
-  const visibleTabs = tabs.filter((tab) => tab.id !== "professional-quotes" || professional);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -66,10 +63,6 @@ export function AccountDrawer({ open, locale, onClose }: { open: boolean; locale
     accountFetcher.load(accountPath);
   }, [accountPath, actionFetcher.data, actionFetcher.state, open]);
 
-  useEffect(() => {
-    if (activeSection === "professional-quotes" && data && !professional) setActiveSection("orders");
-  }, [activeSection, data, professional]);
-
   const displayName = data?.viewer
     ? [data.viewer.profile?.first_name, data.viewer.profile?.last_name].filter(Boolean).join(" ")
     : "";
@@ -90,7 +83,7 @@ export function AccountDrawer({ open, locale, onClose }: { open: boolean; locale
       </header>
 
       {data?.viewer && !mfaChallengeRequired ? <div className="account-drawer__tabs" role="tablist" aria-label={english ? "My account sections" : "Rubriques de mon compte"}>
-        {visibleTabs.map((tab) => <button
+        {tabs.map((tab) => <button
           id={`account-drawer-tab-${tab.id}`}
           className={activeSection === tab.id ? "is-active" : undefined}
           type="button"
@@ -100,15 +93,15 @@ export function AccountDrawer({ open, locale, onClose }: { open: boolean; locale
           tabIndex={activeSection === tab.id ? 0 : -1}
           onClick={() => setActiveSection(tab.id)}
           onKeyDown={(event) => {
-            const currentIndex = visibleTabs.findIndex((candidate) => candidate.id === tab.id);
+            const currentIndex = tabs.findIndex((candidate) => candidate.id === tab.id);
             let nextIndex = currentIndex;
-            if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % visibleTabs.length;
-            else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + visibleTabs.length) % visibleTabs.length;
+            if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tabs.length;
+            else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
             else if (event.key === "Home") nextIndex = 0;
-            else if (event.key === "End") nextIndex = visibleTabs.length - 1;
+            else if (event.key === "End") nextIndex = tabs.length - 1;
             else return;
             event.preventDefault();
-            const nextTab = visibleTabs[nextIndex];
+            const nextTab = tabs[nextIndex];
             setActiveSection(nextTab.id);
             window.requestAnimationFrame(() => document.getElementById(`account-drawer-tab-${nextTab.id}`)?.focus());
           }}
