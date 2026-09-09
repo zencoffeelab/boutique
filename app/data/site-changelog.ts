@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-09-google-merchant-xml-shipping-image-local-requirements",
+    date: "2026-09-09",
+    kind: "Correction",
+    title: "Flux Google Merchant complété pour chaque format de café",
+    description: "Les fichiers XML produits indiquent désormais le poids d’expédition d’un paquet, le prix unitaire au kilo requis pour la vente de café en France et des images accessibles directement dans l’ordre miniature, survol puis diagramme de galerie.",
+  },
+  {
     id: "2026-09-09-admin-product-google-merchant-xml-export",
     date: "2026-09-09",
     kind: "Fonctionnalité",

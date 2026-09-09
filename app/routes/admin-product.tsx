@@ -24,7 +24,7 @@ import { buildVariantOffers } from "~/domain/professional-quote";
 import type { Product, ProductEditorialBlock, ProductVariant } from "~/domain/types";
 import { requireAdmin } from "~/lib/auth.server";
 import { getAdminProducts } from "~/lib/catalog.server";
-import { PUBLIC_MEDIA_CACHE_SECONDS, PUBLIC_MEDIA_MAX_UPLOAD_BYTES } from "~/lib/public-media";
+import { PUBLIC_MEDIA_CACHE_SECONDS, PUBLIC_MEDIA_MAX_UPLOAD_BYTES, publicMediaOriginUrl } from "~/lib/public-media";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
 const optionalText = (max: number) => z.string().trim().max(max).optional().default("");
@@ -36,12 +36,35 @@ const googleMerchantXmlEscape = (value: string) => value
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&apos;");
 
+const googleMerchantOrigin = "https://www.zencoffeelab.com";
+
+function googleMerchantAbsoluteUrl(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value, googleMerchantOrigin);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function googleMerchantImageUrl(value: string | null | undefined) {
+  const url = googleMerchantAbsoluteUrl(value);
+  if (!url) return null;
+  const directStorageUrl = publicMediaOriginUrl(new URL(url).pathname);
+  return directStorageUrl ?? url;
+}
+
 type GoogleMerchantExportProduct = Pick<Product, "slug" | "media" | "hoverImageUrl" | "thumbnailLabelUrl" | "translations" | "variants">;
 
-function googleMerchantXml(product: GoogleMerchantExportProduct) {
+export function googleMerchantXml(product: GoogleMerchantExportProduct) {
   const translation = product.translations["fr-FR"];
-  const imageUrl = product.media[0]?.url ?? product.hoverImageUrl ?? product.thumbnailLabelUrl;
-  const productUrl = `https://www.zencoffeelab.com/boutique/${product.slug}`;
+  const [imageUrl, ...additionalImageUrls] = [
+    product.thumbnailLabelUrl,
+    product.hoverImageUrl,
+    product.media[0]?.url,
+  ].map(googleMerchantImageUrl).filter((url): url is string => url !== null);
+  const productUrl = `${googleMerchantOrigin}/boutique/${product.slug}`;
   const items = product.variants.flatMap((variant) => variant.offers
     .filter((offer) => offer.audience === "retail" && offer.active)
     .map((offer) => {
@@ -54,9 +77,13 @@ function googleMerchantXml(product: GoogleMerchantExportProduct) {
         ["g:description", description],
         ["g:link", productUrl],
         ...(imageUrl ? [["g:image_link", imageUrl]] : []),
+        ...additionalImageUrls.map((url) => ["g:additional_image_link", url]),
         ["g:condition", "new"],
         ["g:availability", availability],
         ["g:price", `${(offer.price.amount / 100).toFixed(2)} EUR`],
+        ["g:shipping_weight", `${variant.weightGrams} g`],
+        ["g:unit_pricing_measure", `${variant.weightGrams} g`],
+        ["g:unit_pricing_base_measure", "1 kg"],
         ["g:brand", "Zen Coffee Lab"],
       ];
       return `    <item>\n${fields.map(([tag, value]) => `      <${tag}>${googleMerchantXmlEscape(value)}</${tag}>`).join("\n")}\n    </item>`;
