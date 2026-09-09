@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-09-password-reset-private-space-guard",
+    date: "2026-09-09",
+    kind: "Correction",
+    title: "Espace privé masqué pendant la réinitialisation du mot de passe",
+    description: "Un lien de mot de passe oublié ouvre désormais directement l’écran de choix du nouveau mot de passe, sans afficher l’espace privé ni ses informations avant cet enregistrement.",
+  },
+  {
     id: "2026-09-09-password-reset-link-session",
     date: "2026-09-09",
     kind: "Correction",

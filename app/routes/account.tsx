@@ -220,9 +220,23 @@ export function MfaLoginGate({ email, mfa, next, english, message, messageIsErro
 
 export { AccountNavigation } from "~/components/account/account-dashboard";
 
+function PasswordRecoveryForm({ english, next }: { english: boolean; next: string }) {
+  return <>
+    <header className="page-hero account-welcome-hero"><AccountLanguageSwitch english={english} /><p className="eyebrow">{english ? "Password recovery" : "Réinitialisation du mot de passe"}</p><h1>{english ? "Choose a new password" : "Choisissez un nouveau mot de passe"}</h1><p className="lede">{english ? "Set your new password to sign in to your account." : "Définissez votre nouveau mot de passe pour vous connecter à votre compte."}</p></header>
+    <Form method="post" className="form-card" aria-labelledby="password-recovery-title">
+      <input type="hidden" name="intent" value="update_password" />
+      <input type="hidden" name="next" value={next} />
+      <h2 id="password-recovery-title">{english ? "New password" : "Nouveau mot de passe"}</h2>
+      <div className="field"><label htmlFor="recovery-password">{english ? "Choose a password" : "Choisissez un mot de passe"}<input id="recovery-password" name="password" type="password" minLength={10} maxLength={200} required autoComplete="new-password" /></label><small>{english ? "At least 10 characters." : "10 caractères minimum."}</small></div>
+      <button className="button button--dark" type="submit">{english ? "Save my password" : "Enregistrer mon mot de passe"}</button>
+    </Form>
+  </>;
+}
+
 export default function Account() {
   const { locale, viewer, orders, addresses, professionalQuotes, professionalApplication, setPassword, authError, next, mfa } = useLoaderData<typeof loader>(); const result = useActionData<typeof action>(); const english = locale === "en-GB";
   const mfaResult = result && "scope" in result && result.scope === "mfa" ? result : null;
+  if (viewer && setPassword) return <PasswordRecoveryForm english={english} next={next} />;
   if (viewer && mfa && mfa.verifiedFactors.length > 0 && mfa.currentLevel !== "aal2") {
     return <MfaLoginGate email={viewer.user.email ?? ""} mfa={mfa} next={next} english={english} message={mfaResult?.message} messageIsError={mfaResult?.ok === false} />;
   }
