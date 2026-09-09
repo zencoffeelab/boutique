@@ -17,6 +17,7 @@ export const siteChangelog = [
     kind: "Fonctionnalité",
     title: "Export XML Google Merchant depuis chaque fiche produit",
     description: "Chaque fiche produit du backoffice propose désormais le téléchargement d’un fichier XML prêt pour Google Merchant. Les variantes et offres boutique actives y reprennent automatiquement le nom, la description, le lien, l’image, le prix et la disponibilité réels du produit.",
+    reference: "6fe181e",
   },
   {
     id: "2026-09-09-professional-account-confirmation-repeat",
