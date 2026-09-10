@@ -3431,6 +3431,11 @@ body.advice-detail-overflow-hidden {
   gap: clamp(2rem, 7vw, 7rem);
   padding-block: clamp(1.5rem, 3vw, 3rem) clamp(5rem, 10vw, 10rem);
 }
+.contact-layout--professional {
+  grid-template-columns: minmax(250px, 0.65fr) minmax(0, 1.35fr);
+  gap: clamp(2rem, 6vw, 6rem);
+  padding-block: clamp(0.75rem, 1.5vw, 1.25rem) clamp(3rem, 6vw, 6rem);
+}
 .contact-details {
   position: sticky;
   top: calc(88px + 2rem);
@@ -3500,6 +3505,52 @@ body.advice-detail-overflow-hidden {
   color: var(--muted);
   font-size: 0.82rem;
 }
+.professional-contact-table-wrap { overflow: hidden; border: 1px solid var(--line); }
+.professional-contact-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: clamp(0.66rem, 1.2vw, 0.85rem); }
+.professional-contact-table th,
+.professional-contact-table td { padding: 0.9rem clamp(0.35rem, 1vw, 0.75rem); overflow-wrap: anywhere; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.professional-contact-table th:first-child,
+.professional-contact-table td:first-child { width: 2.5rem; padding-inline: 0; text-align: center; }
+.professional-contact-table th:nth-child(2) { width: 26%; }
+.professional-contact-table th:nth-child(2),
+.professional-contact-table td:nth-child(2) { padding-left: 0; }
+.professional-contact-table th:nth-child(3) { width: 25%; }
+.professional-contact-table th:nth-child(4) { width: 10%; }
+.professional-contact-table th:nth-child(5),
+.professional-contact-table th:nth-child(6) { width: 13%; }
+.professional-contact-table thead th {
+  padding-block: 0.8rem;
+  background: var(--green-deep);
+  color: var(--paper);
+  font-family: var(--sans);
+  font-size: clamp(0.68rem, 1.1vw, 0.82rem);
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  line-height: 1.25;
+  text-transform: none;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.professional-contact-table__quantity-heading { display: inline-block; min-width: 6.25rem; transform: translateX(-0.4rem); }
+.professional-contact-table__coffee-link { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2rem; }
+.professional-contact-table__coffee-link:hover,
+.professional-contact-table__coffee-link:focus-visible { color: var(--orange); }
+.professional-contact-table tbody tr { height: 5.3rem; }
+.professional-contact-table__tasting-notes {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+}
+.professional-contact-table tbody tr.is-selected { background: color-mix(in srgb, var(--yellow) 14%, transparent); }
+.professional-contact-table tbody th { overflow-wrap: normal; font-family: var(--serif); font-size: clamp(0.8rem, 1.5vw, 1rem); font-weight: 400; white-space: nowrap; }
+.professional-contact-table tbody th small { display: block; margin-top: 0.2rem; color: var(--muted); font-family: var(--sans); font-size: 0.72rem; }
+.professional-contact-table input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: var(--green-deep); }
+.professional-contact-table td:first-child input[type="checkbox"] { margin-right: 0; }
+.professional-contact-table input[type="number"] { width: 100%; min-width: 0; min-height: 2.35rem; padding: 0.35rem; border: 1px solid var(--line); background: var(--paper); }
+.professional-contact-table tfoot th,
+.professional-contact-table tfoot td { border-bottom: 0; background: var(--green-deep); color: var(--paper); font-weight: 700; }
 .contact-success {
   min-height: 30rem;
   padding: clamp(2rem, 5vw, 4rem);
