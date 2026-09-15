@@ -73,7 +73,7 @@ export default function Home() {
       }} />
       <section className="hero">
         <div className="hero__media">
-          <img src={home.hero.url || "/media/home-hero-coffee-cherries.webp"} alt={home.hero.alt || (english ? "Coffee cherries ripening on a coffee plant" : "Cerises de café mûrissant sur un caféier")} width="1672" height="941" fetchPriority="high" />
+          <img src={home.hero.url || "/media/home-hero-origin.jpg"} alt={home.hero.alt || (english ? "Snow-capped mountain range" : "Chaîne de montagnes enneigées")} width="1672" height="941" fetchPriority="high" />
           <div className="hero__copy">
             <p className="eyebrow">{english ? "Micro-roastery" : "micro-torréfacteur"} · Tours</p>
             <h1>{english ? <>A roast tailored to the <em>origin.</em></> : <>Une torréfaction pensée pour l’<em>origine.</em></>}</h1>

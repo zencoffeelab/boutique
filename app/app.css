@@ -196,8 +196,8 @@ button:disabled {
 
 .announcement {
   padding: 0.55rem 1rem;
-  background: #56634f;
-  color: var(--cream);
+  background: var(--green-pastel);
+  color: var(--green-deep);
   text-align: center;
   font-size: 0.72rem;
   font-weight: 700;
