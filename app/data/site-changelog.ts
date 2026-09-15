@@ -14,6 +14,7 @@ export const siteChangelog = [
   {
     id: "2026-09-15-about-first-block-png-photo",
     date: "2026-09-15",
+    reference: "50cece0",
     kind: "Design",
     title: "Photo PNG actualisée pour le premier bloc À propos",
     description: "Le premier bloc éditorial de la page À propos utilise désormais la version PNG fournie de la préparation de café filtre.",
@@ -21,6 +22,7 @@ export const siteChangelog = [
   {
     id: "2026-09-15-about-first-block-new-photo",
     date: "2026-09-15",
+    reference: "50cece0",
     kind: "Design",
     title: "Nouvelle photo pour le premier bloc À propos",
     description: "Le premier bloc éditorial de la page À propos présente désormais la photo fournie d’une préparation de café filtre.",
@@ -28,6 +30,7 @@ export const siteChangelog = [
   {
     id: "2026-09-15-about-story-images-swapped",
     date: "2026-09-15",
+    reference: "50cece0",
     kind: "Design",
     title: "Images des blocs À propos inversées",
     description: "Les deux images éditoriales de la page À propos sont désormais affichées dans l’ordre inverse.",
@@ -35,6 +38,7 @@ export const siteChangelog = [
   {
     id: "2026-09-15-announcement-banner-pastel-green",
     date: "2026-09-15",
+    reference: "50cece0",
     kind: "Design",
     title: "Bandeau supérieur vert pastel",
     description: "Le bandeau supérieur adopte le vert pastel clair utilisé pour les fonds de présentation des cafés.",
@@ -42,6 +46,7 @@ export const siteChangelog = [
   {
     id: "2026-09-15-announcement-banner-black",
     date: "2026-09-15",
+    reference: "50cece0",
     kind: "Design",
     title: "Bandeau supérieur noir",
     description: "Le bandeau supérieur utilise désormais un fond noir.",
@@ -49,6 +54,7 @@ export const siteChangelog = [
   {
     id: "2026-09-15-announcement-banner-hero-photo-color",
     date: "2026-09-15",
+    reference: "50cece0",
     kind: "Design",
     title: "Bandeau supérieur accordé à la photo d’accueil",
     description: "Le bandeau supérieur reprend désormais le brun cuivré relevé dans le bas gauche de la photo du hero.",
@@ -56,6 +62,7 @@ export const siteChangelog = [
   {
     id: "2026-09-15-announcement-banner-button-green",
     date: "2026-09-15",
+    reference: "50cece0",
     kind: "Design",
     title: "Bandeau supérieur harmonisé avec les boutons",
     description: "Le bandeau supérieur reprend désormais le même vert foncé que les boutons principaux du site.",
@@ -63,6 +70,7 @@ export const siteChangelog = [
   {
     id: "2026-09-15-home-hero-snowy-mountains-photo",
     date: "2026-09-15",
+    reference: "50cece0",
     kind: "Design",
     title: "Photo de montagnes enneigées pour le hero de l’accueil",
     description: "L’image de fond de l’accroche d’accueil utilise désormais la vue de montagnes enneigées fournie.",
@@ -70,6 +78,7 @@ export const siteChangelog = [
   {
     id: "2026-09-15-home-hero-origin-photo",
     date: "2026-09-15",
+    reference: "50cece0",
     kind: "Design",
     title: "Nouvelle photo pour le hero de l’accueil",
     description: "L’image en arrière-plan de l’accroche « Une torréfaction pensée pour l’origine. » affiche désormais le paysage de montagne fourni.",
