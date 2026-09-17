@@ -13,6 +13,7 @@ import {
   useNavigation,
 } from "react-router";
 import { z } from "zod";
+import { ProfessionalDiscountTable } from "~/components/professional-discount-table";
 import { contactFormSchema } from "~/domain/schemas";
 import { formatMoney } from "~/domain/money";
 import type { Locale, Product } from "~/domain/types";
@@ -690,8 +691,8 @@ export default function Contact() {
             {steps.map((step, index) => (
               <article key={index}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
-                <h3>{index === 0 ? (english ? "Choose the coffees you would like." : "Choisissez les cafés que vous souhaitez.") : index === 1 ? (english ? "Overall discounts" : "Des réductions globales") : index === 2 ? (english ? "Add comments" : "Ajoutez des commentaires") : step.title}</h3>
-                <p>{index === 0 ? (english ? "We check their availability, then get back to you." : "Nous vérifions leurs disponibilités puis revenons vers vous.") : index === 1 ? (english ? "Discounts on the total will be added to the quote according to the quantities requested." : "Des réductions sur le total seront ajoutées au devis en fonction des quantités demandées.") : index === 2 ? (english ? "If you have a specific request, a question, or anything else: we will reply." : "Si vous avez une demande particulière, une question, ou autre : nous y répondrons.") : step.text}</p>
+                <h3>{index === 1 ? (steps[2]?.title ?? step.title) : index === 2 ? (steps[1]?.title ?? step.title) : step.title}</h3>
+                <p>{index === 1 ? (steps[2]?.text ?? step.text) : index === 2 ? (steps[1]?.text ?? step.text) : step.text}</p>{index === 2 ? <ProfessionalDiscountTable english={english} /> : null}
               </article>
             ))}
           </section>

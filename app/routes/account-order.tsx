@@ -11,6 +11,9 @@ type OrderDetail = {
   id: string;
   order_number: string;
   status: string;
+  subtotal_before_discount_cents: number;
+  professional_discount_cents: number;
+  professional_discount_percent: number;
   subtotal_cents: number;
   shipping_charged_cents: number;
   total_cents: number;
@@ -47,7 +50,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const client = createServiceSupabase();
   if (!client) throw data(null, { status: 503, statusText: "Database unavailable" });
   const { data: order } = await client.from("orders")
-    .select("id,order_number,status,subtotal_cents,shipping_charged_cents,total_cents,created_at,paid_at,shipping_address,shipping_carrier,shipping_service,order_lines(product_name,variant_label,quantity,unit_price_cents,line_total_cents),shipments(carrier,service,tracking_number,tracking_url,status)")
+    .select("id,order_number,status,subtotal_before_discount_cents,professional_discount_cents,professional_discount_percent,subtotal_cents,shipping_charged_cents,total_cents,created_at,paid_at,shipping_address,shipping_carrier,shipping_service,order_lines(product_name,variant_label,quantity,unit_price_cents,line_total_cents),shipments(carrier,service,tracking_number,tracking_url,status)")
     .eq("id", params.id).eq("profile_id", viewer.user.id).maybeSingle();
   if (!order) throw data(null, { status: 404, statusText: "Order not found" });
   return { locale, order: order as OrderDetail };
@@ -74,7 +77,7 @@ export default function AccountOrder() {
         <div><small>{english ? "Total" : "Total"}</small><strong>{formatMoney(order.total_cents, locale)}</strong></div>
         <div><small>{english ? "Payment" : "Paiement"}</small><strong>{order.paid_at ? (english ? "Paid" : "Payée") : (english ? "Pending" : "En attente")}</strong></div>
       </section>
-      <section className="account-order-detail__section"><div className="account-order-detail__heading"><Package aria-hidden="true" /><div><p className="eyebrow">{english ? "Items" : "Articles"}</p><h2>{english ? "Your coffees" : "Vos cafés"}</h2></div></div><div className="account-order-lines">{order.order_lines?.map((line, index) => <article key={`${line.product_name}-${index}`}><div><strong>{line.product_name}</strong>{line.variant_label ? <small>{line.variant_label}</small> : null}</div><span>×{line.quantity}</span><strong>{formatMoney(line.line_total_cents, locale)}</strong></article>)}</div><div className="account-order-totals"><span>{english ? "Subtotal" : "Sous-total"}<strong>{formatMoney(order.subtotal_cents, locale)}</strong></span><span>{english ? "Delivery" : "Livraison"}<strong>{formatMoney(order.shipping_charged_cents, locale)}</strong></span><span>{english ? "Total" : "Total"}<strong>{formatMoney(order.total_cents, locale)}</strong></span></div></section>
+      <section className="account-order-detail__section"><div className="account-order-detail__heading"><Package aria-hidden="true" /><div><p className="eyebrow">{english ? "Items" : "Articles"}</p><h2>{english ? "Your coffees" : "Vos cafés"}</h2></div></div><div className="account-order-lines">{order.order_lines?.map((line, index) => <article key={`${line.product_name}-${index}`}><div><strong>{line.product_name}</strong>{line.variant_label ? <small>{line.variant_label}</small> : null}</div><span>×{line.quantity}</span><strong>{formatMoney(line.line_total_cents, locale)}</strong></article>)}</div><div className="account-order-totals"><span>{english ? "Subtotal" : "Sous-total"}<strong>{formatMoney(order.subtotal_before_discount_cents || order.subtotal_cents, locale)}</strong></span>{order.professional_discount_cents > 0 ? <span>{english ? "Professional offer" : "Offre professionnelle"}{order.professional_discount_percent > 0 ? ` (${order.professional_discount_percent} %)` : ""}<strong>−{formatMoney(order.professional_discount_cents, locale)}</strong></span> : null}<span>{english ? "Delivery" : "Livraison"}<strong>{formatMoney(order.shipping_charged_cents, locale)}</strong></span><span>{english ? "Total" : "Total"}<strong>{formatMoney(order.total_cents, locale)}</strong></span></div></section>
       <section className="account-order-detail__section account-order-delivery"><div className="account-order-detail__heading"><Truck aria-hidden="true" /><div><p className="eyebrow">{english ? "Delivery" : "Livraison"}</p><h2>{english ? "Delivery information" : "Informations de livraison"}</h2></div></div><div className="account-order-delivery__grid"><div>{deliveryAddress.map((line) => <p key={line}>{line}</p>)}</div><div>{shipment?.carrier || order.shipping_carrier ? <p><strong>{shipment?.carrier ?? order.shipping_carrier}{shipment?.service || order.shipping_service ? ` · ${shipment?.service ?? order.shipping_service}` : ""}</strong></p> : null}{shipment?.tracking_number ? <p>{english ? "Tracking number:" : "Numéro de suivi :"} {shipment.tracking_number}</p> : null}{shipment?.tracking_url ? <a className="text-link" href={shipment.tracking_url} target="_blank" rel="noreferrer">{english ? "Track delivery" : "Suivre la livraison"}<ExternalLink aria-hidden="true" /></a> : null}</div></div></section>
       {order.paid_at ? <a className="ui-button ui-button--ghost account-order-invoice" href={`/api/orders/${order.id}/invoice`}>{english ? "Download invoice" : "Télécharger la facture"}</a> : null}
     </main>

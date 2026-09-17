@@ -19,7 +19,7 @@ function sections(content: EditorialContent) {
   }, []);
 }
 
-export function EditorialStory({ content, images, imageFirst = false, splitSections = true, lockBlockSize = false, heightBuffer = 0, tableLineBreaks }: { content: EditorialContent; images: StoryImage[]; imageFirst?: boolean; splitSections?: boolean; lockBlockSize?: boolean; heightBuffer?: number; tableLineBreaks?: readonly string[] }) {
+export function EditorialStory({ content, images, imageFirst = false, splitSections = true, lockBlockSize = false, heightBuffer = 0, tableLineBreaks, className = "" }: { content: EditorialContent; images: StoryImage[]; imageFirst?: boolean; splitSections?: boolean; lockBlockSize?: boolean; heightBuffer?: number; tableLineBreaks?: readonly string[]; className?: string }) {
   const document: RichTextDocument = Array.isArray(content) && content.every((item) => typeof item === "string")
     ? paragraphsToRichTextDocument(content)
     : Array.isArray(content)
@@ -85,7 +85,7 @@ export function EditorialStory({ content, images, imageFirst = false, splitSecti
     };
   }, [lockBlockSize]);
   const fallback = { src: "/media/home-hero-coffee-cherries.webp", alt: "Coffee cherries" };
-  return <div ref={storyRef} className="product-story editorial-story">{blocks.map((block, index) => {
+  return <div ref={storyRef} className={`product-story editorial-story ${className}`}>{blocks.map((block, index) => {
     const imageFirstForBlock = (index + (imageFirst ? 1 : 0)) % 2 === 1;
     const image = images[index % Math.max(images.length, 1)] ?? fallback;
     return <section className={`product-story-block${imageFirstForBlock ? " product-story-block--image-first" : ""}`} key={index}><div className="product-story-block__copy"><RichTextContent content={{ type: "doc", content: block }} tableLineBreaks={tableLineBreaks} /></div><figure className="product-story-block__media"><img src={image.src} alt={image.alt} width="750" height="830" loading="lazy" /></figure></section>;

@@ -3,18 +3,26 @@ import { useEffect, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { data, Form, Link, redirect, useActionData, useLoaderData } from "react-router";
 import { z } from "zod";
+import { Resend } from "resend";
 import { AccountDashboard } from "~/components/account/account-dashboard";
 import { getViewer } from "~/lib/auth.server";
+import { env } from "~/lib/env.server";
 import { getLocale } from "~/lib/i18n";
 import { safeInternalPath } from "~/lib/redirects";
 import { pageMeta } from "~/lib/seo";
 import { authConfirmationUrl, clearPasswordRecoveryCookie, createPublicSupabase, createRequestSupabase, createServiceSupabase, readPasswordRecoverySession } from "~/lib/supabase.server";
 import { SHIPPING_COUNTRY_CODES } from "~/domain/shipping-countries";
 import { professionalApplicationSchema } from "~/domain/schemas";
+import { escapeEmailHtml } from "~/services/email-templates.server";
 
 const addressSchema = z.object({ label: z.string().trim().max(80).default(""), company: z.string().trim().max(120).default(""), firstName: z.string().trim().min(1).max(80), lastName: z.string().trim().min(1).max(80), line1: z.string().trim().min(3).max(160), line2: z.string().trim().max(160).default(""), postalCode: z.string().trim().min(2).max(20), city: z.string().trim().min(1).max(100), countryCode: z.enum(SHIPPING_COUNTRY_CODES), phone: z.string().trim().max(30).default("") });
 const mfaVerificationSchema = z.object({ factorId: z.uuid(), code: z.string().trim().regex(/^\d{6}$/), purpose: z.enum(["login", "setup"]).default("login") });
 const mfaUnenrollmentSchema = z.object({ factorId: z.uuid() });
+const professionalReplySchema = z.object({ messageId: z.uuid(), body: z.string().trim().min(1).max(5_000) });
+
+function messageHasRecipient(recipients: unknown, email: string) {
+  return Array.isArray(recipients) && recipients.some((recipient) => recipient && typeof recipient === "object" && "address" in recipient && typeof recipient.address === "string" && recipient.address.toLocaleLowerCase("en-US") === email);
+}
 
 export function signupConfirmationMessage(locale: "fr-FR" | "en-GB") {
   return locale === "en-GB"
@@ -66,7 +74,7 @@ export function customerLoginDestination(locale: "fr-FR" | "en-GB", accountPath:
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request); const accountPath = locale === "en-GB" ? "/en/my-account" : "/mon-compte"; const url = new URL(request.url); const passwordRecovery = url.searchParams.get("recover") === "1" && Boolean(readPasswordRecoverySession(request)); const viewer = passwordRecovery ? null : await getViewer(request); const setPassword = url.searchParams.get("set-password") === "1"; const passwordResetComplete = url.searchParams.get("password-reset") === "complete"; const authError = url.searchParams.get("auth_error"); const next = safeInternalPath(url.searchParams.get("next"), accountPath);
-  if (!viewer) return { locale, viewer: null, orders: [], addresses: [], professionalApplication: null, setPassword, passwordRecovery, passwordResetComplete, authError, next, mfa: null };
+  if (!viewer) return { locale, viewer: null, orders: [], addresses: [], professionalApplication: null, professionalQuotes: [], professionalMessages: [], upcomingContract: null, setPassword, passwordRecovery, passwordResetComplete, authError, next, mfa: null };
   const publicViewer = { user: { id: viewer.user.id, email: viewer.user.email }, profile: viewer.profile };
   const requestSupabase = createRequestSupabase(request);
   let mfa: { currentLevel: string | null; nextLevel: string | null; verifiedFactors: Array<{ id: string; friendlyName: string; createdAt: string }> } | null = null;
@@ -81,16 +89,24 @@ export async function loader({ request }: LoaderFunctionArgs) {
       verifiedFactors: (factorsResult.data?.totp ?? []).map((factor) => ({ id: factor.id, friendlyName: factor.friendly_name ?? "Authenticator", createdAt: factor.created_at })),
     };
     if (mfa.verifiedFactors.length > 0 && mfa.currentLevel !== "aal2") {
-      return { locale, viewer: publicViewer, orders: [], addresses: [], professionalApplication: null, setPassword, passwordRecovery, passwordResetComplete, authError, next, mfa };
+      return { locale, viewer: publicViewer, orders: [], addresses: [], professionalApplication: null, professionalQuotes: [], professionalMessages: [], upcomingContract: null, setPassword, passwordRecovery, passwordResetComplete, authError, next, mfa };
     }
   }
   const client = createServiceSupabase();
-  const [ordersResult, addressesResult, professionalApplicationResult] = await Promise.all([
+  const professional = viewer.profile?.professional_status === "approved";
+  const contractual = professional && viewer.profile?.professional_account_type === "contractual";
+  const [ordersResult, addressesResult, professionalApplicationResult, quotesResult, inboundMessagesResult, outboundMessagesResult, contractResult] = await Promise.all([
     client ? client.from("orders").select("id,order_number,status,total_cents,created_at,paid_at,shipments(carrier,tracking_number,tracking_url,status)").eq("profile_id", viewer.user.id).neq("status", "pending_payment").order("created_at", { ascending: false }).limit(50) : Promise.resolve({ data: [] }),
     client ? client.from("addresses").select("*").eq("profile_id", viewer.user.id).order("created_at") : Promise.resolve({ data: [] }),
-    client && viewer.profile?.professional_status === "approved" ? client.from("professional_applications").select("company_name,country_code,first_name,last_name,email,company_registration_number,vat_number,phone,electronic_billing_address,billing_address,delivery_address,business_type,monthly_volume,comment").eq("invited_user_id", viewer.user.id).maybeSingle() : Promise.resolve({ data: null }),
+    client && professional ? client.from("professional_applications").select("company_name,country_code,first_name,last_name,email,company_registration_number,vat_number,phone,electronic_billing_address,billing_address,delivery_address,business_type,monthly_volume,comment").eq("invited_user_id", viewer.user.id).maybeSingle() : Promise.resolve({ data: null }),
+    client && professional ? client.from("professional_quotes").select("id,quote_number,status,total_cents,created_at,paid_at").eq("profile_id", viewer.user.id).order("created_at", { ascending: false }).limit(100) : Promise.resolve({ data: [] }),
+    client && professional ? client.from("admin_mail_messages").select("id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,sent_at,parent_id").eq("direction", "inbound").eq("sender_address", viewer.user.email ?? "").order("created_at", { ascending: false }).limit(100) : Promise.resolve({ data: [] }),
+    client && professional ? client.from("admin_mail_messages").select("id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,sent_at,parent_id").eq("direction", "outbound").order("created_at", { ascending: false }).limit(500) : Promise.resolve({ data: [] }),
+    client && contractual ? client.from("professional_contracts").select("id,next_delivery_date,professional_contract_lines(product_name,quantity_grams)").eq("profile_id", viewer.user.id).eq("status", "active").order("next_delivery_date").limit(1).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  return { locale, viewer: publicViewer, orders: ordersResult.data ?? [], addresses: addressesResult.data ?? [], professionalApplication: professionalApplicationResult.data ?? null, setPassword, passwordRecovery, passwordResetComplete, authError, next, mfa };
+  const email = (viewer.user.email ?? "").toLocaleLowerCase("en-US");
+  const professionalMessages = [...(inboundMessagesResult.data ?? []), ...(outboundMessagesResult.data ?? []).filter((message) => messageHasRecipient(message.recipients, email))].toSorted((left, right) => right.created_at.localeCompare(left.created_at));
+  return { locale, viewer: publicViewer, orders: ordersResult.data ?? [], addresses: addressesResult.data ?? [], professionalApplication: professionalApplicationResult.data ?? null, professionalQuotes: quotesResult.data ?? [], professionalMessages, upcomingContract: contractResult.data ?? null, setPassword, passwordRecovery, passwordResetComplete, authError, next, mfa };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -174,6 +190,25 @@ export async function action({ request }: ActionFunctionArgs) {
     if (profileError) return { ok: false, message: profileError.message };
     const emailChanged = email !== (user.email ?? "").toLowerCase();
     return { ok: true, scope: "professional_profile" as const, confirmationId: crypto.randomUUID(), message: emailChanged ? (locale === "en-GB" ? "Professional details saved. Confirm the email change from your inbox." : "Informations professionnelles enregistrées. Confirmez le changement d’e-mail depuis votre boîte de réception.") : (locale === "en-GB" ? "Professional details saved." : "Informations professionnelles enregistrées.") };
+  }
+  if (intent === "reply_professional_message") {
+    const { data: { user } } = await supabase.client.auth.getUser();
+    const parsed = professionalReplySchema.safeParse(Object.fromEntries(form));
+    if (!user || !parsed.success) return { ok: false, message: locale === "en-GB" ? "Your reply is invalid." : "Votre réponse est invalide." };
+    const client = createServiceSupabase(); const config = env();
+    if (!client || !config.RESEND_API_KEY) return { ok: false, message: locale === "en-GB" ? "Messaging is unavailable." : "La messagerie est indisponible." };
+    const { data: profile } = await client.from("profiles").select("professional_status").eq("id", user.id).maybeSingle();
+    if (profile?.professional_status !== "approved") return { ok: false, message: locale === "en-GB" ? "Professional access is required." : "Un accès professionnel est requis." };
+    const { data: parent } = await client.from("admin_mail_messages").select("id,direction,sender_address,recipients,subject,message_id_header,references_header").eq("id", parsed.data.messageId).maybeSingle();
+    const email = (user.email ?? "").toLocaleLowerCase("en-US");
+    if (!parent || (parent.direction === "inbound" ? parent.sender_address.toLocaleLowerCase("en-US") !== email : !messageHasRecipient(parent.recipients, email))) return { ok: false, message: locale === "en-GB" ? "Message not found." : "Message introuvable." };
+    const headers = parent.message_id_header ? { "In-Reply-To": parent.message_id_header, References: [parent.references_header, parent.message_id_header].filter(Boolean).join(" ") } : undefined;
+    const subject = parent.subject.startsWith("Re:") ? parent.subject : `Re: ${parent.subject}`;
+    const sent = await new Resend(config.RESEND_API_KEY).emails.send({ from: config.CONTACT_FROM_EMAIL, to: config.CONTACT_FROM_EMAIL, replyTo: user.email ?? undefined, subject, text: parsed.data.body, html: `<p>${escapeEmailHtml(parsed.data.body).replaceAll("\n", "<br />")}</p>`, headers }, { idempotencyKey: `professional-reply/${user.id}/${crypto.randomUUID()}` });
+    if (sent.error) return { ok: false, message: sent.error.message };
+    const now = new Date().toISOString();
+    await client.from("admin_mail_messages").insert({ direction: "inbound", sender_name: null, sender_address: user.email ?? "", recipients: [{ name: "Zen Coffee Lab", address: config.CONTACT_FROM_EMAIL }], cc_addresses: [], reply_to_address: user.email ?? null, subject, text_body: parsed.data.body, html_body: `<p>${escapeEmailHtml(parsed.data.body).replaceAll("\n", "<br />")}</p>`, parent_id: parent.id, is_read: false, raw_size: new TextEncoder().encode(parsed.data.body).byteLength, received_at: now });
+    return { ok: true, scope: "professional_communication", message: locale === "en-GB" ? "Your reply has been sent." : "Votre réponse a été envoyée." };
   }
   if (intent === "logout") { await supabase.client.auth.signOut(); return redirect(safeInternalPath(form.get("next"), accountPath), { headers: supabase.responseHeaders }); }
   const email = String(form.get("email") ?? ""); const password = String(form.get("password") ?? "");

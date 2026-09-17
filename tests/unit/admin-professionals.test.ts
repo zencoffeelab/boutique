@@ -15,6 +15,16 @@ describe("professional member administration", () => {
       [{ id: "user-pro", email: "pro@example.com", last_sign_in_at: "2026-07-24T14:00:00.000Z", email_confirmed_at: "2026-07-24T13:00:00.000Z" }],
     );
 
-    expect(members[0]).toMatchObject({ company: "Café Nouveau", email: "pro@example.com", role: "admin", status: "suspended", emailConfirmed: true, lastSignInAt: "2026-07-24T14:00:00.000Z" });
+    expect(members[0]).toMatchObject({ company: "Café Nouveau", email: "pro@example.com", role: "admin", status: "suspended", accountType: "classic", emailConfirmed: true, lastSignInAt: "2026-07-24T14:00:00.000Z" });
+  });
+
+  it("keeps contractual accounts in their own category", () => {
+    const [member] = buildProfessionalMembers(
+      [{ id: "user-contract", role: "customer", professional_status: "approved", professional_account_type: "contractual", first_name: "Grace", last_name: "Hopper", phone: null, created_at: "2026-07-20T12:00:00.000Z" }],
+      [],
+      [{ id: "user-contract", email: "grace@example.com" }],
+    );
+
+    expect(member.accountType).toBe("contractual");
   });
 });

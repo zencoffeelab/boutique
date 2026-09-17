@@ -15,9 +15,10 @@ import { dispatchNotificationQueue, enqueueNotification } from "~/services/notif
 import { generateProfessionalAccessLink, ProfessionalAccessError } from "~/services/professional-access.server";
 
 const memberActionSchema = z.object({
-  intent: z.enum(["suspend", "reactivate", "resend_access", "delete_member", "delete_application"]),
+  intent: z.enum(["suspend", "reactivate", "resend_access", "delete_member", "delete_application", "set_account_type"]),
   userId: z.uuid().optional(),
   applicationId: z.uuid().optional(),
+  accountType: z.enum(["classic", "contractual"]).optional(),
   note: z.string().trim().max(1_000).optional().default(""),
 });
 
@@ -27,6 +28,7 @@ type ProfessionalApplication = {
   business_type: string; monthly_volume: string; locale: "fr-FR" | "en-GB"; status: "pending" | "approved" | "rejected" | "suspended";
   decision_note: string | null; decided_at: string | null; invited_user_id: string | null; created_at: string;
 };
+type AccountTypeHistory = { entity_id: string; before_data: { professional_account_type?: string } | null; after_data: { professional_account_type?: string } | null; created_at: string };
 const ADMIN_DATE_FORMATTER = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" });
 
 function includesSearch(values: unknown[], query: string) {
@@ -36,7 +38,7 @@ function includesSearch(values: unknown[], query: string) {
 }
 
 export function buildProfessionalMembers(
-  profiles: Array<{ id: string; role: "customer" | "admin"; professional_status: string | null; first_name: string | null; last_name: string | null; phone: string | null; created_at: string }>,
+  profiles: Array<{ id: string; role: "customer" | "admin"; professional_status: string | null; professional_account_type?: string | null; first_name: string | null; last_name: string | null; phone: string | null; created_at: string }>,
   applications: ProfessionalApplication[],
   users: Array<{ id: string; email?: string; last_sign_in_at?: string; email_confirmed_at?: string }>,
 ) {
@@ -58,6 +60,7 @@ export function buildProfessionalMembers(
       phone: profile.phone ?? application?.phone ?? "",
       locale: application?.locale ?? "fr-FR",
       status: profile.professional_status as "approved" | "suspended",
+      accountType: profile.professional_account_type === "contractual" ? "contractual" as const : "classic" as const,
       approvedAt: application?.decided_at ?? profile.created_at,
       lastSignInAt: user?.last_sign_in_at ?? null,
       emailConfirmed: Boolean(user?.email_confirmed_at),
@@ -69,39 +72,48 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
   const url = new URL(request.url);
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
-  const requestedStatus = url.searchParams.get("memberStatus");
-  const memberStatus = requestedStatus === "approved" || requestedStatus === "suspended" ? requestedStatus : "all";
-  if (admin.demo) return { demo: true, adminId: admin.id, query, memberStatus, summary: { pending: 0, members: 0, suspended: 0 }, pending: [], history: [], members: [] };
+  const requestedTab = url.searchParams.get("tab");
+  const tab = requestedTab === "classic" || requestedTab === "contractual" || requestedTab === "history" || requestedTab === "account-history" ? requestedTab : "pending";
+  if (admin.demo) return { demo: true, adminId: admin.id, query, tab, summary: { pending: 0, classic: 0, contractual: 0, history: 0, accountHistory: 0, suspended: 0 }, pending: [], history: [], classic: [], contractual: [], accountHistory: [] };
 
   const client = createServiceSupabase();
   if (!client) throw new Response("Base de données indisponible.", { status: 503 });
-  const [applicationResult, profileResult, userResult] = await Promise.all([
+  const [applicationResult, profileResult, userResult, accountHistoryResult] = await Promise.all([
     client.from("professional_applications").select("id,company_name,country_code,first_name,last_name,email,company_registration_number,vat_number,phone,electronic_billing_address,billing_address,delivery_address,comment,business_type,monthly_volume,locale,status,decision_note,decided_at,invited_user_id,created_at").order("created_at", { ascending: false }).limit(500),
-    client.from("profiles").select("id,role,professional_status,first_name,last_name,phone,created_at,updated_at").in("professional_status", ["approved", "suspended"]).limit(1_000),
+    client.from("profiles").select("id,role,professional_status,professional_account_type,first_name,last_name,phone,created_at,updated_at").in("professional_status", ["approved", "suspended"]).limit(1_000),
     client.auth.admin.listUsers({ page: 1, perPage: 1_000 }),
+    client.from("audit_log").select("entity_id,before_data,after_data,created_at").eq("action", "professional_member.account_type_updated").order("created_at", { ascending: false }).limit(500),
   ]);
   if (applicationResult.error) throw new Response(applicationResult.error.message, { status: 500 });
   if (profileResult.error) throw new Response(profileResult.error.message, { status: 500 });
   if (userResult.error) throw new Response(userResult.error.message, { status: 500 });
+  if (accountHistoryResult.error) throw new Response(accountHistoryResult.error.message, { status: 500 });
 
   const applications = (applicationResult.data ?? []) as ProfessionalApplication[];
   const allMembers = buildProfessionalMembers(profileResult.data ?? [], applications, userResult.data.users);
 
   const applicationMatches = (application: ProfessionalApplication) => includesSearch([application.company_name, application.first_name, application.last_name, application.email, application.company_registration_number, application.vat_number, application.phone, application.electronic_billing_address, application.billing_address?.line1, application.billing_address?.postalCode, application.billing_address?.city, application.delivery_address?.firstName, application.delivery_address?.lastName, application.delivery_address?.line1, application.delivery_address?.postalCode, application.delivery_address?.city], query);
-  const memberMatches = (member: (typeof allMembers)[number]) => includesSearch([member.company, member.firstName, member.lastName, member.email, member.phone], query) && (memberStatus === "all" || member.status === memberStatus);
+  const memberMatches = (member: (typeof allMembers)[number]) => includesSearch([member.company, member.firstName, member.lastName, member.email, member.phone], query);
+  const membersById = new Map(allMembers.map((member) => [member.id, member]));
+  const accountHistory = ((accountHistoryResult.data ?? []) as AccountTypeHistory[]).map((entry) => ({ ...entry, member: membersById.get(entry.entity_id) })).filter((entry) => includesSearch([entry.member?.company, entry.member?.firstName, entry.member?.lastName, entry.member?.email], query));
   return {
     demo: false,
     adminId: admin.id,
     query,
-    memberStatus,
+    tab,
     summary: {
       pending: applications.filter((application) => application.status === "pending").length,
-      members: allMembers.length,
+      classic: allMembers.filter((member) => member.accountType === "classic").length,
+      contractual: allMembers.filter((member) => member.accountType === "contractual").length,
+      history: applications.filter((application) => application.status !== "pending").length,
+      accountHistory: (accountHistoryResult.data ?? []).length,
       suspended: allMembers.filter((member) => member.status === "suspended").length,
     },
     pending: applications.filter((application) => application.status === "pending" && applicationMatches(application)),
     history: applications.filter((application) => application.status !== "pending" && applicationMatches(application)),
-    members: allMembers.filter(memberMatches),
+    classic: allMembers.filter((member) => member.accountType === "classic" && memberMatches(member)),
+    contractual: allMembers.filter((member) => member.accountType === "contractual" && memberMatches(member)),
+    accountHistory,
   };
 }
 
@@ -125,9 +137,19 @@ export async function action({ request, context }: ActionFunctionArgs) {
   }
 
   if (!parsed.data.userId) return Response.json({ ok: false, message: "Membre invalide." }, { status: 422 });
-  const { data: profile, error: profileError } = await client.from("profiles").select("id,role,professional_status,first_name,last_name,password_setup_required").eq("id", parsed.data.userId).maybeSingle();
+  const { data: profile, error: profileError } = await client.from("profiles").select("id,role,professional_status,professional_account_type,first_name,last_name,password_setup_required").eq("id", parsed.data.userId).maybeSingle();
   if (profileError) return Response.json({ ok: false, message: profileError.message }, { status: 500 });
   if (!profile || !["approved", "suspended"].includes(profile.professional_status ?? "")) return Response.json({ ok: false, message: "Compte professionnel introuvable." }, { status: 404 });
+
+  if (parsed.data.intent === "set_account_type") {
+    if (!parsed.data.accountType) return Response.json({ ok: false, message: "Niveau de compte invalide." }, { status: 422 });
+    const currentType = profile.professional_account_type === "contractual" ? "contractual" : "classic";
+    if (currentType === parsed.data.accountType) return Response.json({ ok: true, message: "Ce compte possède déjà ce niveau." });
+    const { error } = await client.from("profiles").update({ professional_account_type: parsed.data.accountType, updated_at: new Date().toISOString() }).eq("id", profile.id);
+    if (error) return Response.json({ ok: false, message: error.message }, { status: 500 });
+    await client.from("audit_log").insert({ actor_id: admin.id === "demo-admin" ? null : admin.id, action: "professional_member.account_type_updated", entity_type: "profile", entity_id: profile.id, before_data: { professional_account_type: currentType }, after_data: { professional_account_type: parsed.data.accountType, note: parsed.data.note } });
+    return Response.json({ ok: true, message: parsed.data.accountType === "contractual" ? "Compte passé en statut contractuel." : "Compte repassé en statut classique." });
+  }
 
   if (parsed.data.intent === "delete_member") {
     if (profile.role === "admin" || profile.id === admin.id) return Response.json({ ok: false, message: "Un compte administrateur ne peut pas etre supprime depuis cet espace." }, { status: 409 });
@@ -246,14 +268,16 @@ function ProfessionalDecision({ application }: { application: ProfessionalApplic
   </article>;
 }
 
-function MemberActions({ member }: { member: { id: string; email: string; status: "approved" | "suspended" } }) {
+function MemberActions({ member }: { member: { id: string; email: string; status: "approved" | "suspended"; accountType: "classic" | "contractual" } }) {
   const fetcher = useFetcher<ActionResponse>();
   const busy = fetcher.state !== "idle";
   return <div className="admin-member-actions">
-    <fetcher.Form method="post" onSubmit={(event) => { if (member.status === "approved" && !window.confirm("Suspendre immédiatement l’accès professionnel de ce membre ?")) event.preventDefault(); }}>
+    <fetcher.Form method="post" onSubmit={(event) => { const submitter = (event.nativeEvent as SubmitEvent).submitter; if (submitter instanceof HTMLButtonElement && submitter.value === "suspend" && !window.confirm("Suspendre immédiatement l’accès professionnel de ce membre ?")) event.preventDefault(); }}>
       <input type="hidden" name="userId" value={member.id} />
       <button className={`ui-button ui-button--sm ${member.status === "approved" ? "ui-button--danger" : "ui-button--outline"}`} name="intent" value={member.status === "approved" ? "suspend" : "reactivate"} disabled={busy}>{member.status === "approved" ? <><ShieldOff aria-hidden="true" /> Suspendre</> : <><ShieldCheck aria-hidden="true" /> Réactiver</>}</button>
       {member.status === "approved" ? <button className="ui-button ui-button--ghost ui-button--sm" name="intent" value="resend_access" disabled={busy}><RefreshCw aria-hidden="true" /> Régénérer l’accès</button> : null}
+      <input type="hidden" name="accountType" value={member.accountType === "classic" ? "contractual" : "classic"} />
+      <button className="ui-button ui-button--ghost ui-button--sm" name="intent" value="set_account_type" disabled={busy}>{member.accountType === "classic" ? "Passer en contractuel" : "Passer en classique"}</button>
       <button className="ui-button ui-button--ghost ui-button--sm" name="intent" value="delete_member" disabled={busy} onClick={(event) => { if (!window.confirm("Supprimer définitivement ce compte professionnel et ses demandes ? L adresse e-mail pourra ensuite être réutilisée.")) event.preventDefault(); }}><Trash2 aria-hidden="true" /> Supprimer</button>
     </fetcher.Form>
     <Link className="text-link" to={`/admin/commandes?q=${encodeURIComponent(member.email)}`}>Voir les commandes</Link>
@@ -263,36 +287,47 @@ function MemberActions({ member }: { member: { id: string; email: string; status
 }
 
 export default function AdminProfessionals() {
-  const { demo, adminId, query, memberStatus, summary, pending, history, members } = useLoaderData<typeof loader>();
+  const { demo, adminId, query, tab, summary, pending, history, classic, contractual, accountHistory } = useLoaderData<typeof loader>();
+  const members = tab === "contractual" ? contractual : classic;
+  const memberTitle = tab === "contractual" ? "Comptes contractuels" : "Comptes classiques";
   return <AdminShell active="professionals">
     <header className="admin-heading"><div><p className="eyebrow">Comptes & accès</p><h1>Professionnels</h1></div><Link className="ui-button ui-button--outline ui-button--sm" to="/professionnel">Voir la page pro</Link></header>
     {demo ? <p className="admin-notice">Connectez Supabase pour consulter et administrer les comptes professionnels.</p> : null}
     <section className="stats-grid" aria-label="Indicateurs professionnels">
       <Card><CardContent><Clock3 aria-hidden="true" /><p className="stat-label">Demandes en attente</p><p className="stat-value">{summary.pending}</p></CardContent></Card>
-      <Card><CardContent><Users aria-hidden="true" /><p className="stat-label">Membres professionnels</p><p className="stat-value">{summary.members}</p></CardContent></Card>
+      <Card><CardContent><Users aria-hidden="true" /><p className="stat-label">Comptes classiques</p><p className="stat-value">{summary.classic}</p></CardContent></Card>
+      <Card><CardContent><Users aria-hidden="true" /><p className="stat-label">Comptes contractuels</p><p className="stat-value">{summary.contractual}</p></CardContent></Card>
       <Card><CardContent><ShieldOff aria-hidden="true" /><p className="stat-label">Accès suspendus</p><p className="stat-value">{summary.suspended}</p></CardContent></Card>
     </section>
     <Form method="get" className="admin-filter admin-professional-filter" role="search">
       <label className="sr-only" htmlFor="professional-search">Rechercher</label><input id="professional-search" name="q" type="search" defaultValue={query} placeholder="Entreprise, nom, e-mail ou téléphone" />
-      <label className="sr-only" htmlFor="member-status">Statut des membres</label><select id="member-status" name="memberStatus" defaultValue={memberStatus}><option value="all">Tous les membres</option><option value="approved">Actifs</option><option value="suspended">Suspendus</option></select>
+      <input type="hidden" name="tab" value={tab} />
       <button className="ui-button ui-button--default" type="submit"><Search aria-hidden="true" /> Rechercher</button>
     </Form>
 
-    <Card className="admin-professional-section">
+    <nav className="admin-professional-tabs" aria-label="Catégories de comptes professionnels" role="tablist">
+      <Link role="tab" aria-selected={tab === "pending"} className={tab === "pending" ? "is-active" : ""} to="/admin/professionnels"><span>À traiter</span>{summary.pending > 0 ? <Badge className="admin-professional-tabs__notification">{summary.pending}</Badge> : null}</Link>
+      <Link role="tab" aria-selected={tab === "classic"} className={tab === "classic" ? "is-active" : ""} to="/admin/professionnels?tab=classic"><span>Classiques</span><Badge>{summary.classic}</Badge></Link>
+      <Link role="tab" aria-selected={tab === "contractual"} className={tab === "contractual" ? "is-active" : ""} to="/admin/professionnels?tab=contractual"><span>Contractuels</span><Badge>{summary.contractual}</Badge></Link>
+      <Link role="tab" aria-selected={tab === "history"} className={tab === "history" ? "is-active" : ""} to="/admin/professionnels?tab=history"><span>Historique des demandes</span><Badge>{summary.history}</Badge></Link>
+      <Link role="tab" aria-selected={tab === "account-history"} className={tab === "account-history" ? "is-active" : ""} to="/admin/professionnels?tab=account-history"><span>Historique des comptes</span><Badge>{summary.accountHistory}</Badge></Link>
+    </nav>
+
+    {tab === "pending" ? <Card className="admin-professional-section">
       <CardHeader><p className="eyebrow">À traiter</p><h2>Demandes en attente</h2></CardHeader>
       <CardContent>{pending.length ? pending.map((application) => <ProfessionalDecision key={application.id} application={application} />) : <p>Aucune demande en attente.</p>}</CardContent>
-    </Card>
+    </Card> : null}
 
-    <Card className="admin-professional-section">
-      <CardHeader><p className="eyebrow">Comptes validés</p><h2>Membres professionnels</h2></CardHeader>
+    {tab === "classic" || tab === "contractual" ? <Card className="admin-professional-section">
+      <CardHeader><p className="eyebrow">Comptes validés</p><h2>{memberTitle}</h2></CardHeader>
       <CardContent style={{ padding: 0 }}><Table><TableHeader><TableRow><TableHead>Membre</TableHead><TableHead>Statut</TableHead><TableHead>Validation</TableHead><TableHead>Dernière connexion</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader><TableBody>{members.map((member) => <TableRow key={member.id}>
         <TableCell><strong><Link className="text-link" to={`/admin/professionnels/${member.id}`}>{member.company || `${member.firstName} ${member.lastName}`}</Link></strong><br /><small>{member.firstName} {member.lastName} · <a href={`mailto:${member.email}`}>{member.email}</a>{member.phone ? <> · {member.phone}</> : null}</small></TableCell>
-        <TableCell><Badge className={`admin-pro-status admin-pro-status--${member.status}`}>{member.status === "approved" ? "Actif" : "Suspendu"}</Badge>{member.role === "admin" ? <><br /><Badge className="admin-member-role-badge">Administrateur</Badge></> : null}<br /><small>{member.emailConfirmed ? "E-mail confirmé" : "Activation en attente"}</small></TableCell>
+        <TableCell><Badge className={`admin-pro-status admin-pro-status--${member.status}`}>{member.status === "approved" ? "Actif" : "Suspendu"}</Badge><br /><Badge className={`admin-pro-status admin-pro-status--${member.accountType}`}>{member.accountType === "contractual" ? "Contractuel" : "Classique"}</Badge>{member.role === "admin" ? <><br /><Badge className="admin-member-role-badge">Administrateur</Badge></> : null}<br /><small>{member.emailConfirmed ? "E-mail confirmé" : "Activation en attente"}</small></TableCell>
         <TableCell>{formatDate(member.approvedAt)}</TableCell><TableCell>{formatDate(member.lastSignInAt)}</TableCell><TableCell><MemberActions member={member} /><AdminMemberRoleForm memberId={member.id} role={member.role} currentAdminId={adminId} memberLabel={member.company || `${member.firstName} ${member.lastName}` || member.email} /></TableCell>
       </TableRow>)}</TableBody></Table>{members.length ? null : <p className="admin-empty-state">Aucun membre ne correspond aux filtres.</p>}</CardContent>
-    </Card>
+    </Card> : null}
 
-    <Card className="admin-professional-section">
+    {tab === "history" ? <Card className="admin-professional-section">
       <CardHeader><p className="eyebrow">Traçabilité</p><h2>Historique des demandes</h2></CardHeader>
       <CardContent style={{ padding: 0 }}><Table><TableHeader><TableRow><TableHead>Entreprise</TableHead><TableHead>Contact</TableHead><TableHead>Décision</TableHead><TableHead>Date</TableHead><TableHead>Note</TableHead></TableRow></TableHeader><TableBody>{history.map((application) => <TableRow key={application.id}>
         <TableCell><strong>{application.company_name}</strong><br /><small>{application.business_type} · {application.monthly_volume}</small></TableCell>
@@ -300,6 +335,15 @@ export default function AdminProfessionals() {
         <TableCell><Badge className={`admin-pro-status admin-pro-status--${application.status}`}>{statusLabel(application.status)}</Badge></TableCell>
         <TableCell>{formatDate(application.decided_at)}</TableCell><TableCell>{application.decision_note || "—"}</TableCell>
       </TableRow>)}</TableBody></Table>{history.length ? null : <p className="admin-empty-state">Aucune demande traitée ne correspond à la recherche.</p>}</CardContent>
-    </Card>
+    </Card> : null}
+
+    {tab === "account-history" ? <Card className="admin-professional-section">
+      <CardHeader><p className="eyebrow">Traçabilité</p><h2>Historique des changements de niveau</h2></CardHeader>
+      <CardContent style={{ padding: 0 }}><Table><TableHeader><TableRow><TableHead>Compte</TableHead><TableHead>Changement</TableHead><TableHead>Date</TableHead></TableRow></TableHeader><TableBody>{accountHistory.map((entry) => <TableRow key={`${entry.entity_id}-${entry.created_at}`}>
+        <TableCell>{entry.member ? <><strong><Link className="text-link" to={`/admin/professionnels/${entry.member.id}`}>{entry.member.company || `${entry.member.firstName} ${entry.member.lastName}`}</Link></strong><br /><small>{entry.member.email}</small></> : <small>Compte supprimé ({entry.entity_id})</small>}</TableCell>
+        <TableCell><Badge className={`admin-pro-status admin-pro-status--${entry.before_data?.professional_account_type ?? "classic"}`}>{entry.before_data?.professional_account_type === "contractual" ? "Contractuel" : "Classique"}</Badge> → <Badge className={`admin-pro-status admin-pro-status--${entry.after_data?.professional_account_type ?? "classic"}`}>{entry.after_data?.professional_account_type === "contractual" ? "Contractuel" : "Classique"}</Badge></TableCell>
+        <TableCell>{formatDate(entry.created_at)}</TableCell>
+      </TableRow>)}</TableBody></Table>{accountHistory.length ? null : <p className="admin-empty-state">Aucun changement de niveau enregistré.</p>}</CardContent>
+    </Card> : null}
   </AdminShell>;
 }

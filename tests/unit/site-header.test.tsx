@@ -22,20 +22,19 @@ describe("public account navigation", () => {
     expect(html).not.toContain("account-avatar");
   });
 
-  it("shows the account label and user initials when a session exists", () => {
+  it("uses a compact account icon in the header when a session exists", () => {
     const html = renderHeader(true, false, "JD");
     expect(html).toContain('aria-label="Mon compte"');
-    expect(html).toContain("Mon compte");
+    expect(html).toContain('class="lucide lucide-user-round"');
     expect(html).toContain('class="account-avatar"');
     expect(html).toContain(">JD<");
-    expect(html.indexOf("Mon compte")).toBeLessThan(html.indexOf(">JD<"));
   });
 
-  it("shows a separate quote basket only to approved professionals", () => {
+  it("places the basket after the account action", () => {
     const professionalHeader = renderHeader(true, true, "JD");
-    expect(professionalHeader).toContain("Panier de devis");
-    expect(professionalHeader.lastIndexOf("Mon compte")).toBeGreaterThan(professionalHeader.lastIndexOf("Panier (0)"));
-    expect(renderHeader(true, false)).not.toContain("Panier de devis");
+    expect(professionalHeader.lastIndexOf('lucide-shopping-basket')).toBeGreaterThan(professionalHeader.lastIndexOf('lucide-user-round'));
+    const standardHeader = renderHeader(true, false, "JD");
+    expect(standardHeader.lastIndexOf('lucide-shopping-basket')).toBeGreaterThan(standardHeader.lastIndexOf('lucide-user-round'));
   });
 
   it("shows the active language with an SVG flag in a dropdown", () => {

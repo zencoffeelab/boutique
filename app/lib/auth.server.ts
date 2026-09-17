@@ -26,9 +26,9 @@ export async function getSessionStatus(request: Request) {
     // A temporary auth/network outage must not turn every public page into a 500.
     return { signedIn: false, professional: false, professionalUserId: null, accountInitials: null, admin: false, passwordSetupRequired: false, responseHeaders: supabase.responseHeaders };
   }
-  let profile: { role?: string | null; professional_status?: string | null; password_setup_required?: boolean; first_name?: string | null; last_name?: string | null } | null = null;
+  let profile: { role?: string | null; professional_status?: string | null; professional_account_type?: string | null; password_setup_required?: boolean; first_name?: string | null; last_name?: string | null } | null = null;
   if (!error && data.user) {
-    const result = await supabase.client.from("profiles").select("role,professional_status,password_setup_required,first_name,last_name").eq("id", data.user.id).maybeSingle();
+    const result = await supabase.client.from("profiles").select("role,professional_status,professional_account_type,password_setup_required,first_name,last_name").eq("id", data.user.id).maybeSingle();
     if (result.error?.code === "42703") {
       const legacy = await supabase.client.from("profiles").select("role,professional_status,first_name,last_name").eq("id", data.user.id).maybeSingle();
       if (legacy.error) throw new Response("Unable to verify account activation status.", { status: 503 });
@@ -64,7 +64,7 @@ export async function getViewer(request: Request) {
   if (error || !data.user) return null;
   const { data: profile } = await supabase.client
     .from("profiles")
-    .select("id, role, professional_status, first_name, last_name")
+    .select("id, role, professional_status, professional_account_type, first_name, last_name")
     .eq("id", data.user.id)
     .maybeSingle();
   return { user: data.user, profile, responseHeaders: supabase.responseHeaders };

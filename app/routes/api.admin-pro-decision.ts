@@ -55,6 +55,7 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
       last_name: application.last_name,
       phone: application.phone,
       professional_status: "approved",
+      professional_account_type: "classic",
       password_setup_required: requiresPasswordSetup,
       updated_at: new Date().toISOString(),
     });

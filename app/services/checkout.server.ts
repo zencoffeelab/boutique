@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type Stripe from "stripe";
 import { shippingRateLabel } from "~/domain/shipping-rate-label";
+import { professionalVolumePricing } from "~/domain/professional-volume-discount";
 import type { Audience } from "~/domain/types";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
@@ -41,6 +42,7 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
   const rate = quote.rates.find((candidate) => candidate.id === input.shippingRateId);
   if (!rate) throw new Response("Shipping rate is not part of this quote.", { status: 409 });
   const shippingAddress = rate.deliveryMethod === "pickup" && rate.pickupPoint ? { ...quote.address, pickupPoint: rate.pickupPoint } : quote.address;
+  const pricing = professionalVolumePricing(quote.lines, quote.audience === "professional");
   if (config.PAYMENTS_MOCK) {
     const order = `ZCL-DEMO-${randomUUID().slice(0, 8).toUpperCase()}`;
     return { ok: true, confirmationUrl: `${config.VITE_SITE_URL}${quote.locale === "en-GB" ? "/en/order/confirmation" : "/commande/confirmation"}?order=${encodeURIComponent(order)}` };
@@ -51,6 +53,27 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
   if (error || !order) throw new Response(error?.message ?? "Unable to reserve stock.", { status: 409 });
   const stripe = createStripe(config.STRIPE_SECRET_KEY);
   try {
+    let remainingDiscount = pricing.discountCents;
+    const coffeeLineItems = quote.lines.map((line, index) => {
+      const lineTotal = line.unitPriceCents * line.quantity;
+      const lineDiscount = index === quote.lines.length - 1
+        ? remainingDiscount
+        : Math.min(remainingDiscount, Math.round(pricing.discountCents * lineTotal / pricing.subtotalBeforeDiscountCents));
+      remainingDiscount -= lineDiscount;
+      return {
+        quantity: 1,
+        price_data: {
+          currency: "eur" as const,
+          unit_amount: lineTotal - lineDiscount,
+          product_data: {
+            name: `${line.quantity} × ${line.productName}`,
+            description: line.variantLabel,
+            images: line.imageUrl ? [new URL(line.imageUrl, config.VITE_SITE_URL).toString()] : undefined,
+            metadata: { variant_id: line.variantId },
+          },
+        },
+      };
+    });
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "payment", customer_email: quote.address.email, client_reference_id: order.id,
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
@@ -58,7 +81,7 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
       cancel_url: `${config.VITE_SITE_URL}${quote.locale === "en-GB" ? "/en/checkout" : "/commande"}?canceled=1`,
       metadata: { order_id: order.id, quote_id: quote.id, audience: quote.audience },
       payment_intent_data: { metadata: { order_id: order.id } },
-      line_items: [...quote.lines.map((line) => ({ quantity: line.quantity, price_data: { currency: "eur" as const, unit_amount: line.unitPriceCents, product_data: { name: line.productName, description: line.variantLabel, images: line.imageUrl ? [new URL(line.imageUrl, config.VITE_SITE_URL).toString()] : undefined, metadata: { variant_id: line.variantId } } } })), ...(rate.amountCents > 0 ? [{ quantity: 1, price_data: { currency: "eur" as const, unit_amount: rate.amountCents, product_data: { name: quote.locale === "en-GB" ? "Shipping" : "Livraison", description: shippingRateLabel(rate) } } }] : [])],
+      line_items: [...coffeeLineItems, ...(rate.amountCents > 0 ? [{ quantity: 1, price_data: { currency: "eur" as const, unit_amount: rate.amountCents, product_data: { name: quote.locale === "en-GB" ? "Shipping" : "Livraison", description: shippingRateLabel(rate) } } }] : [])],
       locale: quote.locale === "fr-FR" ? "fr" : "en",
     };
     let session;
@@ -69,7 +92,7 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
       console.error("stripe_paypal_unavailable_fallback_to_card", { message: cause instanceof Error ? cause.message : String(cause) });
       session = await stripe.checkout.sessions.create({ ...sessionParams, payment_method_types: ["card"] });
     }
-    const { error: paymentError } = await supabase.from("payments").insert({ order_id: order.id, provider: "stripe", provider_checkout_id: session.id, status: "pending", amount_cents: quote.subtotalCents + rate.amountCents });
+    const { error: paymentError } = await supabase.from("payments").insert({ order_id: order.id, provider: "stripe", provider_checkout_id: session.id, status: "pending", amount_cents: pricing.subtotalCents + rate.amountCents });
     if (paymentError) { await stripe.checkout.sessions.expire(session.id); throw paymentError; }
     if (!session.url) throw new Error("Stripe did not return a checkout URL.");
     return { ok: true, checkoutUrl: session.url };

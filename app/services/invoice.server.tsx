@@ -27,6 +27,10 @@ type OrderSnapshot = {
     };
   };
   shipping_charged_cents: number;
+  subtotal_before_discount_cents?: number;
+  professional_discount_cents?: number;
+  professional_discount_percent?: number;
+  subtotal_cents?: number;
   total_cents: number;
 };
 
@@ -140,6 +144,9 @@ export async function renderInvoicePdf(input: { invoice: InvoiceSnapshot; order:
     `${address.postalCode ?? ""} ${address.city ?? ""}`.trim(), address.countryCode, order.email,
   ].filter((line): line is string => Boolean(line));
   const totalCents = order.total_cents;
+  const lineSubtotalCents = lines.reduce((total, line) => total + line.line_total_cents, 0);
+  const subtotalBeforeDiscountCents = order.subtotal_before_discount_cents || lineSubtotalCents;
+  const professionalDiscountCents = order.professional_discount_cents ?? 0;
 
   drawTopText(page, boldFont, "ZEN", margin, 58, 26, textColor, 130);
   drawTopText(page, font, "coffee lab", margin + 16, 86, 8.5, mutedColor, 130);
@@ -178,8 +185,12 @@ export async function renderInvoicePdf(input: { invoice: InvoiceSnapshot; order:
   };
   drawTopText(page, boldFont, english ? "Terms and conditions" : "Termes et conditions", margin, summaryTop, 8.5, mutedColor, 330);
   drawTopText(page, font, english ? "VAT not applicable, art. 293 B of the French tax code." : "TVA non applicable, art. 293 B du CGI.", margin, summaryTop + 16, 7.5, mutedColor, 340);
-  drawSummaryLine("Total", euros(totalCents, documentLocale), summaryTop + 8, true);
-  drawTopRule(page, summaryTop + 34, 1);
+  drawSummaryLine(english ? "Subtotal" : "Sous-total", euros(subtotalBeforeDiscountCents, documentLocale), summaryTop + 8);
+  if (professionalDiscountCents > 0) {
+    drawSummaryLine(english ? "Professional offer" : "Offre professionnelle", `-${euros(professionalDiscountCents, documentLocale)}`, summaryTop + 22);
+  }
+  drawSummaryLine("Total", euros(totalCents, documentLocale), summaryTop + (professionalDiscountCents > 0 ? 38 : 24), true);
+  drawTopRule(page, summaryTop + (professionalDiscountCents > 0 ? 64 : 50), 1);
 
   drawTopRule(page, 785, 0.8);
   drawTopText(page, font, "Zen Coffee Lab · Ugo Simon-Meslet · 32 rue Louis Blanc · 37000 Tours · France", margin + 28, 799, 7, mutedColor, right);

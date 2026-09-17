@@ -509,7 +509,7 @@ function AboutPageFields({ translation, language, shared }: { translation: Conte
       {[1, 2].map((index) => {
         const image = images[index - 1] ?? {};
         return <div className="admin-about-image-row" key={index}>
-          <div><strong>Image du bloc éditorial {index}</strong><AdminImageEditorInput name={`aboutStoryImage${index}`} label={image.url ? "Remplacer l’image" : "Importer l’image"} help="JPEG, PNG ou WebP · recadrage au ratio 75:83" currentPreviewUrl={image.url} defaultAspect="75:83" lockAspect defaultOutputWidth={1500} /><input type="hidden" name={`aboutStoryImageUrl${index}`} value={String(image.url ?? "")} /><input type="hidden" name={`aboutStoryImagePath${index}`} value={String(image.path ?? "")} /></div>
+          <div><strong>Image du bloc éditorial {index}</strong><AdminImageEditorInput name={`aboutStoryImage${index}`} label={image.url ? "Remplacer l’image" : "Importer l’image"} help="JPEG, PNG ou WebP · recadrage possible au ratio d’origine" currentPreviewUrl={image.url} lockAspect defaultOutputWidth={1500} /><input type="hidden" name={`aboutStoryImageUrl${index}`} value={String(image.url ?? "")} /><input type="hidden" name={`aboutStoryImagePath${index}`} value={String(image.path ?? "")} /></div>
           <div className="field"><label>Texte alternatif<input name={`aboutStoryAlt${index}${suffix}`} defaultValue={String(image.alt ?? "")} maxLength={240} /></label></div>
         </div>;
       })}

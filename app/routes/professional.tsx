@@ -4,6 +4,7 @@ import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Link, useFetcher, useLoaderData, useNavigate } from "react-router";
 import { useCart } from "~/components/cart/cart-provider";
 import { ContentBlocks } from "~/components/content-blocks";
+import { ProfessionalDiscountTable } from "~/components/professional-discount-table";
 import { buildProductCartLine } from "~/domain/cart";
 import type { Product } from "~/domain/types";
 import { SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
@@ -18,6 +19,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request);
   const viewer = await getViewer(request);
   const professionalStatus = viewer?.profile?.professional_status ?? null;
+  const accountType = viewer?.profile?.professional_account_type === "contractual" ? "contractual" : "classic";
   const approved = professionalStatus === "approved";
   const admin = viewer?.profile?.role === "admin";
   const [content, connectedContent, sampleSet] = await Promise.all([
@@ -25,7 +27,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     approved || admin ? getContentPage("professionnel-connecte", locale) : Promise.resolve(null),
     approved || admin ? getSampleSetProduct() : Promise.resolve(null),
   ]);
-  return { locale, approved, admin, signedIn: Boolean(viewer), accountEmail: viewer?.user.email ?? null, professionalStatus, content, connectedContent, sampleSet };
+  return { locale, approved, admin, accountType, signedIn: Boolean(viewer), accountEmail: viewer?.user.email ?? null, professionalStatus, content, connectedContent, sampleSet };
 }
 export function headers() { return { "Cache-Control": "private, no-store" }; }
 export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(data?.locale === "en-GB" ? "Coffee for professionals | Zen Coffee Lab" : "Café pour professionnels | Zen Coffee Lab", data?.locale === "en-GB" ? "Specialty coffee and support for cafés, restaurants and resellers." : "Cafés de spécialité et accompagnement pour coffee shops, restaurants et revendeurs.", data?.locale === "en-GB" ? "/en/professional" : "/professionnel");
@@ -97,15 +99,25 @@ function ProfessionalConnectedPage({ english, content, sampleSet }: { english: b
   return <>
     <header className="page-hero professional-hero professional-hero--connected"><p className="eyebrow">{copy.eyebrow}</p><h1>{copy.title}</h1><p className="lede">{copy.lede}</p></header>
     <section className="professional-connected-layout page-shell" aria-label={english ? "Professional next steps" : "Prochaines étapes professionnelles"}>
-      <section className="steps professional-connected-steps" aria-label={english ? "Professional account steps" : "Étapes du compte professionnel"}>{copy.steps.map((step, index) => <article key={index}><span>{String(index + 1).padStart(2, "0")}</span><h3>{step.title}</h3><p>{step.text}</p></article>)}</section>
+      <section className="steps professional-connected-steps" aria-label={english ? "Professional account steps" : "Étapes du compte professionnel"}>{copy.steps.map((step, index) => <article key={index}><span>{String(index + 1).padStart(2, "0")}</span><h3>{index === 1 ? (copy.steps[2]?.title ?? step.title) : index === 2 ? (copy.steps[1]?.title ?? step.title) : step.title}</h3><p>{index === 1 ? (copy.steps[2]?.text ?? step.text) : index === 2 ? (copy.steps[1]?.text ?? step.text) : step.text}</p>{index === 2 ? <ProfessionalDiscountTable english={english} /> : null}</article>)}</section>
       <section className="professional-connected-actions"><ProfessionalConnectedAction text={copy.shopText} button={copy.shopButton} to={english ? "/en/shop" : "/boutique"} /><ProfessionalConnectedAction text={copy.contactText} button={copy.contactButton} to={english ? "/en/contact?professional=1" : "/contact?professional=1"} /><ProfessionalSampleSetAction text={copy.sampleText} button={copy.sampleButton} sampleSet={sampleSet} english={english} /></section>
     </section>
     <aside className="professional-banner professional-banner--connected"><p className="eyebrow">{copy.bannerEyebrow}</p><h2>{copy.bannerTitle}</h2><p>{copy.bannerText}</p></aside>
   </>;
 }
 
+function ProfessionalClassicPage({ english }: { english: boolean }) {
+  return <>
+    <header className="page-hero professional-hero professional-hero--connected"><p className="eyebrow">Zen Coffee Lab · Professionnels</p><h1>{english ? "Your classic professional account" : "Votre compte professionnel classique"}</h1><p className="lede">{english ? "Access the professional coffee shop and your volume offer." : "Accédez à la boutique professionnelle et à votre offre selon le volume de cafés commandé."}</p></header>
+    <section className="professional-connected-layout page-shell" aria-label={english ? "Classic professional account" : "Compte professionnel classique"}>
+      <section className="steps professional-connected-steps"><article><span>01</span><h3>{english ? "Professional shop" : "Boutique professionnelle"}</h3><p>{english ? "Order the coffees selected for professionals from the shop." : "Commandez les cafés sélectionnés pour les professionnels depuis la boutique."}</p><Link className="button button--dark" to={english ? "/en/shop" : "/boutique"}>{english ? "Visit the shop" : "Voir la boutique"}<ArrowRight aria-hidden="true" /></Link></article><article><span>02</span><h3>{english ? "Volume offer" : "Offre volume"}</h3><p>{english ? "Your reduction is calculated automatically from the total coffee weight in your basket." : "Votre réduction est calculée automatiquement selon le poids total des cafés de votre panier."}</p><ProfessionalDiscountTable english={english} /></article></section>
+      <section className="professional-connected-actions"><article><h3>{english ? "Need tailored support?" : "Besoin d’un accompagnement sur mesure ?"}</h3><p>{english ? "A contractual account unlocks an extended private space and additional services." : "Un compte contractuel donne accès à un espace privé étendu et à des services complémentaires."}</p><Link className="button button--dark" to={english ? "/en/contact?professional=1" : "/contact?professional=1"}>{english ? "Contact us" : "Nous contacter"}<ArrowRight aria-hidden="true" /></Link></article></section>
+    </section>
+  </>;
+}
+
 export default function Professional() {
-  const { locale, approved, admin, signedIn, accountEmail, content, connectedContent, sampleSet } = useLoaderData<typeof loader>();
+  const { locale, approved, admin, accountType, signedIn, accountEmail, content, connectedContent, sampleSet } = useLoaderData<typeof loader>();
   const english = locale === "en-GB";
   const fetcher = useFetcher<ApplicationResponse>();
   const [countryCode, setCountryCode] = useState("FR");
@@ -114,7 +126,8 @@ export default function Professional() {
   const accountPath = english ? "/en/my-account" : "/mon-compte";
   const loginPath = `${accountPath}?next=${encodeURIComponent(professionalPath)}`;
   const pageContent = getProfessionalPageContent(english ? "en-GB" : "fr-FR", content?.blocks);
-  if (approved || admin) return <ProfessionalConnectedPage english={english} content={connectedContent} sampleSet={sampleSet} />;
+  if (admin || (approved && accountType === "contractual")) return <ProfessionalConnectedPage english={english} content={connectedContent} sampleSet={sampleSet} />;
+  if (approved) return <ProfessionalClassicPage english={english} />;
   return <>
     <header className="page-hero professional-hero"><p className="eyebrow">{pageContent.eyebrow}</p><h1>{content?.title ?? (english ? "Coffee made for your business" : "Du café pensé pour votre établissement")}</h1><p className="lede">{pageContent.lede}</p><ProfessionalLoginLink signedIn={signedIn} english={english} loginPath={loginPath} content={pageContent} /></header>
     <ContentBlocks blocks={content?.blocks} />

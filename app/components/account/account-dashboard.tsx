@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, ChevronRight, MapPin, Package, ShieldCheck, UserRound } from "lucide-react";
+import { CalendarClock, CircleAlert, CircleCheck, ChevronRight, FileText, Mail, MapPin, Package, Reply, ShieldCheck, UserRound } from "lucide-react";
 import { useEffect, useState, type FormEventHandler, type PropsWithChildren } from "react";
 import { Form, Link, useFetcher } from "react-router";
 import { AddressAutocomplete } from "~/components/address-autocomplete";
@@ -6,7 +6,7 @@ import { formatMoney } from "~/domain/money";
 import { SHIPPING_COUNTRY_CODES, shippingCountryLabel } from "~/domain/shipping-countries";
 import type { Locale } from "~/domain/types";
 
-export type AccountSectionId = "orders" | "addresses" | "settings";
+export type AccountSectionId = "orders" | "upcoming-order" | "documents" | "communication" | "addresses" | "settings";
 
 export type AccountMfaState = {
   currentLevel: string | null;
@@ -19,6 +19,7 @@ type AccountViewer = {
   profile: {
     role?: string | null;
     professional_status?: string | null;
+    professional_account_type?: string | null;
     first_name?: string | null;
     last_name?: string | null;
   } | null;
@@ -71,6 +72,9 @@ export type AccountDashboardData = {
   orders: AccountOrder[];
   addresses: AccountAddress[];
   professionalApplication?: AccountProfessionalApplication | null;
+  professionalQuotes?: Array<{ id: string; quote_number: string; status: string; total_cents: number; created_at: string; paid_at?: string | null }>;
+  professionalMessages?: Array<{ id: string; direction: "inbound" | "outbound"; sender_name?: string | null; sender_address: string; recipients: unknown; subject: string; text_body?: string | null; created_at: string; sent_at?: string | null; parent_id?: string | null }>;
+  upcomingContract?: { id: string; next_delivery_date: string; professional_contract_lines?: Array<{ product_name: string; quantity_grams: number }> | null } | null;
   setPassword: boolean;
   next: string;
   mfa: AccountMfaState | null;
@@ -117,9 +121,12 @@ function ProfessionalProfileConfirmation({ english, message }: { english: boolea
   </dialog>;
 }
 
-export function AccountNavigation({ english, orderCount, addressCount }: { english: boolean; orderCount: number; addressCount: number }) {
+export function AccountNavigation({ english, orderCount, addressCount, professional = false, contractual = false, documentCount = 0, communicationCount = 0 }: { english: boolean; orderCount: number; addressCount: number; professional?: boolean; contractual?: boolean; documentCount?: number; communicationCount?: number }) {
   return <nav className="account-anchor-nav" aria-label={english ? "My account sections" : "Sections de mon compte"}>
     <a href="#account-orders"><Package aria-hidden="true" /><span><strong>{english ? "Orders" : "Commandes"}</strong><small>{english ? "Invoices and tracking" : "Factures et suivis"}</small></span><em>{orderCount}</em><ChevronRight aria-hidden="true" /></a>
+    {contractual ? <a href="#account-upcoming-order"><CalendarClock aria-hidden="true" /><span><strong>{english ? "Your next order" : "Votre prochaine commande"}</strong><small>{english ? "Contract delivery" : "Livraison contractuelle"}</small></span><ChevronRight aria-hidden="true" /></a> : null}
+    {professional ? <a href="#account-documents"><FileText aria-hidden="true" /><span><strong>{english ? "Documents" : "Documents"}</strong><small>{english ? "Quotes and invoices" : "Devis et factures"}</small></span><em>{documentCount}</em><ChevronRight aria-hidden="true" /></a> : null}
+    {professional ? <a href="#account-communication"><Mail aria-hidden="true" /><span><strong>{english ? "Communication" : "Communication"}</strong><small>{english ? "Your email exchanges" : "Vos échanges par e-mail"}</small></span><em>{communicationCount}</em><ChevronRight aria-hidden="true" /></a> : null}
     <a href="#account-addresses"><MapPin aria-hidden="true" /><span><strong>{english ? "Addresses" : "Adresses"}</strong><small>{english ? "Saved delivery details" : "Coordonnées enregistrées"}</small></span><em>{addressCount}</em><ChevronRight aria-hidden="true" /></a>
     <a href="#account-settings"><ShieldCheck aria-hidden="true" /><span><strong>{english ? "Settings" : "Paramètres"}</strong><small>{english ? "Access and security" : "Accès et sécurité"}</small></span><ChevronRight aria-hidden="true" /></a>
   </nav>;
@@ -210,7 +217,7 @@ function ProfessionalAccountForm({ application, drawer, accountPath, locale }: {
 }
 
 function AccountSections({ data, result, mode, activeSection, onNavigate }: { data: AccountDashboardData; result?: AccountActionFeedback | null; mode: "page" | "drawer"; activeSection: AccountSectionId; onNavigate?: () => void }) {
-  const { locale, viewer, orders, addresses, professionalApplication, setPassword, next, mfa } = data;
+  const { locale, viewer, orders, addresses, professionalApplication, professionalQuotes = [], professionalMessages = [], upcomingContract, setPassword, next, mfa } = data;
   const english = locale === "en-GB";
   const drawer = mode === "drawer";
   const prefix = drawer ? "account-drawer" : "account";
@@ -228,6 +235,21 @@ function AccountSections({ data, result, mode, activeSection, onNavigate }: { da
       <div className="account-section__heading"><div><p className="eyebrow">{english ? "History" : "Historique"}</p><h2 id={`${prefix}-orders-title`}>{english ? "Your orders" : "Vos commandes"}</h2></div><span>{orders.length} {english ? (orders.length === 1 ? "order" : "orders") : (orders.length === 1 ? "commande" : "commandes")}</span></div>
       {orders.length ? <div className="account-panel account-table-wrap"><table className="ui-table"><thead><tr><th>{english ? "Order" : "Commande"}</th><th>Date</th><th>{english ? "Status" : "Statut"}</th><th>Total</th><th>Documents</th></tr></thead><tbody>{orders.map((order) => <tr key={order.id}><td><Link className="account-order-link" to={`${accountPath}/${english ? "orders" : "commandes"}/${order.id}`} onClick={onNavigate}><strong>{order.order_number}</strong><span>{english ? "View details" : "Voir le détail"}</span></Link></td><td>{new Date(order.created_at).toLocaleDateString(locale)}</td><td><span className="ui-badge account-order-status">{orderStatusLabel(order.status, english)}</span></td><td><strong>{formatMoney(order.total_cents, locale)}</strong></td><td><div className="account-order-links">{order.paid_at ? <a className="text-link" href={`/api/orders/${order.id}/invoice`}>{english ? "Invoice PDF" : "Facture PDF"}</a> : "—"}{order.shipments?.[0]?.tracking_url ? <a className="text-link" href={order.shipments[0].tracking_url} target="_blank" rel="noreferrer">{english ? "Track" : "Suivre"}</a> : null}</div></td></tr>)}</tbody></table></div> : <div className="account-panel account-empty-state"><Package aria-hidden="true" /><div><h3>{english ? "No orders yet" : "Aucune commande pour le moment"}</h3><p>{english ? "Your paid orders, invoices and tracking will appear here." : "Vos commandes payées, factures et suivis apparaîtront ici."}</p></div><Link className="button button--dark" to={english ? "/en/shop" : "/boutique"} onClick={onNavigate}>{english ? "Discover our coffees" : "Découvrir nos cafés"}</Link></div>}
     </section>
+
+    {viewer.profile?.professional_account_type === "contractual" ? <section className="account-section" id={`${prefix}-upcoming-order`} aria-labelledby={drawer ? "account-drawer-tab-upcoming-order" : `${prefix}-upcoming-order-title`} role={drawer ? "tabpanel" : undefined} hidden={sectionVisibility(mode, activeSection, "upcoming-order")}>
+      <div className="account-section__heading"><div><p className="eyebrow">{english ? "Contract delivery" : "Livraison contractuelle"}</p><h2 id={`${prefix}-upcoming-order-title`}>{english ? "Your next order" : "Votre prochaine commande"}</h2></div></div>
+      {upcomingContract ? <div className="account-panel"><p><strong>{english ? "Expected delivery:" : "Livraison prévue :"}</strong> {new Date(`${upcomingContract.next_delivery_date}T12:00:00`).toLocaleDateString(locale, { dateStyle: "long" })}</p><div className="account-order-lines">{upcomingContract.professional_contract_lines?.map((line) => <article key={`${line.product_name}-${line.quantity_grams}`}><strong>{line.product_name}</strong><span>{line.quantity_grams >= 1_000 ? `${line.quantity_grams / 1_000} kg` : `${line.quantity_grams} g`}</span></article>)}</div></div> : <div className="account-panel account-empty-state"><CalendarClock aria-hidden="true" /><div><h3>{english ? "No order planned yet" : "Aucune commande prévue pour le moment"}</h3><p>{english ? "Your next contract delivery will appear here once your contract has been created." : "Votre prochaine livraison apparaîtra ici dès que votre contrat aura été créé."}</p></div></div>}
+    </section> : null}
+
+    {professional ? <section className="account-section" id={`${prefix}-documents`} aria-labelledby={drawer ? "account-drawer-tab-documents" : `${prefix}-documents-title`} role={drawer ? "tabpanel" : undefined} hidden={sectionVisibility(mode, activeSection, "documents")}>
+      <div className="account-section__heading"><div><p className="eyebrow">{english ? "Private archive" : "Espace privé"}</p><h2 id={`${prefix}-documents-title`}>{english ? "Documents" : "Documents"}</h2></div><span>{orders.filter((order) => order.paid_at).length + professionalQuotes.length}</span></div>
+      <div className="account-panel account-table-wrap"><table className="ui-table"><thead><tr><th>{english ? "Document" : "Document"}</th><th>Date</th><th>{english ? "Status" : "Statut"}</th><th>{english ? "Amount" : "Montant"}</th><th /></tr></thead><tbody>{orders.filter((order) => order.paid_at).map((order) => <tr key={`invoice-${order.id}`}><td><strong>{english ? "Invoice" : "Facture"} {order.order_number}</strong></td><td>{new Date(order.paid_at ?? order.created_at).toLocaleDateString(locale)}</td><td>{english ? "Available" : "Disponible"}</td><td>{formatMoney(order.total_cents, locale)}</td><td><a className="text-link" href={`/api/orders/${order.id}/invoice`}>{english ? "Open" : "Ouvrir"}</a></td></tr>)}{professionalQuotes.map((quote) => <tr key={`quote-${quote.id}`}><td><strong>{english ? "Quote" : "Devis"} {quote.quote_number}</strong></td><td>{new Date(quote.created_at).toLocaleDateString(locale)}</td><td>{quote.status}</td><td>{formatMoney(quote.total_cents, locale)}</td><td><a className="text-link" href={`/api/professional-quotes/${quote.id}/pdf`}>{english ? "Open" : "Ouvrir"}</a></td></tr>)}</tbody></table>{orders.some((order) => order.paid_at) || professionalQuotes.length ? null : <p className="admin-empty-state">{english ? "No document is available yet." : "Aucun document n’est disponible pour le moment."}</p>}</div>
+    </section> : null}
+
+    {professional ? <section className="account-section" id={`${prefix}-communication`} aria-labelledby={drawer ? "account-drawer-tab-communication" : `${prefix}-communication-title`} role={drawer ? "tabpanel" : undefined} hidden={sectionVisibility(mode, activeSection, "communication")}>
+      <div className="account-section__heading"><div><p className="eyebrow">{english ? "Email exchanges" : "Échanges par e-mail"}</p><h2 id={`${prefix}-communication-title`}>{english ? "Communication" : "Communication"}</h2></div><span>{professionalMessages.length}</span></div>
+      <div className="account-communication-list">{professionalMessages.map((message) => <article className="account-panel" key={message.id}><div><p className="eyebrow">{message.direction === "outbound" ? (english ? "Sent by Zen Coffee Lab" : "Envoyé par Zen Coffee Lab") : (english ? "Your message" : "Votre message")}</p><h3>{message.subject}</h3><small>{new Date(message.sent_at ?? message.created_at).toLocaleString(locale)}</small><p>{message.text_body || "—"}</p></div><AccountMutationForm drawer={drawer} method="post" action={accountPath} className="account-communication-reply"><input type="hidden" name="intent" value="reply_professional_message" /><input type="hidden" name="messageId" value={message.id} /><label>{english ? "Reply" : "Répondre"}<textarea name="body" rows={3} maxLength={5_000} required /></label><button className="ui-button ui-button--ghost ui-button--sm" type="submit"><Reply aria-hidden="true" />{english ? "Send" : "Envoyer"}</button></AccountMutationForm></article>)}</div>{professionalMessages.length ? null : <div className="account-panel account-empty-state"><Mail aria-hidden="true" /><div><h3>{english ? "No message yet" : "Aucun échange pour le moment"}</h3><p>{english ? "Your professional email exchanges will appear here." : "Vos échanges professionnels par e-mail apparaîtront ici."}</p></div></div>}
+    </section> : null}
 
     <section className="account-section" id={`${prefix}-addresses`} aria-labelledby={drawer ? "account-drawer-tab-addresses" : `${prefix}-addresses-title`} role={drawer ? "tabpanel" : undefined} hidden={sectionVisibility(mode, activeSection, "addresses")}>
       {professionalApplication ? <ProfessionalAccountForm application={professionalApplication} drawer={drawer} accountPath={accountPath} locale={locale} /> : null}
@@ -257,7 +279,7 @@ function AccountSections({ data, result, mode, activeSection, onNavigate }: { da
 }
 
 export function AccountDashboard({ data, result, mode = "page", activeSection = "orders", onNavigate }: { data: AccountDashboardData; result?: AccountActionFeedback | null; mode?: "page" | "drawer"; activeSection?: AccountSectionId; onNavigate?: () => void }) {
-  const { locale, viewer, orders, addresses } = data;
+  const { locale, viewer, orders, addresses, professionalQuotes = [], professionalMessages = [] } = data;
   const english = locale === "en-GB";
   const displayName = [viewer.profile?.first_name, viewer.profile?.last_name].filter(Boolean).join(" ");
   const initial = (viewer.profile?.first_name || viewer.user.email || "Z").slice(0, 1).toLocaleUpperCase(locale);
@@ -269,7 +291,7 @@ export function AccountDashboard({ data, result, mode = "page", activeSection = 
     <div className="page-shell account-page-shell">
       <aside className="account-sidebar">
         <div className="account-profile-card"><span aria-hidden="true">{initial}</span><div><small>{english ? "Signed in as" : "Connecté en tant que"}</small><strong>{displayName || viewer.user.email}</strong>{displayName ? <small>{viewer.user.email}</small> : null}</div></div>
-        <AccountNavigation english={english} orderCount={orders.length} addressCount={addresses.length} />
+        <AccountNavigation english={english} orderCount={orders.length} addressCount={addresses.length} professional={viewer.profile?.professional_status === "approved"} contractual={viewer.profile?.professional_account_type === "contractual"} documentCount={orders.filter((order) => order.paid_at).length + professionalQuotes.length} communicationCount={professionalMessages.length} />
       </aside>
       <AccountSections data={data} result={result} mode={mode} activeSection={activeSection} />
     </div>

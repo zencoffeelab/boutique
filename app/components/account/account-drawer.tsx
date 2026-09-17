@@ -14,6 +14,9 @@ type AccountDrawerResponse = Omit<AccountDashboardData, "viewer"> & {
 
 const tabs: Array<{ id: AccountSectionId; fr: string; en: string }> = [
   { id: "orders", fr: "Commandes", en: "Orders" },
+  { id: "upcoming-order", fr: "Prochaine commande", en: "Next order" },
+  { id: "documents", fr: "Documents", en: "Documents" },
+  { id: "communication", fr: "Communication", en: "Communication" },
   { id: "addresses", fr: "Adresses", en: "Addresses" },
   { id: "settings", fr: "Paramètres", en: "Settings" },
 ];
@@ -31,6 +34,7 @@ export function AccountDrawer({ open, locale, onClose }: { open: boolean; locale
   const returnPath = `${location.pathname}${location.search}`;
   const data = accountFetcher.data;
   const mfaChallengeRequired = Boolean(data?.mfa?.verifiedFactors.length && data.mfa.currentLevel !== "aal2");
+  const visibleTabs = data?.viewer?.profile?.professional_status === "approved" ? tabs.filter((tab) => data.viewer?.profile?.professional_account_type === "contractual" || tab.id !== "upcoming-order") : tabs.filter((tab) => tab.id !== "documents" && tab.id !== "communication" && tab.id !== "upcoming-order");
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -83,7 +87,7 @@ export function AccountDrawer({ open, locale, onClose }: { open: boolean; locale
       </header>
 
       {data?.viewer && !mfaChallengeRequired ? <div className="account-drawer__tabs" role="tablist" aria-label={english ? "My account sections" : "Rubriques de mon compte"}>
-        {tabs.map((tab) => <button
+        {visibleTabs.map((tab) => <button
           id={`account-drawer-tab-${tab.id}`}
           className={activeSection === tab.id ? "is-active" : undefined}
           type="button"
@@ -93,15 +97,15 @@ export function AccountDrawer({ open, locale, onClose }: { open: boolean; locale
           tabIndex={activeSection === tab.id ? 0 : -1}
           onClick={() => setActiveSection(tab.id)}
           onKeyDown={(event) => {
-            const currentIndex = tabs.findIndex((candidate) => candidate.id === tab.id);
+            const currentIndex = visibleTabs.findIndex((candidate) => candidate.id === tab.id);
             let nextIndex = currentIndex;
-            if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tabs.length;
-            else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+            if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % visibleTabs.length;
+            else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + visibleTabs.length) % visibleTabs.length;
             else if (event.key === "Home") nextIndex = 0;
-            else if (event.key === "End") nextIndex = tabs.length - 1;
+            else if (event.key === "End") nextIndex = visibleTabs.length - 1;
             else return;
             event.preventDefault();
-            const nextTab = tabs[nextIndex];
+            const nextTab = visibleTabs[nextIndex];
             setActiveSection(nextTab.id);
             window.requestAnimationFrame(() => document.getElementById(`account-drawer-tab-${nextTab.id}`)?.focus());
           }}
