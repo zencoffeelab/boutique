@@ -13,7 +13,7 @@ import { getViewer } from "~/lib/auth.server";
 import { getProducts, getProfessionalCartProductsWithSampleSet } from "~/lib/catalog.server";
 import { getLocale } from "~/lib/i18n";
 import { pageMeta } from "~/lib/seo";
-import { createRequestSupabase } from "~/lib/supabase.server";
+import { createRequestSupabase, createServiceSupabase } from "~/lib/supabase.server";
 import { pickupPointsConfigured } from "~/services/pickup-points.server";
 
 type ProfessionalDeliveryAddress = {
@@ -43,11 +43,12 @@ function professionalDeliveryAddress(value: unknown): ProfessionalDeliveryAddres
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request); const viewer = await getViewer(request); const audience = viewer?.profile?.professional_status === "approved" || viewer?.profile?.role === "admin" ? "professional" : "retail";
   const requestSupabase = viewer ? createRequestSupabase(request) : null;
+  const serviceSupabase = audience === "professional" ? createServiceSupabase() : null;
   const [savedAddressResult, professionalApplicationResult] = requestSupabase
     ? await Promise.all([
         requestSupabase.client.from("addresses").select("first_name,last_name,company,line1,line2,postal_code,city,country_code,phone").eq("profile_id", viewer!.user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        audience === "professional"
-          ? requestSupabase.client.from("professional_applications").select("company_name,phone,billing_address,delivery_address").eq("invited_user_id", viewer!.user.id).maybeSingle()
+        serviceSupabase
+          ? serviceSupabase.from("professional_applications").select("company_name,phone,billing_address,delivery_address").eq("invited_user_id", viewer!.user.id).maybeSingle()
           : Promise.resolve({ data: null }),
       ])
     : [{ data: null }, { data: null }];

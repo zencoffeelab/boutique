@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-21-checkout-professional-address-access",
+    date: "2026-09-21",
+    kind: "Correction",
+    title: "Adresse professionnelle accessible à la commande",
+    description: "La commande récupère désormais de façon sécurisée l’adresse professionnelle de l’utilisateur connecté afin de préremplir sa livraison.",
+  },
+  {
     id: "2026-09-21-checkout-billing-address-delivery-fallback",
     date: "2026-09-21",
     kind: "Fonctionnalité",
