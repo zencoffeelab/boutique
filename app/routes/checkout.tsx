@@ -16,23 +16,63 @@ import { pageMeta } from "~/lib/seo";
 import { createRequestSupabase } from "~/lib/supabase.server";
 import { pickupPointsConfigured } from "~/services/pickup-points.server";
 
+type ProfessionalDeliveryAddress = {
+  firstName?: string;
+  lastName?: string;
+  line1?: string;
+  postalCode?: string;
+  city?: string;
+  countryCode?: string;
+};
+
+function professionalDeliveryAddress(value: unknown): ProfessionalDeliveryAddress | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const address = value as Record<string, unknown>;
+  return typeof address.line1 === "string" && address.line1.trim()
+    ? {
+        firstName: typeof address.firstName === "string" ? address.firstName : "",
+        lastName: typeof address.lastName === "string" ? address.lastName : "",
+        line1: address.line1,
+        postalCode: typeof address.postalCode === "string" ? address.postalCode : "",
+        city: typeof address.city === "string" ? address.city : "",
+        countryCode: typeof address.countryCode === "string" ? address.countryCode : "FR",
+      }
+    : null;
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request); const viewer = await getViewer(request); const audience = viewer?.profile?.professional_status === "approved" || viewer?.profile?.role === "admin" ? "professional" : "retail";
   const requestSupabase = viewer ? createRequestSupabase(request) : null;
-  const savedAddress = requestSupabase
-    ? (await requestSupabase.client.from("addresses").select("first_name,last_name,company,line1,line2,postal_code,city,country_code,phone").eq("profile_id", viewer!.user.id).order("created_at").limit(1).maybeSingle()).data
-    : null;
+  const [savedAddressResult, professionalApplicationResult] = requestSupabase
+    ? await Promise.all([
+        requestSupabase.client.from("addresses").select("first_name,last_name,company,line1,line2,postal_code,city,country_code,phone").eq("profile_id", viewer!.user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        audience === "professional"
+          ? requestSupabase.client.from("professional_applications").select("company_name,phone,billing_address,delivery_address").eq("invited_user_id", viewer!.user.id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ])
+    : [{ data: null }, { data: null }];
+  const savedAddress = savedAddressResult.data;
+  const professionalAddress = professionalDeliveryAddress(professionalApplicationResult.data?.delivery_address)
+    ?? professionalDeliveryAddress(professionalApplicationResult.data?.billing_address);
+  const checkoutAddress = savedAddress
+    ? {
+        firstName: savedAddress.first_name ?? "", lastName: savedAddress.last_name ?? "", company: savedAddress.company ?? "", line1: savedAddress.line1 ?? "", line2: savedAddress.line2 ?? "",
+        postalCode: savedAddress.postal_code ?? "", city: savedAddress.city ?? "", countryCode: savedAddress.country_code ?? "FR", phone: savedAddress.phone ?? "",
+      }
+    : professionalAddress
+      ? {
+          firstName: professionalAddress.firstName ?? "", lastName: professionalAddress.lastName ?? "", company: professionalApplicationResult.data?.company_name ?? "", line1: professionalAddress.line1 ?? "", line2: "",
+          postalCode: professionalAddress.postalCode ?? "", city: professionalAddress.city ?? "", countryCode: professionalAddress.countryCode ?? "FR", phone: professionalApplicationResult.data?.phone ?? "",
+        }
+      : null;
   return {
     locale,
     audience,
     account: viewer ? {
       email: viewer.user.email ?? "",
-      firstName: savedAddress?.first_name ?? viewer.profile?.first_name ?? "",
-      lastName: savedAddress?.last_name ?? viewer.profile?.last_name ?? "",
-      address: savedAddress ? {
-        company: savedAddress.company ?? "", line1: savedAddress.line1 ?? "", line2: savedAddress.line2 ?? "",
-        postalCode: savedAddress.postal_code ?? "", city: savedAddress.city ?? "", countryCode: savedAddress.country_code ?? "FR", phone: savedAddress.phone ?? "",
-      } : null,
+      firstName: checkoutAddress?.firstName || viewer.profile?.first_name || "",
+      lastName: checkoutAddress?.lastName || viewer.profile?.last_name || "",
+      address: checkoutAddress,
     } : null,
     pickupConfigured: pickupPointsConfigured(),
     products: audience === "professional" ? await getProfessionalCartProductsWithSampleSet() : await getProducts({ status: "published", audience }),

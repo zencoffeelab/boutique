@@ -12,6 +12,20 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-21-checkout-billing-address-delivery-fallback",
+    date: "2026-09-21",
+    kind: "Fonctionnalité",
+    title: "Adresse de facturation utilisée en secours",
+    description: "Lorsqu’aucune adresse de livraison n’est enregistrée, la commande préremplit désormais l’adresse de facturation disponible sur le compte.",
+  },
+  {
+    id: "2026-09-21-checkout-saved-delivery-address-prefill",
+    date: "2026-09-21",
+    kind: "Fonctionnalité",
+    title: "Adresse de livraison préremplie à la commande",
+    description: "Les comptes particuliers et professionnels, classiques ou contractuels, retrouvent désormais automatiquement leur adresse de livraison enregistrée dans « Livraison & paiement ».",
+  },
+  {
     id: "2026-09-21-cart-drawer-free-shipping-banner-aligned",
     date: "2026-09-21",
     kind: "Design",
