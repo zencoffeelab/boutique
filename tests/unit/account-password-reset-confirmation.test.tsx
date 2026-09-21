@@ -25,6 +25,7 @@ describe("account password reset confirmation", () => {
       path: "*",
       element: <AccountDashboard
         data={accountData}
+        activeSection="settings"
         result={{ ok: true, scope: "password_reset", message }}
       />,
     }]);

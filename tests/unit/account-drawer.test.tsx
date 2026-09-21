@@ -26,6 +26,7 @@ const accountData = {
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.matchMedia = (() => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined, addListener: () => undefined, removeListener: () => undefined, dispatchEvent: () => false, media: "", onchange: null })) as typeof window.matchMedia;
   HTMLDialogElement.prototype.showModal = function showModal() { this.setAttribute("open", ""); };
   HTMLDialogElement.prototype.close = function close() { this.removeAttribute("open"); };
 });

@@ -32,9 +32,9 @@ describe("public account navigation", () => {
 
   it("places the basket after the account action", () => {
     const professionalHeader = renderHeader(true, true, "JD");
-    expect(professionalHeader.lastIndexOf('lucide-shopping-basket')).toBeGreaterThan(professionalHeader.lastIndexOf('lucide-user-round'));
+    expect(professionalHeader.lastIndexOf('lucide-shopping-cart')).toBeGreaterThan(professionalHeader.lastIndexOf('lucide-user-round'));
     const standardHeader = renderHeader(true, false, "JD");
-    expect(standardHeader.lastIndexOf('lucide-shopping-basket')).toBeGreaterThan(standardHeader.lastIndexOf('lucide-user-round'));
+    expect(standardHeader.lastIndexOf('lucide-shopping-cart')).toBeGreaterThan(standardHeader.lastIndexOf('lucide-user-round'));
   });
 
   it("shows the active language with an SVG flag in a dropdown", () => {

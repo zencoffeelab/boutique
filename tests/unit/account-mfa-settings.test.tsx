@@ -19,7 +19,7 @@ const accountData: AccountDashboardData = {
 };
 
 function renderDashboard(data: AccountDashboardData) {
-  const router = createMemoryRouter([{ path: "*", element: <AccountDashboard data={data} /> }]);
+  const router = createMemoryRouter([{ path: "*", element: <AccountDashboard data={data} activeSection="settings" /> }]);
   render(<RouterProvider router={router} />);
 }
 

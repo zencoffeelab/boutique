@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Menu, MonitorSmartphone, Search, ShoppingBasket, UserRound, X } from "lucide-react";
+import { Check, ChevronDown, Menu, MonitorSmartphone, Search, ShoppingCart, UserRound, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { AccountDrawer } from "~/components/account/account-drawer";
@@ -204,7 +204,7 @@ export function SiteHeader({ signedIn, professional, accountInitials, admin = fa
           {admin && !embeddedMobilePreview ? <button className={`admin-mobile-preview-button${mobilePreview ? " is-active" : ""}`} type="button" onClick={toggleMobilePreview} aria-pressed={mobilePreview} aria-label={mobilePreview ? "Désactiver l’aperçu mobile" : "Activer l’aperçu mobile"} title={mobilePreview ? "Désactiver l’aperçu mobile" : "Aperçu mobile"}><MonitorSmartphone aria-hidden="true" /><span>Mobile</span></button> : null}
           {signedIn ? <button className="icon-button account-button--icon" type="button" onClick={openAccountDrawer} aria-label={accountLabel} aria-expanded={accountDrawerOpen} aria-controls="account-drawer"><UserRound aria-hidden="true" /></button> : <Link className="icon-button account-button--icon" to={paths.account} aria-label={accountLabel}><UserRound aria-hidden="true" /></Link>}
           <button className="icon-button cart-button" type="button" onClick={() => { closeMenu(); openDrawer(); }} aria-label={`${t.cart} (${itemCount})`} aria-expanded={drawerOpen} aria-controls="cart-drawer">
-            <ShoppingBasket aria-hidden="true" /><span>{itemCount}</span>
+            <ShoppingCart aria-hidden="true" /><span>{itemCount}</span>
           </button>
         </div>
       </header>

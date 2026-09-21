@@ -13,10 +13,10 @@ type AccountDrawerResponse = Omit<AccountDashboardData, "viewer"> & {
 };
 
 const tabs: Array<{ id: AccountSectionId; fr: string; en: string }> = [
-  { id: "orders", fr: "Commandes", en: "Orders" },
   { id: "upcoming-order", fr: "Prochaine commande", en: "Next order" },
-  { id: "documents", fr: "Documents", en: "Documents" },
+  { id: "orders", fr: "Commandes", en: "Orders" },
   { id: "communication", fr: "Communication", en: "Communication" },
+  { id: "documents", fr: "Documents", en: "Documents" },
   { id: "addresses", fr: "Adresses", en: "Addresses" },
   { id: "settings", fr: "Paramètres", en: "Settings" },
 ];
@@ -86,7 +86,7 @@ export function AccountDrawer({ open, locale, onClose }: { open: boolean; locale
         <button className="icon-button" type="button" onClick={onClose} aria-label={english ? "Close my account" : "Fermer mon compte"} autoFocus><X aria-hidden="true" /></button>
       </header>
 
-      {data?.viewer && !mfaChallengeRequired ? <div className="account-drawer__tabs" role="tablist" aria-label={english ? "My account sections" : "Rubriques de mon compte"}>
+      {data?.viewer && !mfaChallengeRequired ? <div className={`account-drawer__tabs account-drawer__tabs--${visibleTabs.length}`} role="tablist" aria-label={english ? "My account sections" : "Rubriques de mon compte"}>
         {visibleTabs.map((tab) => <button
           id={`account-drawer-tab-${tab.id}`}
           className={activeSection === tab.id ? "is-active" : undefined}

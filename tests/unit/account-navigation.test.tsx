@@ -33,13 +33,14 @@ describe("account anchor navigation", () => {
     expect(countries).not.toContain("US");
   });
 
-  it("links every customer section and exposes the current counts", () => {
+  it("lists every customer section as a selectable tab and exposes the current counts", () => {
     const html = renderToStaticMarkup(<MemoryRouter><AccountNavigation english={false} orderCount={3} addressCount={2} /></MemoryRouter>);
 
     expect(html).toContain('aria-label="Sections de mon compte"');
-    expect(html).toContain('href="#account-orders"');
-    expect(html).toContain('href="#account-addresses"');
-    expect(html).toContain('href="#account-settings"');
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('id="account-tab-orders"');
+    expect(html).toContain('id="account-tab-addresses"');
+    expect(html).toContain('id="account-tab-settings"');
     expect(html).toContain(">3<");
     expect(html).toContain(">2<");
     expect(html).not.toContain("Boutique pro");
@@ -49,7 +50,7 @@ describe("account anchor navigation", () => {
     const html = renderToStaticMarkup(<MemoryRouter><AccountNavigation english orderCount={0} addressCount={0} /></MemoryRouter>);
     expect(html).not.toContain('href="#account-professional-quotes"');
     expect(html).not.toContain("Professional shop");
-    expect(html).toContain('href="#account-orders"');
+    expect(html).toContain('id="account-tab-orders"');
   });
 });
 

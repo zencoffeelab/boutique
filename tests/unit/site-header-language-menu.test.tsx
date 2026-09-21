@@ -21,7 +21,7 @@ describe("custom language menu", () => {
       </MemoryRouter>,
     );
 
-    const trigger = screen.getByRole("button", { name: "Langue active : Français" });
+    const trigger = screen.getAllByRole("button", { name: "Langue active : Français" }).at(-1)!;
     expect(trigger.querySelector('[data-language-flag="fr-FR"] svg')).toBeInTheDocument();
     await user.click(trigger);
     const languageMenu = screen.getByRole("menu", { name: "Choisir la langue" });
@@ -35,6 +35,6 @@ describe("custom language menu", () => {
 
     await user.click(trigger);
     await user.click(screen.getByRole("menuitem", { name: "English (EN)" }));
-    expect(screen.getByRole("button", { name: "Active language: English" })).toHaveTextContent("EN");
+    expect(screen.getAllByRole("button", { name: "Active language: English" }).at(-1)).toHaveTextContent("EN");
   });
 });
