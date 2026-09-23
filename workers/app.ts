@@ -6,7 +6,6 @@ import {
 } from "../app/lib/public-media";
 
 interface CloudflareRuntimeEnv {
-  VITE_SITE_URL?: string;
   CRON_SECRET?: string;
 }
 
@@ -99,11 +98,13 @@ export default {
     });
   },
   async scheduled(_controller: unknown, env: CloudflareRuntimeEnv, ctx: CloudflareRuntimeContext) {
-    if (!env.VITE_SITE_URL || !env.CRON_SECRET) {
+    if (!env.CRON_SECRET) {
       console.error("commerce_cron_not_configured");
       return;
     }
-    const endpoint = new URL("/api/cron/commerce", env.VITE_SITE_URL);
+    // Keep scheduled jobs on the canonical host. This avoids a redirect that
+    // would discard the Authorization header before reaching the cron route.
+    const endpoint = new URL("/api/cron/commerce", "https://www.zencoffeelab.com");
     ctx.waitUntil(fetch(endpoint, { headers: { authorization: `Bearer ${env.CRON_SECRET}` } }).then(async (response) => {
       if (!response.ok) throw new Error(`Commerce cron returned ${response.status}: ${await response.text()}`);
     }));

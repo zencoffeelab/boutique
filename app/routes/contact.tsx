@@ -333,6 +333,27 @@ export async function action({ request, context }: ActionFunctionArgs) {
       subject: label,
       message,
     });
+    const receivedAt = new Date().toISOString();
+    const { error: mailboxError } = await client
+      .from("admin_mail_messages")
+      .insert({
+        direction: "inbound",
+        sender_name: name,
+        sender_address: email.toLowerCase(),
+        recipients: [{ name: "Zen Coffee Lab", address: env().ADMIN_NOTIFICATION_EMAIL }],
+        cc_addresses: [],
+        reply_to_address: email.toLowerCase(),
+        subject: adminEmail.subject,
+        text_body: message,
+        html_body: adminEmail.html,
+        message_id_header: `<contact-message-${stored.id}@zencoffeelab.com>`,
+        provider_id: `contact-message/${stored.id}`,
+        is_read: false,
+        raw_size: new TextEncoder().encode(message).byteLength,
+        received_at: receivedAt,
+      });
+    if (mailboxError)
+      throw new Error(`Unable to archive contact message in admin mailbox: ${mailboxError.message}`);
     const confirmationEmail = contactMessageReceivedEmail({
       locale,
       name,
