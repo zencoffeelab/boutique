@@ -7093,23 +7093,24 @@ body.advice-detail-overflow-hidden {
 .admin-professional-detail__message-link:hover {
   background: var(--sand);
 }
-.admin-professional-detail__message-link::after {
-  content: "R\u00e9pondre";
-  margin-left: 0.5rem;
-  color: var(--forest);
-  font-size: 0.78rem;
-  font-weight: 700;
+.admin-professional-detail__message-subject {
+  color: var(--ink);
+  text-decoration-color: var(--orange);
+  text-underline-offset: 0.2em;
 }
-.admin-professional-detail__timeline article:has(.admin-professional-detail__message-link) {
+.admin-professional-detail__message-subject:hover {
+  color: var(--forest);
+}
+.admin-professional-detail__timeline article:has(.admin-professional-detail__message-subject) {
   gap: 0.75rem;
   padding: 1rem;
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--paper) 90%, var(--sand));
 }
-.admin-professional-detail__timeline article:has(.admin-professional-detail__message-link) + article:has(.admin-professional-detail__message-link) {
+.admin-professional-detail__timeline article:has(.admin-professional-detail__message-subject) + article:has(.admin-professional-detail__message-subject) {
   margin-top: 0.75rem;
 }
-.admin-professional-detail__timeline article:has(.admin-professional-detail__message-link) p {
+.admin-professional-detail__timeline article:has(.admin-professional-detail__message-subject) p {
   max-width: 78ch;
   margin: 0;
   white-space: pre-wrap;
