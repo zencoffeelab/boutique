@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-public-forms-turnstile-configuration",
+    date: "2026-09-23",
+    kind: "S\u00e9curit\u00e9",
+    title: "Protection anti-spam des formulaires configur\u00e9e",
+    description: "Les formulaires publics utilisent d\u00e9sormais le widget Cloudflare Turnstile configur\u00e9 pour le site, avec une v\u00e9rification serveur du domaine et de l\u2019action.",
+  },
+  {
     id: "2026-09-23-professional-contact-request-antispam-fix",
     date: "2026-09-23",
     kind: "Correction",

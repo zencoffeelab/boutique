@@ -20,8 +20,8 @@ function expectedHostnames(value: string | undefined) {
   return new Set((value ?? "").split(",").map((hostname) => hostname.trim().toLowerCase()).filter(Boolean));
 }
 
-async function verify(url: string, secret: string, response: string, remoteip: string) {
-  const result = await fetch(url, {
+async function verifyTurnstile(secret: string, response: string, remoteip: string) {
+  const result = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ secret, response, ...(remoteip ? { remoteip } : {}) }),
@@ -56,22 +56,14 @@ export function withinProfessionalContactRateLimit(request: Request) {
 export async function verifyPublicCaptcha(request: Request, payload: CaptchaPayload, expectedAction: CaptchaAction) {
   if (env().NODE_ENV === "test") return true;
   const config = env();
-  const recaptchaResponse = valueOf(payload, "g-recaptcha-response");
   const turnstileResponse = valueOf(payload, "cf-turnstile-response");
-  if (!config.RECAPTCHA_SECRET_KEY || !config.TURNSTILE_SECRET_KEY) return config.NODE_ENV !== "production";
+  if (!config.TURNSTILE_SECRET_KEY) return config.NODE_ENV !== "production";
   const hosts = expectedHostnames(config.TURNSTILE_HOSTNAMES);
-  if (hosts.size === 0) return false;
-  if (!recaptchaResponse || !turnstileResponse) return false;
-  const remoteip = clientIp(request);
+  if (hosts.size === 0 || !turnstileResponse) return false;
   try {
-    const [recaptcha, turnstile] = await Promise.all([
-      verify("https://www.google.com/recaptcha/api/siteverify", config.RECAPTCHA_SECRET_KEY, recaptchaResponse, remoteip),
-      verify("https://challenges.cloudflare.com/turnstile/v0/siteverify", config.TURNSTILE_SECRET_KEY, turnstileResponse, remoteip),
-    ]);
-    if (!recaptcha || !turnstile) return false;
-    const host = (turnstile.hostname ?? "").toLowerCase();
-    const recaptchaHost = (recaptcha.hostname ?? "").toLowerCase();
-    if (!recaptcha.success || !turnstile.success || turnstile.action !== expectedAction || !hosts.has(host) || !hosts.has(recaptchaHost)) return false;
+    const turnstile = await verifyTurnstile(config.TURNSTILE_SECRET_KEY, turnstileResponse, clientIp(request));
+    const host = (turnstile?.hostname ?? "").toLowerCase();
+    if (!turnstile?.success || turnstile.action !== expectedAction || !hosts.has(host)) return false;
     return withinRateLimit(request, expectedAction);
   } catch (cause) {
     console.error("public_captcha_verification_failed", { message: cause instanceof Error ? cause.message : String(cause) });
@@ -82,6 +74,6 @@ export async function verifyPublicCaptcha(request: Request, payload: CaptchaPayl
 export function captchaRejected(locale: "fr-FR" | "en-GB") {
   return Response.json({
     ok: false,
-    message: locale === "en-GB" ? "Please complete both anti-spam checks and try again." : "Veuillez valider les deux contrôles anti-spam puis réessayer.",
+    message: locale === "en-GB" ? "Please complete the anti-spam check and try again." : "Veuillez valider le contr\u00f4le anti-spam puis r\u00e9essayer.",
   }, { status: 403 });
 }
