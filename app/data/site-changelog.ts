@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-professional-message-threads-readable",
+    date: "2026-09-23",
+    kind: "Design",
+    title: "\u00c9changes professionnels plus lisibles",
+    description: "Les messages des comptes professionnels pr\u00e9sentent d\u00e9sormais clairement leur auteur, leur date et leur contenu, avec une zone de r\u00e9ponse mieux s\u00e9par\u00e9e dans l\u2019espace priv\u00e9 comme dans la fiche administrateur.",
+  },
+  {
     id: "2026-09-23-professional-contact-admin-inbox",
     date: "2026-09-23",
     kind: "Correction",

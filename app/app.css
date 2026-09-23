@@ -7079,9 +7079,96 @@ body.advice-detail-overflow-hidden {
 }
 .admin-professional-detail__message-link {
   width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--orange) 45%, var(--line));
+  background: color-mix(in srgb, var(--paper) 84%, var(--sand));
   color: var(--ink);
+  font-weight: 700;
   text-decoration-color: var(--orange);
   text-underline-offset: 0.2em;
+}
+.admin-professional-detail__message-link:hover {
+  background: var(--sand);
+}
+.admin-professional-detail__message-link::after {
+  content: "R\u00e9pondre";
+  margin-left: 0.5rem;
+  color: var(--forest);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.admin-professional-detail__timeline article:has(.admin-professional-detail__message-link) {
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper) 90%, var(--sand));
+}
+.admin-professional-detail__timeline article:has(.admin-professional-detail__message-link) + article:has(.admin-professional-detail__message-link) {
+  margin-top: 0.75rem;
+}
+.admin-professional-detail__timeline article:has(.admin-professional-detail__message-link) p {
+  max-width: 78ch;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+.account-communication-list {
+  display: grid;
+  gap: 1rem;
+}
+.account-communication-list .account-panel {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1rem, 2vw, 1.4rem);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper) 91%, var(--sand));
+}
+.account-communication-list .account-panel > div {
+  display: grid;
+  gap: 0.45rem;
+}
+.account-communication-list .account-panel .eyebrow {
+  margin: 0;
+  color: var(--forest);
+}
+.account-communication-list .account-panel h3 {
+  margin: 0;
+  font: 650 clamp(1.05rem, 2vw, 1.25rem)/1.25 var(--sans);
+}
+.account-communication-list .account-panel small {
+  color: var(--muted);
+}
+.account-communication-list .account-panel > div > p:last-child {
+  max-width: 78ch;
+  margin: 0.5rem 0 0;
+  padding: 0.9rem 1rem;
+  border-left: 3px solid var(--orange);
+  background: color-mix(in srgb, var(--sand) 68%, var(--paper));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+.account-communication-reply {
+  display: grid;
+  gap: 0.65rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.account-communication-reply label {
+  display: grid;
+  gap: 0.45rem;
+  font-weight: 700;
+}
+.account-communication-reply textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+.account-communication-reply .ui-button {
+  justify-self: start;
 }
 .admin-professional-detail__timeline {
   display: grid;
