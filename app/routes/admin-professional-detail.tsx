@@ -353,7 +353,7 @@ export default function AdminProfessionalDetail() {
   );
   const [activeTab, setActiveTab] = useState<
     "information" | "documents" | "orders" | "messages"
-  >("information");
+  >("messages");
   return (
     <AdminShell active="professionals">
       <header className="admin-heading admin-professional-detail__heading">
@@ -393,6 +393,15 @@ export default function AdminProfessionalDetail() {
         <button
           type="button"
           role="tab"
+          aria-selected={activeTab === "messages"}
+          className={activeTab === "messages" ? "is-active" : ""}
+          onClick={() => setActiveTab("messages")}
+        >
+          Mails <span>{messages.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={activeTab === "information"}
           className={activeTab === "information" ? "is-active" : ""}
           onClick={() => setActiveTab("information")}
@@ -421,15 +430,6 @@ export default function AdminProfessionalDetail() {
           onClick={() => setActiveTab("orders")}
         >
           Commandes <span>{orders.length}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "messages"}
-          className={activeTab === "messages" ? "is-active" : ""}
-          onClick={() => setActiveTab("messages")}
-        >
-          Mails <span>{messages.length}</span>
         </button>
       </nav>
       {activeTab === "information" ? (

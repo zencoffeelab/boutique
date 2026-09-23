@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-professional-communication-priority",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Communication professionnelle prioritaire",
+    description: "Les échanges professionnels sont désormais disponibles dans l’espace privé complet et affichés en priorité. Les messages non lus sont signalés dans Communication et dans Professionnels avec le compte expéditeur, tandis que l’onglet Mails ouvre en premier dans chaque fiche professionnelle.",
+  },
+  {
     id: "2026-09-23-resend-worker-secret-runtime",
     date: "2026-09-23",
     kind: "Correction",
