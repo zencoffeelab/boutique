@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-professional-message-reply-on-demand",
+    date: "2026-09-23",
+    kind: "Design",
+    title: "Réponse aux messages professionnels à la demande",
+    description: "La zone de réponse d’un compte professionnel reste désormais repliée sous chaque message et s’ouvre uniquement après un clic sur Répondre.",
+  },
+  {
     id: "2026-09-23-professional-communication-priority",
     date: "2026-09-23",
     kind: "Correction",

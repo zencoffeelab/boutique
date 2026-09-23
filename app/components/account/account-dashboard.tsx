@@ -1227,6 +1227,11 @@ function AccountSections({
                   </small>
                   <p>{message.text_body || "—"}</p>
                 </div>
+                <details className="account-communication-reply-toggle">
+                  <summary className="ui-button ui-button--ghost ui-button--sm">
+                    <Reply aria-hidden="true" />
+                    {english ? "Reply" : "Répondre"}
+                  </summary>
                 <AccountMutationForm
                   drawer={drawer}
                   method="post"
@@ -1251,6 +1256,7 @@ function AccountSections({
                     {english ? "Send" : "Envoyer"}
                   </button>
                 </AccountMutationForm>
+                </details>
               </article>
             ))}
           </div>

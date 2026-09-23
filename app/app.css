@@ -7162,6 +7162,20 @@ body.advice-detail-overflow-hidden {
   padding-top: 1rem;
   border-top: 1px solid var(--line);
 }
+.account-communication-reply-toggle {
+  margin-top: 0.25rem;
+}
+.account-communication-reply-toggle > summary {
+  width: fit-content;
+  cursor: pointer;
+  list-style: none;
+}
+.account-communication-reply-toggle > summary::-webkit-details-marker {
+  display: none;
+}
+.account-communication-reply-toggle:not([open]) .account-communication-reply {
+  display: none;
+}
 .account-communication-reply label {
   display: grid;
   gap: 0.45rem;
