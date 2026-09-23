@@ -2,6 +2,7 @@ import { env } from "./env.server";
 
 type CaptchaPayload = FormData | Record<string, unknown>;
 type CaptchaAction = "contact";
+type RateLimitAction = CaptchaAction | "professional-contact";
 
 function valueOf(payload: CaptchaPayload, key: string) {
   if (payload instanceof FormData) return String(payload.get(key) ?? "").trim();
@@ -29,7 +30,7 @@ async function verify(url: string, secret: string, response: string, remoteip: s
   return await result.json() as { success?: boolean; action?: string; hostname?: string };
 }
 
-async function withinRateLimit(request: Request, action: CaptchaAction) {
+async function withinRateLimit(request: Request, action: RateLimitAction) {
   const ip = clientIp(request);
   if (!ip) return true;
   const cache = (globalThis as typeof globalThis & { caches?: { default?: Cache } }).caches?.default;
@@ -41,6 +42,15 @@ async function withinRateLimit(request: Request, action: CaptchaAction) {
   if (!Number.isFinite(count) || count >= limit) return false;
   await cache.put(key, new Response(String(count + 1), { headers: { "cache-control": "max-age=600" } }));
   return true;
+}
+
+/**
+ * Professional requests are only available to approved, authenticated accounts.
+ * They do not need public CAPTCHA widgets, but still receive the same IP-based
+ * throttling as public forms.
+ */
+export function withinProfessionalContactRateLimit(request: Request) {
+  return withinRateLimit(request, "professional-contact");
 }
 
 export async function verifyPublicCaptcha(request: Request, payload: CaptchaPayload, expectedAction: CaptchaAction) {

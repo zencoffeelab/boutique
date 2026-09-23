@@ -98,6 +98,9 @@ export function PublicCaptcha({ locale }: { locale: "fr-FR" | "en-GB" }) {
 
 function publicFormAction(form: HTMLFormElement) {
   if (form.method.toLowerCase() === "dialog" || form.closest(".admin-body")) return false;
+  // This form is protected by its required approved-account session and a
+  // server-side rate limit. It must not rely on public CAPTCHA site keys.
+  if (form.querySelector("input[name='intent'][value='professional-selection']")) return false;
   const path = window.location.pathname;
   return /contact/.test(path) ? "contact" : false;
 }

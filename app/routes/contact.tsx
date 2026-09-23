@@ -25,7 +25,11 @@ import { getLocale } from "~/lib/i18n";
 import { getProfessionalConnectedPageContent } from "~/lib/professional-content";
 import { pageMeta } from "~/lib/seo";
 import { createServiceSupabase } from "~/lib/supabase.server";
-import { captchaRejected, verifyPublicCaptcha } from "~/lib/antispam.server";
+import {
+  captchaRejected,
+  verifyPublicCaptcha,
+  withinProfessionalContactRateLimit,
+} from "~/lib/antispam.server";
 import {
   contactAdminAlertEmail,
   contactMessageReceivedEmail,
@@ -144,14 +148,15 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const raw = Object.fromEntries(await request.formData());
   const locale = raw.locale === "en-GB" ? "en-GB" : "fr-FR";
   const english = locale === "en-GB";
-  if (!(await verifyPublicCaptcha(request, raw, "contact")))
+  const professionalSelection = raw.intent === "professional-selection";
+  if (!professionalSelection && !(await verifyPublicCaptcha(request, raw, "contact")))
     return captchaRejected(locale);
   let name: string,
     email: string,
     phone = "",
     subject: keyof (typeof SUBJECT_LABELS)["fr-FR"],
     message: string;
-  if (raw.intent === "professional-selection") {
+  if (professionalSelection) {
     const viewer = await getViewer(request);
     if (
       !viewer ||
@@ -166,6 +171,16 @@ export async function action({ request, context }: ActionFunctionArgs) {
             : "Cette demande est réservée aux comptes professionnels validés.",
         },
         { status: 403 },
+      );
+    if (!(await withinProfessionalContactRateLimit(request)))
+      return data<Result>(
+        {
+          ok: false,
+          message: english
+            ? "Please wait a few minutes before sending another request."
+            : "Veuillez patienter quelques minutes avant dâ€™envoyer une nouvelle demande.",
+        },
+        { status: 429 },
       );
     const parsed = proSchema.safeParse({
       ...raw,

@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-professional-contact-request-antispam-fix",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Demandes professionnelles envoyÃ©es sans blocage anti-spam",
+    description: "Les comptes professionnels validÃ©s peuvent dÃ©sormais envoyer leur sÃ©lection de cafÃ©s sans dÃ©pendre des widgets anti-spam publics, tout en restant protÃ©gÃ©s par leur connexion et une limitation de frÃ©quence.",
+  },
+  {
     id: "2026-09-23-product-variant-save-transaction",
     date: "2026-09-23",
     kind: "Correction",
