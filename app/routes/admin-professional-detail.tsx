@@ -85,6 +85,7 @@ type MailMessage = {
   created_at: string;
   received_at: string | null;
   sent_at: string | null;
+  is_read: boolean;
   admin_mail_attachments?: Array<{
     id: string;
     filename: string;
@@ -142,7 +143,7 @@ function hasRecipient(message: MailMessage, email: string) {
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  await requireAdmin(request);
+  const admin = await requireAdmin(request);
   const memberId = idSchema.safeParse(params.id);
   if (!memberId.success)
     throw new Response("Compte professionnel introuvable.", { status: 404 });
@@ -176,7 +177,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const orderColumns =
     "id,order_number,status,total_cents,created_at,paid_at,order_lines(product_name,variant_label,quantity,line_total_cents)";
   const mailColumns =
-    "id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,received_at,sent_at,admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)";
+    "id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,received_at,sent_at,is_read,admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)";
   const [
     memberApplications,
     emailApplications,
@@ -248,6 +249,22 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     quotesResult.error ??
     contractsResult.error;
   if (error) throw new Response(error.message, { status: 500 });
+  const unreadReceivedMessageIds = (receivedMessages.data ?? []).flatMap(
+    (message) =>
+      message.direction === "inbound" && !message.is_read ? [message.id] : [],
+  );
+  if (unreadReceivedMessageIds.length) {
+    const { error: readError } = await client
+      .from("admin_mail_messages")
+      .update({
+        is_read: true,
+        read_at: new Date().toISOString(),
+        read_by: admin.id,
+        updated_at: new Date().toISOString(),
+      })
+      .in("id", unreadReceivedMessageIds);
+    if (readError) throw new Response(readError.message, { status: 500 });
+  }
   const applications = uniqueById([
     ...(memberApplications.data ?? []),
     ...(emailApplications.data ?? []),

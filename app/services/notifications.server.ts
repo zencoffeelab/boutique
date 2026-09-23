@@ -50,7 +50,7 @@ export async function processNotificationQueue(limit = notificationBatchSize) {
       const { data: quote } = await client.from("professional_quotes").select("quote_number,storage_path").eq("id", String(item.payload.quoteId)).maybeSingle();
       if (quote?.storage_path) { const { data: file } = await client.storage.from("professional-quotes").download(quote.storage_path); if (file) attachments = [{ filename: `${quote.quote_number}.pdf`, content: Buffer.from(await file.arrayBuffer()) }]; }
     }
-    const result = await resend.emails.send({ from: config.RESEND_FROM_EMAIL, to: item.recipient, subject: item.subject, html: item.html, attachments }, { idempotencyKey: item.dedupe_key || `notification/${item.id}` });
+    const result = await resend.emails.send({ from: config.RESEND_FROM_EMAIL, to: item.recipient, subject: item.subject, html: item.html, attachments, headers: item.kind === "contact_message" ? { "X-Zen-Coffee-Mailbox-Archived": "1" } : undefined }, { idempotencyKey: item.dedupe_key || `notification/${item.id}` });
     if (result.error) {
       const minutes = Math.min(24 * 60, 2 ** claimedAttempts);
       await client.from("notification_outbox").update({ last_error: result.error.message, next_attempt_at: new Date(Date.now() + minutes * 60_000).toISOString() }).eq("id", item.id);

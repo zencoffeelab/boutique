@@ -12,6 +12,34 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-contact-mail-duplicate-prevention",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Doublons de messages de formulaire évités",
+    description: "Les demandes envoyées depuis un formulaire sont déjà archivées dans la messagerie du backoffice. Leur alerte e-mail n’est désormais plus archivée une seconde fois lors de sa réception.",
+  },
+  {
+    id: "2026-09-23-professional-message-read-status",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Notifications effacées à la lecture",
+    description: "L’ouverture de l’onglet Mails d’une fiche professionnelle marque désormais les messages reçus comme lus et retire leur notification du menu Professionnels.",
+  },
+  {
+    id: "2026-09-23-professional-backoffice-notifications",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Alertes des demandes et messages professionnels",
+    description: "Le menu Professionnels affiche désormais un compteur pour les nouvelles demandes et les messages non lus. Depuis l’alerte de la page Professionnels, chaque expéditeur ouvre directement la fiche du compte dans son onglet Mails.",
+  },
+  {
+    id: "2026-09-23-professional-form-success-scroll",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Confirmation visible après un envoi",
+    description: "Après l’envoi d’un message ou d’une demande professionnelle, la page remonte automatiquement en haut afin d’afficher immédiatement la confirmation.",
+  },
+  {
     id: "2026-09-23-professional-mail-attachments-visible",
     date: "2026-09-23",
     kind: "Correction",

@@ -688,6 +688,10 @@ export default function Contact() {
   const english = locale === "en-GB";
   const sending = navigation.state === "submitting";
   const error = (field: string) => result?.errors?.[field]?.[0];
+  useEffect(() => {
+    if (!result?.ok) return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [result]);
   return (
     <>
       <header className="page-hero contact-hero">

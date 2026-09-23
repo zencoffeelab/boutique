@@ -89,6 +89,7 @@ export default [
   route("api/admin/pro-applications/:id/decision", "routes/api.admin-pro-decision.ts"),
   route("api/admin/members/:id/role", "routes/api.admin-member-role.ts"),
   route("api/admin/mail/unread-count", "routes/api.admin-mail-unread-count.ts"),
+  route("api/admin/professionals/unread-count", "routes/api.admin-professionals-unread-count.ts"),
   route("api/admin/orders/unread-count", "routes/api.admin-order-unread-count.ts"),
   route("api/admin/orders/:id/label", "routes/api.admin-order-label.ts"),
   route("api/admin/shipments/:id/label", "routes/api.admin-sendcloud-label.ts"),

@@ -253,7 +253,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     userResult.data.users,
   );
   const professionalEmails = new Set(allMembers.map((member) => member.email.toLocaleLowerCase("en-US")));
-  const unreadProfessionalMessages = (unreadMailResult.data ?? []).filter((message) => professionalEmails.has(message.sender_address.toLocaleLowerCase("en-US")));
+  const unreadProfessionalMessages = (unreadMailResult.data ?? []).flatMap((message) => {
+    const member = allMembers.find((item) => item.email.toLocaleLowerCase("en-US") === message.sender_address.toLocaleLowerCase("en-US"));
+    return member && professionalEmails.has(message.sender_address.toLocaleLowerCase("en-US"))
+      ? [{ ...message, memberId: member.id }]
+      : [];
+  });
 
   const applicationMatches = (application: ProfessionalApplication) =>
     includesSearch(
@@ -1081,7 +1086,7 @@ export default function AdminProfessionals() {
           Voir la page pro
         </Link>
       </header>
-      {unreadProfessionalMessages.length ? <p className="admin-notice"><strong>{unreadProfessionalMessages.length} nouveau{unreadProfessionalMessages.length > 1 ? "x" : ""} message{unreadProfessionalMessages.length > 1 ? "s" : ""} professionnel{unreadProfessionalMessages.length > 1 ? "s" : ""}</strong> : {unreadProfessionalMessages.map((message) => message.sender_name || message.sender_address).join(", ")}.</p> : null}
+      {unreadProfessionalMessages.length ? <p className="admin-notice"><strong>{unreadProfessionalMessages.length} nouveau{unreadProfessionalMessages.length > 1 ? "x" : ""} message{unreadProfessionalMessages.length > 1 ? "s" : ""} professionnel{unreadProfessionalMessages.length > 1 ? "s" : ""}</strong> : {unreadProfessionalMessages.map((message, index) => <span key={message.id}>{index ? ", " : null}<Link to={`/admin/professionnels/${message.memberId}`}>{message.sender_name || message.sender_address}</Link></span>)}.</p> : null}
       {demo ? (
         <p className="admin-notice">
           Connectez Supabase pour consulter et administrer les comptes

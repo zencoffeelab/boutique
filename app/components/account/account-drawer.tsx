@@ -104,6 +104,11 @@ export function AccountDrawer({
     )
       return;
     lastActionDataRef.current = actionFetcher.data;
+    if (actionFetcher.data.ok && actionFetcher.data.scope === "professional_communication")
+      dialogRef.current?.querySelector<HTMLElement>(".account-drawer__panel")?.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
     accountFetcher.load(accountPath);
   }, [accountPath, actionFetcher.data, actionFetcher.state, open]);
 

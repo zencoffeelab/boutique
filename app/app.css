@@ -5228,7 +5228,8 @@ body.advice-detail-overflow-hidden {
   color: #182116;
   font: 800 0.68rem/1 var(--sans);
 }
-.admin-sidebar__order-count {
+.admin-sidebar__order-count,
+.admin-sidebar__professional-count {
   display: inline-grid;
   min-width: 1.35rem;
   height: 1.35rem;
@@ -5239,6 +5240,11 @@ body.advice-detail-overflow-hidden {
   background: #f1d0ac;
   color: #39220f;
   font: 800 0.68rem/1 var(--sans);
+}
+.admin-sidebar__professional-count {
+  border-color: #d3c2e8;
+  background: #d9c9ec;
+  color: #35204b;
 }
 .admin-logout {
   margin-top: auto;

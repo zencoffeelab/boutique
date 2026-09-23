@@ -187,6 +187,7 @@ export async function persistIncomingEmail(message: ForwardableEmail, env: Email
 
 export default {
   async email(message: ForwardableEmail, env: EmailForwardingEnv) {
+    if (message.headers?.get("x-zen-coffee-mailbox-archived") === "1") return;
     try {
       const storedMessageId = await persistIncomingEmail(message, env);
       if (!storedMessageId) throw new Error("Incoming email storage is not configured.");

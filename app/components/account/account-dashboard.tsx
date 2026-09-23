@@ -1682,6 +1682,11 @@ export function AccountDashboard({
     });
   };
 
+  useEffect(() => {
+    if (mode !== "page" || !result?.ok || result.scope !== "professional_communication") return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [mode, result]);
+
   if (mode === "drawer")
     return (
       <AccountSections

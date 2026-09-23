@@ -168,12 +168,37 @@ function AdminOrderUnreadBadge() {
   return <span className="admin-sidebar__order-count" aria-label={label} title={label}>{unread > 99 ? "99+" : unread}</span>;
 }
 
+function AdminProfessionalUnreadBadge() {
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      try {
+        const response = await fetch("/api/admin/professionals/unread-count", { credentials: "same-origin", headers: { Accept: "application/json" } });
+        if (!response.ok) return;
+        const result = await response.json() as { unread?: unknown };
+        if (active && typeof result.unread === "number") setUnread(result.unread);
+      } catch {
+        // Le compteur sera retenté au prochain rafraîchissement sans interrompre le back-office.
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, []);
+
+  if (unread <= 0) return null;
+  const label = `${unread} nouveauté${unread > 1 ? "s" : ""} professionnelle${unread > 1 ? "s" : ""}`;
+  return <span className="admin-sidebar__professional-count" aria-label={label} title={label}>{unread > 99 ? "99+" : unread}</span>;
+}
+
 export function AdminShell({ active, children, unreadMailCount }: { active: AdminSection; children: ReactNode; unreadMailCount?: number }) {
   return <div className="admin-shell">
     <aside className="admin-sidebar">
       <Logo />
       <nav aria-label="Administration">
-        {navigation.map(({ section, label, href, icon: Icon }) => <Link aria-current={section === active ? "page" : undefined} to={href} key={section}><Icon aria-hidden="true" /> {label}{section === "orders" ? <AdminOrderUnreadBadge /> : null}{section === "mail" ? <AdminMailUnreadBadge initialCount={unreadMailCount} /> : null}</Link>)}
+        {navigation.map(({ section, label, href, icon: Icon }) => <Link aria-current={section === active ? "page" : undefined} to={href} key={section}><Icon aria-hidden="true" /> {label}{section === "orders" ? <AdminOrderUnreadBadge /> : null}{section === "professionals" ? <AdminProfessionalUnreadBadge /> : null}{section === "mail" ? <AdminMailUnreadBadge initialCount={unreadMailCount} /> : null}</Link>)}
       </nav>
       <form className="admin-logout" method="post" action="/mon-compte">
         <input type="hidden" name="intent" value="logout" />
