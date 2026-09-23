@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-professional-message-full-content",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Contenu complet des mails professionnels",
+    description: "La fiche professionnelle affiche désormais chaque message dans son intégralité et place l’action de réponse juste sous le contenu du mail reçu.",
+  },
+  {
     id: "2026-09-23-professional-message-reply-action",
     date: "2026-09-23",
     kind: "Correction",

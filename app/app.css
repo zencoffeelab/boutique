@@ -7078,6 +7078,7 @@ body.advice-detail-overflow-hidden {
   color: var(--muted);
 }
 .admin-professional-detail__message-link {
+  order: 3;
   width: fit-content;
   display: inline-flex;
   align-items: center;
@@ -7094,6 +7095,7 @@ body.advice-detail-overflow-hidden {
   background: var(--sand);
 }
 .admin-professional-detail__message-subject {
+  order: 1;
   color: var(--ink);
   text-decoration-color: var(--orange);
   text-underline-offset: 0.2em;
@@ -7111,6 +7113,7 @@ body.advice-detail-overflow-hidden {
   margin-top: 0.75rem;
 }
 .admin-professional-detail__timeline article:has(.admin-professional-detail__message-subject) p {
+  order: 2;
   max-width: 78ch;
   margin: 0;
   white-space: pre-wrap;

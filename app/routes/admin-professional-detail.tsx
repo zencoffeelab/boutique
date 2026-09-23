@@ -879,7 +879,7 @@ export default function AdminProfessionalDetail() {
                       </Link>
                     ) : null}
                     <p>
-                      {message.text_body?.slice(0, 220) ||
+                      {message.text_body ||
                         "Aperçu indisponible"}
                     </p>
                   </article>
