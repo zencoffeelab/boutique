@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-professional-mail-attachments-visible",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Pièces jointes visibles dans les échanges professionnels",
+    description: "Les pièces jointes des e-mails sont désormais affichées et téléchargeables depuis la fiche administrateur comme depuis l’espace privé du compte professionnel concerné.",
+  },
+  {
     id: "2026-09-23-professional-received-mail-badge",
     date: "2026-09-23",
     kind: "Design",

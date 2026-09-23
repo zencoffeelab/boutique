@@ -7,6 +7,7 @@ import {
   Mail,
   MapPin,
   Package,
+  Paperclip,
   Reply,
   ShieldCheck,
   UserRound,
@@ -139,6 +140,14 @@ export type AccountDashboardData = {
     created_at: string;
     sent_at?: string | null;
     parent_id?: string | null;
+    admin_mail_attachments?: Array<{
+      id: string;
+      filename: string;
+      mime_type: string;
+      size_bytes: number;
+      content_id?: string | null;
+      disposition?: string | null;
+    }>;
   }>;
   upcomingContract?: {
     id: string;
@@ -1227,6 +1236,18 @@ function AccountSections({
                   </small>
                   <p>{message.text_body || "—"}</p>
                 </div>
+                {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
+                  <ul className="account-mail-attachments" aria-label={english ? "Attachments" : "Pièces jointes"}>
+                    {message.admin_mail_attachments.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).map((attachment) => (
+                      <li key={attachment.id}>
+                        <a href={`${english ? "/en/my-account/messaging" : "/mon-compte/messagerie"}/${message.id}/${english ? "attachments" : "pieces-jointes"}/${attachment.id}`}>
+                          <Paperclip aria-hidden="true" />
+                          {attachment.filename}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 <details className="account-communication-reply-toggle">
                   <summary className="ui-button ui-button--ghost ui-button--sm">
                     <Reply aria-hidden="true" />

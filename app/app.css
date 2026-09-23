@@ -7078,7 +7078,7 @@ body.advice-detail-overflow-hidden {
   color: var(--muted);
 }
 .admin-professional-detail__message-link {
-  order: 3;
+  order: 4;
   width: fit-content;
   display: inline-flex;
   align-items: center;
@@ -7119,6 +7119,34 @@ body.advice-detail-overflow-hidden {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.65;
+}
+.admin-professional-detail__mail-attachments,
+.account-mail-attachments {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.admin-professional-detail__mail-attachments {
+  order: 3;
+}
+.admin-professional-detail__mail-attachments a,
+.account-mail-attachments a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: fit-content;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration-color: var(--orange);
+  text-underline-offset: 0.2em;
+  overflow-wrap: anywhere;
+}
+.account-mail-attachments a svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
 }
 .account-communication-list {
   display: grid;

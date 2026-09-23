@@ -317,7 +317,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       ? client
           .from("admin_mail_messages")
           .select(
-            "id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,sent_at,parent_id",
+            "id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,sent_at,parent_id,admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)",
           )
           .eq("direction", "inbound")
           .eq("sender_address", viewer.user.email ?? "")
@@ -328,7 +328,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       ? client
           .from("admin_mail_messages")
           .select(
-            "id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,sent_at,parent_id",
+            "id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,sent_at,parent_id,admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)",
           )
           .eq("direction", "outbound")
           .order("created_at", { ascending: false })

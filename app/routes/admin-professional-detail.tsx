@@ -85,6 +85,14 @@ type MailMessage = {
   created_at: string;
   received_at: string | null;
   sent_at: string | null;
+  admin_mail_attachments?: Array<{
+    id: string;
+    filename: string;
+    mime_type: string;
+    size_bytes: number;
+    content_id: string | null;
+    disposition: string | null;
+  }>;
 };
 
 function uniqueById<T extends { id: string }>(items: T[]) {
@@ -168,7 +176,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const orderColumns =
     "id,order_number,status,total_cents,created_at,paid_at,order_lines(product_name,variant_label,quantity,line_total_cents)";
   const mailColumns =
-    "id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,received_at,sent_at";
+    "id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,received_at,sent_at,admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)";
   const [
     memberApplications,
     emailApplications,
@@ -882,6 +890,17 @@ export default function AdminProfessionalDetail() {
                       {message.text_body ||
                         "Aperçu indisponible"}
                     </p>
+                    {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
+                      <ul className="admin-professional-detail__mail-attachments" aria-label="Pièces jointes">
+                        {message.admin_mail_attachments.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).map((attachment) => (
+                          <li key={attachment.id}>
+                            <a href={`/admin/messagerie/${message.id}/pieces-jointes/${attachment.id}`}>
+                              {attachment.filename}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </article>
                 ))}
               </div>
