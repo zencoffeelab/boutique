@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-resend-worker-secret-runtime",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Envoi de mails Resend rétabli",
+    description: "Le Worker transmet désormais explicitement la clé Resend configurée dans Cloudflare au serveur de l’application, ce qui rétablit l’envoi des réponses depuis le backoffice.",
+  },
+  {
     id: "2026-09-23-professional-message-full-content",
     date: "2026-09-23",
     kind: "Correction",

@@ -7,6 +7,7 @@ import {
 
 interface CloudflareRuntimeEnv {
   CRON_SECRET?: string;
+  RESEND_API_KEY?: string;
 }
 
 interface CloudflareRuntimeContext {
@@ -76,6 +77,12 @@ async function servePublicMedia(request: Request, url: URL, ctx: CloudflareRunti
 
 export default {
   async fetch(request: Request, env: CloudflareRuntimeEnv, ctx: CloudflareRuntimeContext) {
+    // React Router's server modules read their configuration from process.env,
+    // while Workers secrets are supplied as request bindings. Explicitly expose
+    // this one server-only secret without replacing process.env wholesale.
+    if (!process.env.RESEND_API_KEY && typeof env.RESEND_API_KEY === "string") {
+      process.env.RESEND_API_KEY = env.RESEND_API_KEY;
+    }
     const url = new URL(request.url);
     const legacyRedirect = legacyRedirects.get(url.pathname);
 
