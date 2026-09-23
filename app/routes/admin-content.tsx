@@ -481,7 +481,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export const meta: MetaFunction = () => [
-  { title: "Contenus | Zen Coffee Lab" },
+  { title: "Contenus — Zen Coffee Lab" },
   { name: "robots", content: "noindex,nofollow" },
 ];
 
@@ -639,7 +639,7 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
       <fieldset>
         <legend>Français</legend>
         <div className="field"><label>Titre<input name="titleFr" defaultValue={fr?.title ?? pageKey} required /></label></div>
-        <div className="field"><label>Titre SEO<input name="seoTitleFr" defaultValue={fr?.seo_title ?? pageKey} required /></label></div>
+        <div className="field"><label>Titre de l’onglet navigateur (SEO)<input name="seoTitleFr" defaultValue={fr?.seo_title ?? pageKey} required /></label></div>
         <div className="field"><label>Description SEO<textarea name="seoDescriptionFr" defaultValue={fr?.seo_description ?? "Description à compléter avant publication."} required /></label></div>
         <AdminSeoAnalysis formId={formId} locale="fr-FR" focusKeyphraseName="focusKeyphraseFr" defaultFocusKeyphrase={fr?.focus_keyphrase ?? ""} titleFieldName="titleFr" seoTitleFieldName="seoTitleFr" seoDescriptionFieldName="seoDescriptionFr" slugValue={pageKey} contentFieldNames={seoContentFields("Fr")} imageAltFieldNames={["aboutStoryAlt1Fr", "aboutStoryAlt2Fr"]} disabled={demo} />
         {pageKey === "professionnel-connecte" ? <input type="hidden" name="contentFr" value={JSON.stringify(initialContent(fr, placeholderFr))} /> : null}
@@ -652,7 +652,7 @@ function ContentPageForm({ pageKey, page, demo }: { pageKey: string; page?: Cont
       <fieldset>
         <legend>English</legend>
         <div className="field"><label>Title<input name="titleEn" defaultValue={en?.title ?? pageKey} required /></label></div>
-        <div className="field"><label>SEO title<input name="seoTitleEn" defaultValue={en?.seo_title ?? pageKey} required /></label></div>
+        <div className="field"><label>Browser tab title (SEO)<input name="seoTitleEn" defaultValue={en?.seo_title ?? pageKey} required /></label></div>
         <div className="field"><label>SEO description<textarea name="seoDescriptionEn" defaultValue={en?.seo_description ?? "Description to complete before publication."} required /></label></div>
         <AdminSeoAnalysis formId={formId} locale="en-GB" focusKeyphraseName="focusKeyphraseEn" defaultFocusKeyphrase={en?.focus_keyphrase ?? ""} titleFieldName="titleEn" seoTitleFieldName="seoTitleEn" seoDescriptionFieldName="seoDescriptionEn" slugValue={pageKey} contentFieldNames={seoContentFields("En")} imageAltFieldNames={["aboutStoryAlt1En", "aboutStoryAlt2En"]} disabled={demo} />
         {pageKey === "professionnel-connecte" ? <input type="hidden" name="contentEn" value={JSON.stringify(initialContent(en, placeholderEn))} /> : null}

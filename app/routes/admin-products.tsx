@@ -101,7 +101,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request); const products = await getAdminProducts(); const variants = products.flatMap((product) => product.variants);
   return { demo: admin.demo, products, stats: { products: products.length, published: products.filter((product) => product.status === "published").length, publishedPro: products.filter((product) => product.status === "published_pro").length, archived: products.filter((product) => product.status === "archived").length, variants: variants.length, lowStock: variants.filter((variant) => variant.stockOnHand - variant.stockReserved <= variant.lowStockThreshold).length } };
 }
-export const meta: MetaFunction = () => [{ title: "Produits | Administration Zen Coffee Lab" }, { name: "robots", content: "noindex,nofollow" }];
+export const meta: MetaFunction = () => [{ title: "Produits — Administration Zen Coffee Lab" }, { name: "robots", content: "noindex,nofollow" }];
 const statusLabels: Record<ProductStatus, string> = { draft: "Brouillon", published: "Publié", published_pro: "Publié pro", archived: "Archivé" };
 type ProductGroup = Readonly<{ id: string; name: string; products: readonly Product[] }>;
 

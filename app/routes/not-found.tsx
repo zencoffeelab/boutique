@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router";
 export function loader() { return new Response(null, { status: 404 }); }
 export function headers() { return { "X-Robots-Tag": "noindex, nofollow" }; }
 export const meta = () => [
-  { title: "Page introuvable | Zen Coffee Lab" },
+  { title: "Page introuvable — Zen Coffee Lab" },
   { name: "robots", content: "noindex,nofollow" },
 ];
 export default function NotFound() {

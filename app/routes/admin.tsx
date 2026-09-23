@@ -52,7 +52,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export const meta: MetaFunction = () => [
-  { title: "Tableau de bord | Zen Coffee Lab" },
+  { title: "Tableau de bord — Zen Coffee Lab" },
   { name: "robots", content: "noindex,nofollow" },
 ];
 

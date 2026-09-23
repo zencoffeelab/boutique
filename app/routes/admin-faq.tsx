@@ -68,7 +68,7 @@ export async function action({ request }: ActionFunctionArgs) {
   return { ok: true, message: "FAQ enregistrée." };
 }
 
-export const meta: MetaFunction = () => [{ title: "FAQ | Administration Zen Coffee Lab" }, { name: "robots", content: "noindex,nofollow" }];
+export const meta: MetaFunction = () => [{ title: "FAQ — Administration Zen Coffee Lab" }, { name: "robots", content: "noindex,nofollow" }];
 
 function FaqForm({ item, demo }: { item?: FaqItem; demo: boolean }) {
   return <Form method="post" className="form-grid">

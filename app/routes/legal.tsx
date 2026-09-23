@@ -4,6 +4,7 @@ import { ContentBlocks } from "~/components/content-blocks";
 import { getContentPage } from "~/lib/content.server";
 import { getLocale } from "~/lib/i18n";
 import { richTextPlainText, storedBlocksToRichTextDocument } from "~/lib/rich-text";
+import { browserTitle } from "~/lib/seo";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url); const locale = getLocale(request);
@@ -11,7 +12,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const pageKey = kind === "terms" ? "cgv" : kind === "privacy" ? "politique-de-confidentialite" : "mentions-legales";
   return { locale, kind, content: await getContentPage(pageKey, locale) };
 }
-export const meta: MetaFunction<typeof loader> = ({ data }) => [{ title: `${data?.kind === "terms" ? "CGV" : data?.kind === "privacy" ? "Confidentialité" : "Mentions légales"} | Zen Coffee Lab` }];
+export const meta: MetaFunction<typeof loader> = ({ data }) => [{ title: browserTitle(data?.content?.seoTitle ?? `${data?.kind === "terms" ? "CGV" : data?.kind === "privacy" ? "Confidentialité" : "Mentions légales"} | Zen Coffee Lab`) }];
 
 export function FrenchLegalNotice() {
   return <section className="article-body rich-text-content legal-document" aria-label="Mentions légales">

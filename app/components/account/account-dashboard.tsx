@@ -1260,7 +1260,14 @@ function AccountSections({
                     ).toLocaleString(locale)}
                   </small>
                   <details className="account-communication-message">
-                    <summary>{message.text_body || "—"}</summary>
+                    <summary>
+                      <span className="account-communication-message__excerpt">
+                        {message.text_body || "—"}
+                      </span>
+                      <span className="account-communication-message__collapse">
+                        {english ? "Collapse message" : "Réduire le message"}
+                      </span>
+                    </summary>
                     <p>{message.text_body || "—"}</p>
                     {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
                       <ul className="account-mail-attachments" aria-label={english ? "Attachments" : "Pièces jointes"}>

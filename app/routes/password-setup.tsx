@@ -65,7 +65,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export const meta: MetaFunction = () => [
-  { title: "Activation du compte | Zen Coffee Lab" },
+  { title: "Activation du compte — Zen Coffee Lab" },
   { name: "robots", content: "noindex,nofollow" },
 ];
 

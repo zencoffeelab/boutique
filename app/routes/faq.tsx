@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { useState } from "react";
 import { useLoaderData } from "react-router";
-import { getFaqItems } from "~/lib/content.server";
+import { getContentPage, getFaqItems } from "~/lib/content.server";
 import { getLocale } from "~/lib/i18n";
 import { JsonLd, pageMeta } from "~/lib/seo";
 
@@ -17,8 +17,8 @@ const faqSections = [
   { count: 4, fr: "Livraison", en: "Delivery" },
   { count: Number.POSITIVE_INFINITY, fr: "Retours", en: "Returns" },
 ];
-export async function loader({ request }: LoaderFunctionArgs) { const locale = getLocale(request); return { locale, managedItems: await getFaqItems(locale) }; }
-export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(`FAQ | Zen Coffee Lab`, data?.locale === "en-GB" ? "Answers about coffee, roasting, orders and delivery." : "Réponses sur le café, la torréfaction, les commandes et la livraison.", data?.locale === "en-GB" ? "/en/faq" : "/faq");
+export async function loader({ request }: LoaderFunctionArgs) { const locale = getLocale(request); const [managedItems, content] = await Promise.all([getFaqItems(locale), getContentPage("faq", locale)]); return { locale, managedItems, content }; }
+export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(data?.content?.seoTitle ?? "FAQ | Zen Coffee Lab", data?.content?.seoDescription ?? (data?.locale === "en-GB" ? "Answers about coffee, roasting, orders and delivery." : "Réponses sur le café, la torréfaction, les commandes et la livraison."), data?.locale === "en-GB" ? "/en/faq" : "/faq");
 export default function FAQ() {
   const { locale, managedItems } = useLoaderData<typeof loader>(); const english = locale === "en-GB"; const translated = managedItems?.length ? managedItems : items.map((item) => english ? item.en : item.fr);
   const [openQuestion, setOpenQuestion] = useState<string | null>(null);

@@ -137,7 +137,7 @@ export async function action({ request }: ActionFunctionArgs) {
   return { ok: true, message: "Configuration d’emballage enregistrée." };
 }
 
-export const meta: MetaFunction = () => [{ title: "Expédition | Zen Coffee Lab" }, { name: "robots", content: "noindex,nofollow" }];
+export const meta: MetaFunction = () => [{ title: "Expédition — Zen Coffee Lab" }, { name: "robots", content: "noindex,nofollow" }];
 
 function PresetForm({ preset, demo }: { preset?: PackagingPresetRow; demo: boolean }) {
   return <Form method="post" className="form-grid">

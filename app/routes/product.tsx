@@ -81,7 +81,7 @@ export function headers() {
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  if (!data) return [{ title: "Café introuvable | Zen Coffee Lab" }];
+  if (!data) return [{ title: "Café introuvable — Zen Coffee Lab" }];
   const metadata = pageMeta(
     data.product.translations[data.locale].seoTitle,
     data.product.translations[data.locale].seoDescription,

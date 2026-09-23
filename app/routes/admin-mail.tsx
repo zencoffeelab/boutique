@@ -316,7 +316,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export function headers() { return { "Cache-Control": "private, no-store" }; }
 
 export const meta: MetaFunction = () => [
-  { title: "Messagerie | Administration Zen Coffee Lab" },
+  { title: "Messagerie — Administration Zen Coffee Lab" },
   { name: "robots", content: "noindex,nofollow" },
 ];
 

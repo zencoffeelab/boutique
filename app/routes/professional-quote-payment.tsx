@@ -27,7 +27,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const url = await createProfessionalQuoteCheckout({ quoteId: quote.id, profileId: viewer.user.id, email: viewer.user.email!, locale });
   return redirect(url);
 }
-export const meta: MetaFunction = () => [{ title: "Paiement du devis | Zen Coffee Lab" }, { name: "robots", content: "noindex,nofollow" }];
+export const meta: MetaFunction = () => [{ title: "Paiement du devis — Zen Coffee Lab" }, { name: "robots", content: "noindex,nofollow" }];
 
 export default function ProfessionalQuotePayment() {
   const { locale, quote } = useLoaderData<typeof loader>();

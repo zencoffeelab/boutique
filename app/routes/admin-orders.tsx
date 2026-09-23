@@ -308,7 +308,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
 }
 
 export const meta: MetaFunction = () => [
-  { title: "Commandes | Zen Coffee Lab" },
+  { title: "Commandes — Zen Coffee Lab" },
   { name: "robots", content: "noindex,nofollow" },
 ];
 

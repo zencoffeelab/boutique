@@ -1245,7 +1245,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export const meta: MetaFunction = () => [
-  { title: "Éditer un café | Zen Coffee Lab" },
+  { title: "Éditer un café — Zen Coffee Lab" },
   { name: "robots", content: "noindex,nofollow" },
 ];
 

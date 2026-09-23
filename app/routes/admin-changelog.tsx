@@ -10,7 +10,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export const meta: MetaFunction = () => [
-  { title: "Journal des modifications | Administration Zen Coffee Lab" },
+  { title: "Journal des modifications — Administration Zen Coffee Lab" },
   { name: "robots", content: "noindex,nofollow" },
 ];
 

@@ -70,7 +70,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export const meta: MetaFunction = () => [
-  { title: "Bandeau | Administration Zen Coffee Lab" },
+  { title: "Bandeau — Administration Zen Coffee Lab" },
   { name: "robots", content: "noindex,nofollow" },
 ];
 

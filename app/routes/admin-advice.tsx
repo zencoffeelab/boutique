@@ -495,7 +495,7 @@ export async function action({ request }: ActionFunctionArgs) {
   return error ? { ok: false, message: error.message } : { ok: true, message: "Conseil enregistré." };
 }
 
-export const meta: MetaFunction = () => [{ title: "Blog | Administration Zen Coffee Lab" }];
+export const meta: MetaFunction = () => [{ title: "Blog — Administration Zen Coffee Lab" }];
 
 function layout(translation?: Translation) {
   return translation?.blocks.find((block) => block.type === "storyLayout")?.content as Record<string, unknown> | undefined;

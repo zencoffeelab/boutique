@@ -8,21 +8,23 @@ const canonicalPath = (pathname: string) => {
   if (!pathname || pathname === "/") return "/";
   return `/${pathname.replace(/^\/+|\/+$/g, "")}`;
 };
+export const browserTitle = (title: string) => title.replace(/\s*\|\s*/g, " — ");
 
 export function pageMeta(title: string, description: string, pathname: string, image?: string) {
+  const normalizedTitle = browserTitle(title);
   const normalizedPath = canonicalPath(pathname);
   const canonical = `${origin}${normalizedPath}`;
   const alternate = alternatePath(normalizedPath);
   const frenchPath = normalizedPath === "/en" || normalizedPath.startsWith("/en/") ? alternate : normalizedPath;
   const englishPath = normalizedPath === "/en" || normalizedPath.startsWith("/en/") ? normalizedPath : alternate;
   return [
-    { title },
+    { title: normalizedTitle },
     { name: "description", content: description },
     { tagName: "link", rel: "canonical", href: canonical },
     { tagName: "link", rel: "alternate", hrefLang: "fr-FR", href: `${origin}${frenchPath}` },
     { tagName: "link", rel: "alternate", hrefLang: "en-GB", href: `${origin}${englishPath}` },
     { tagName: "link", rel: "alternate", hrefLang: "x-default", href: `${origin}${frenchPath}` },
-    { property: "og:title", content: title },
+    { property: "og:title", content: normalizedTitle },
     { property: "og:description", content: description },
     { property: "og:url", content: canonical },
     ...(image ? [{ property: "og:image", content: absoluteUrl(image) }] : []),

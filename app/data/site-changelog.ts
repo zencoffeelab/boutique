@@ -12,6 +12,27 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-browser-tab-title-separator",
+    date: "2026-09-23",
+    kind: "Design",
+    title: "Séparateur des titres d’onglets harmonisé",
+    description: "Tous les titres affichés dans les onglets du navigateur utilisent désormais un tiret cadratin à la place de la barre verticale.",
+  },
+  {
+    id: "2026-09-23-page-browser-tab-titles",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Titres d’onglets par page appliqués",
+    description: "Le champ « Titre de l’onglet navigateur (SEO) » de chaque page est désormais utilisé, notamment pour Professionnels, FAQ et les pages légales.",
+  },
+  {
+    id: "2026-09-23-professional-mail-preview-consistency",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Lecture fluide des échanges professionnels",
+    description: "Les aperçus des messages sont désormais limités proprement à deux lignes. À l’ouverture, ils disparaissent pour laisser place au contenu complet sans répétition.",
+  },
+  {
     id: "2026-09-23-professional-tab-notifications",
     date: "2026-09-23",
     kind: "Correction",

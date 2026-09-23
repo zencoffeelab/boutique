@@ -7130,15 +7130,27 @@ body.advice-detail-overflow-hidden {
   display: block;
   margin-bottom: 0.35rem;
 }
-.admin-professional-detail__message-preview > summary span {
+.admin-professional-detail__message-excerpt {
   display: -webkit-box;
   overflow: hidden;
   color: var(--muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
-.admin-professional-detail__message-preview[open] > summary span {
+.admin-professional-detail__message-collapse {
   display: none;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.admin-professional-detail__message-preview[open] .admin-professional-detail__message-excerpt {
+  display: none;
+}
+.admin-professional-detail__message-preview[open] .admin-professional-detail__message-collapse {
+  display: inline-block;
 }
 .admin-professional-detail__timeline article:has(.admin-professional-detail__message-preview) {
   gap: 0.75rem;
@@ -7217,21 +7229,41 @@ body.advice-detail-overflow-hidden {
   margin: 0.5rem 0 0;
 }
 .account-communication-message > summary {
-  display: -webkit-box;
-  overflow: hidden;
   padding: 0.9rem 1rem;
   border-left: 3px solid var(--orange);
   background: color-mix(in srgb, var(--sand) 68%, var(--paper));
   cursor: pointer;
   list-style: none;
-  white-space: pre-wrap;
+}
+.account-communication-message__excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink);
+  white-space: normal;
   overflow-wrap: anywhere;
-  line-height: 1.65;
+  line-height: 1.6;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+.account-communication-message__collapse {
+  display: none;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
 .account-communication-message > summary::-webkit-details-marker {
   display: none;
+}
+.account-communication-message[open] > summary {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.account-communication-message[open] .account-communication-message__excerpt {
+  display: none;
+}
+.account-communication-message[open] .account-communication-message__collapse {
+  display: inline-block;
 }
 .account-communication-message > p {
   max-width: 78ch;

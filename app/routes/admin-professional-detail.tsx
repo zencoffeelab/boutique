@@ -365,7 +365,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export const meta: MetaFunction = () => [
-  { title: "Fiche professionnelle | Administration Zen Coffee Lab" },
+  { title: "Fiche professionnelle — Administration Zen Coffee Lab" },
   { name: "robots", content: "noindex,nofollow" },
 ];
 
@@ -893,7 +893,12 @@ export default function AdminProfessionalDetail() {
                     <details className="admin-professional-detail__message-preview">
                       <summary>
                         <strong>{message.subject}</strong>
-                        <span>{message.text_body || "Aperçu indisponible"}</span>
+                        <span className="admin-professional-detail__message-excerpt">
+                          {message.text_body || "Aperçu indisponible"}
+                        </span>
+                        <span className="admin-professional-detail__message-collapse">
+                          Réduire le message
+                        </span>
                       </summary>
                       <p>{message.text_body || "Aperçu indisponible"}</p>
                       {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (

@@ -755,7 +755,7 @@ export const shouldRevalidate: ShouldRevalidateFunction = ({
     : defaultShouldRevalidate;
 
 export const meta: MetaFunction = () => [
-  { title: "Professionnels | Administration Zen Coffee Lab" },
+  { title: "Professionnels — Administration Zen Coffee Lab" },
   { name: "robots", content: "noindex,nofollow" },
 ];
 
