@@ -1268,7 +1268,14 @@ function AccountSections({
                         {english ? "Collapse message" : "Réduire le message"}
                       </span>
                     </summary>
-                    <p>{message.text_body || "—"}</p>
+                    <button
+                      className="account-communication-message__body"
+                      type="button"
+                      onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
+                      aria-label={english ? "Collapse message" : "Réduire le message"}
+                    >
+                      {message.text_body || "—"}
+                    </button>
                     {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
                       <ul className="account-mail-attachments" aria-label={english ? "Attachments" : "Pièces jointes"}>
                         {message.admin_mail_attachments.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).map((attachment) => (

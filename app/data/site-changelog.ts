@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-professional-message-preview-spacing",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Aperçus et fermeture des messages professionnels améliorés",
+    description: "Les aperçus conservent désormais les retours à la ligne du message. Un clic sur le contenu complet le referme directement.",
+  },
+  {
     id: "2026-09-23-browser-tab-title-separator",
     date: "2026-09-23",
     kind: "Design",

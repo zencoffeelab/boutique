@@ -7239,9 +7239,9 @@ body.advice-detail-overflow-hidden {
   display: -webkit-box;
   overflow: hidden;
   color: var(--ink);
-  white-space: normal;
+  white-space: pre-line;
   overflow-wrap: anywhere;
-  line-height: 1.6;
+  line-height: 1.65;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -7265,15 +7265,23 @@ body.advice-detail-overflow-hidden {
 .account-communication-message[open] .account-communication-message__collapse {
   display: inline-block;
 }
-.account-communication-message > p {
+.account-communication-message__body {
+  width: 100%;
   max-width: 78ch;
   margin: 0;
   padding: 0.9rem 1rem;
   border-left: 3px solid var(--orange);
   background: color-mix(in srgb, var(--sand) 68%, var(--paper));
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.65;
+  cursor: pointer;
+}
+.account-communication-message__body:hover {
+  background: color-mix(in srgb, var(--sand) 82%, var(--paper));
 }
 .account-communication-reply {
   display: grid;
