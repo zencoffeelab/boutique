@@ -732,6 +732,25 @@ export async function action({ request }: ActionFunctionArgs) {
         errors: parsed.error.flatten().fieldErrors,
       };
 
+    const { error: variantUpdateError } = await client.rpc("admin_update_product_variant", {
+      p_actor_id: admin.id,
+      p_product_id: parsed.data.productId,
+      p_variant_id: parsed.data.variantId,
+      p_sku: parsed.data.sku,
+      p_label: parsed.data.label,
+      p_weight_grams: parsed.data.weightGrams,
+      p_internal_cost_cents: parsed.data.internalCostCents,
+      p_stock_on_hand: parsed.data.stockOnHand,
+      p_low_stock_threshold: parsed.data.lowStockThreshold,
+      p_hs_code: parsed.data.hsCode,
+      p_customs_origin_country: parsed.data.customsOriginCountry,
+      p_professional_requested: parsed.data.professional,
+      p_professional_minimum_quantity: parsed.data.proMinimumQuantity ?? 1,
+    });
+    if (variantUpdateError) return { ok: false, message: variantUpdateError.message };
+    return { ok: true, message: `Variante « ${parsed.data.label} » enregistrée.` };
+
+    /* Legacy multi-request variant update retained here temporarily for reference.
     const { data: existing, error: readError } = await client
       .from("product_variants")
       .select("*,variant_offers(*)")
@@ -914,6 +933,7 @@ export async function action({ request }: ActionFunctionArgs) {
       after_data: { variant: variantMutation, offers: desiredOffers },
     });
     return { ok: true, message: `Variante « ${parsed.data.label} » enregistrée.` };
+    */
   }
   if (intent === "create_variant") {
     const parsed = variantSchema.safeParse(Object.fromEntries(form));

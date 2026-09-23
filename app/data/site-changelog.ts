@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-product-variant-save-transaction",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Enregistrement des variantes fiabilisé",
+    description: "La modification d’une variante de produit est désormais traitée en une seule opération sécurisée, ce qui évite les dépassements de limite serveur.",
+  },
+  {
     id: "2026-09-23-admin-products-page-lightened",
     date: "2026-09-23",
     kind: "Correction",
