@@ -340,7 +340,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       (member) => member.accountType === "contractual" && memberMatches(member),
     ),
     accountHistory,
-    unreadProfessionalMessages = [],
+    unreadProfessionalMessages,
   };
 }
 
@@ -1062,7 +1062,7 @@ export default function AdminProfessionals() {
     classic,
     contractual,
     accountHistory,
-    unreadProfessionalMessages,
+    unreadProfessionalMessages = [],
   } = useLoaderData<typeof loader>();
   const members = tab === "contractual" ? contractual : classic;
   const memberTitle =
