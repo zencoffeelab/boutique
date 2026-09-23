@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-worker-production-configuration-preserved",
+    date: "2026-09-23",
+    kind: "Configuration",
+    title: "Configuration de production du Worker pr\u00e9serv\u00e9e",
+    description: "Les param\u00e8tres d\u2019exp\u00e9dition d\u00e9j\u00e0 utilis\u00e9s en production sont d\u00e9sormais conserv\u00e9s lors des d\u00e9ploiements du site.",
+  },
+  {
     id: "2026-09-23-public-forms-turnstile-configuration",
     date: "2026-09-23",
     kind: "S\u00e9curit\u00e9",

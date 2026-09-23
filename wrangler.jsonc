@@ -23,10 +23,21 @@
     "PAYMENTS_MOCK": "false",
     "SHIPPING_MOCK": "false",
     "DEMO_ADMIN": "false",
-    "TURNSTILE_HOSTNAMES": "zencoffeelab.com,www.zencoffeelab.com"
+    "TURNSTILE_HOSTNAMES": "zencoffeelab.com,www.zencoffeelab.com",
+    "COLISSIMO_FR_MODE": "sendcloud_only",
+    "SHIP_FROM_NAME": "Zen Coffee Lab",
+    "SHIP_FROM_COMPANY": "Zen Coffee Lab",
+    "SHIP_FROM_STREET1": "32 rue Louis Blanc",
+    "SHIP_FROM_STREET2": "",
+    "SHIP_FROM_CITY": "Tours",
+    "SHIP_FROM_POSTAL_CODE": "37000",
+    "SHIP_FROM_COUNTRY": "FR",
+    "SHIP_FROM_PHONE": "+33612692079",
+    "SHIP_FROM_EMAIL": "contact@zencoffeelab.com"
   },
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "redact_query_string": false
   },
   "triggers": {
     "crons": ["*/5 * * * *"]
