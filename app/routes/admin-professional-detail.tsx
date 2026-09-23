@@ -222,9 +222,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       .from("admin_mail_messages")
       .select(mailColumns)
       .eq("direction", "outbound")
-      .contains("recipients", [{ address: email }])
       .order("created_at", { ascending: false })
-      .limit(40),
+      .limit(250),
     client
       .from("professional_quotes")
       .select(
@@ -280,7 +279,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     ...(receivedMessages.data ?? []),
     ...(sentMessages.data ?? []).filter((message) =>
       hasRecipient(message as MailMessage, email),
-    ),
+    ).slice(0, 40),
   ] as MailMessage[]).toSorted((left, right) =>
     right.created_at.localeCompare(left.created_at),
   );

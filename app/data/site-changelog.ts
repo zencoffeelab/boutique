@@ -12,6 +12,41 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-professional-detail-json-filter",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Fiches professionnelles de nouveau accessibles",
+    description: "Le chargement des e-mails sortants n’utilise plus un filtre JSON incompatible. L’ouverture d’une fiche de compte professionnel ne provoque plus d’erreur de syntaxe JSON.",
+  },
+  {
+    id: "2026-09-23-admin-mail-action-buttons",
+    date: "2026-09-23",
+    kind: "Design",
+    title: "Actions de messagerie harmonisées",
+    description: "Les boutons Répondre et Appliquer de la messagerie du backoffice utilisent désormais exactement le même style à contour que Marquer lu.",
+  },
+  {
+    id: "2026-09-23-professional-mail-deletion-protection",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Échanges professionnels protégés de la suppression",
+    description: "Les échanges rattachés à un compte professionnel ne peuvent plus être supprimés depuis la messagerie générale, afin de rester visibles dans les espaces Communication.",
+  },
+  {
+    id: "2026-09-23-admin-mail-label-readability",
+    date: "2026-09-23",
+    kind: "Design",
+    title: "Labels de messagerie plus lisibles",
+    description: "Les labels longs peuvent désormais revenir à la ligne dans les e-mails et le filtre de labels utilise toute la largeur disponible.",
+  },
+  {
+    id: "2026-09-23-admin-mail-label-filter-instant",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Filtrage des labels de messagerie instantané",
+    description: "Dans la messagerie du backoffice, sélectionner un label affiche immédiatement les e-mails associés sans bouton Rechercher.",
+  },
+  {
     id: "2026-09-23-professional-message-preview-spacing",
     date: "2026-09-23",
     kind: "Correction",

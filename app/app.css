@@ -9687,18 +9687,22 @@ body.advice-detail-overflow-hidden {
 .admin-mail-label {
   display: inline-flex;
   width: fit-content;
+  max-width: 100%;
   align-items: center;
   gap: 0.3rem;
   padding: 0.28rem 0.5rem;
   border: 1px solid currentColor;
   border-radius: 999px;
   background: #fff;
-  font: 750 0.68rem/1 var(--sans);
+  font: 750 0.68rem/1.25 var(--sans);
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .admin-mail-label svg {
   width: 0.72rem;
   height: 0.72rem;
+  flex: 0 0 auto;
 }
 
 .admin-mail-list {
@@ -9709,7 +9713,7 @@ body.advice-detail-overflow-hidden {
 
 .admin-mail-search {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(8rem, 0.7fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.5rem;
   padding: 0.8rem;
   border-bottom: 1px solid #d5dbd1;
@@ -9747,6 +9751,9 @@ body.advice-detail-overflow-hidden {
   border-radius: 0.55rem;
   background: #fff;
   color: #30372d;
+}
+.admin-mail-search__label-filter {
+  min-width: 0;
 }
 
 .admin-mail-list__items {
@@ -9812,6 +9819,18 @@ body.advice-detail-overflow-hidden {
   height: 1rem;
   margin: 1.1rem 0.15rem 0 0.8rem;
   accent-color: var(--green-deep);
+}
+.admin-mail-list__checkbox--protected {
+  display: grid;
+  place-items: center;
+  color: var(--orange);
+  font-size: 0.7rem;
+}
+.admin-mail-detail__preserved-message {
+  max-width: 16rem;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .admin-mail-open-form {
@@ -9953,7 +9972,6 @@ body.advice-detail-overflow-hidden {
 .admin-mail-detail__actions form {
   margin: 0;
 }
-
 .admin-mail-label-assignment {
   display: flex;
   flex-wrap: wrap;

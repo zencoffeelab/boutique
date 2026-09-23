@@ -36,6 +36,7 @@ type AdminMailMessage = {
   received_at: string | null;
   sent_at: string | null;
   created_at: string;
+  is_professional_correspondence: boolean;
   admin_mail_attachments: MailAttachment[];
 };
 
@@ -98,9 +99,26 @@ function normalizeMessage(value: Record<string, unknown>): AdminMailMessage {
     direction: value.direction === "outbound" ? "outbound" : "inbound",
     recipients: normalizeAddresses(value.recipients),
     cc_addresses: normalizeAddresses(value.cc_addresses),
+    is_professional_correspondence: false,
     admin_mail_attachments: Array.isArray(value.admin_mail_attachments) ? value.admin_mail_attachments as MailAttachment[] : [],
     admin_mail_labels: label,
   } as AdminMailMessage;
+}
+
+function correspondenceAddresses(message: Pick<AdminMailMessage, "direction" | "sender_address" | "recipients">) {
+  return message.direction === "inbound"
+    ? [message.sender_address]
+    : message.recipients.map((recipient) => recipient.address);
+}
+
+async function professionalCorrespondenceIds(client: any, messages: Array<Pick<AdminMailMessage, "id" | "direction" | "sender_address" | "recipients">>) {
+  const { data, error } = await client.from("professional_applications").select("email");
+  if (error) return { ids: new Set<string>(), error };
+  const professionalEmails = new Set((data ?? []).flatMap((application: { email?: unknown }) => typeof application.email === "string" ? [application.email.toLocaleLowerCase("en-US")] : []));
+  return {
+    ids: new Set(messages.filter((message) => correspondenceAddresses(message).some((address) => professionalEmails.has(address.toLocaleLowerCase("en-US")))).map((message) => message.id)),
+    error: null,
+  };
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -115,17 +133,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (admin.demo) return { demo: true, view, query, labelFilter, labels: [] as MailLabel[], compose, composeToken: crypto.randomUUID(), messages: [] as AdminMailMessage[], selected: null as AdminMailMessage | null, stats: { inbox: 0, unread: 0, sent: 0 } };
   const client = createServiceSupabase();
   if (!client) throw new Response("Base de données indisponible.", { status: 503 });
-  const [messageResult, labelsResult, inboxResult, unreadResult, sentResult] = await Promise.all([
+  const [messageResult, labelsResult, inboxResult, unreadResult, sentResult, professionalApplicationsResult] = await Promise.all([
     client.from("admin_mail_messages").select("id,direction,sender_name,sender_address,recipients,cc_addresses,reply_to_address,subject,text_body,html_body,message_id_header,in_reply_to_header,references_header,parent_id,label_id,is_read,provider_id,raw_size,received_at,sent_at,created_at,admin_mail_labels(id,name,color),admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)").order("created_at", { ascending: false }).limit(250),
     client.from("admin_mail_labels").select("id,name,color").order("name", { ascending: true }),
     client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound"),
     client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound").eq("is_read", false),
     client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "outbound"),
+    client.from("professional_applications").select("email"),
   ]);
-  const queryError = messageResult.error ?? labelsResult.error ?? inboxResult.error ?? unreadResult.error ?? sentResult.error;
+  const queryError = messageResult.error ?? labelsResult.error ?? inboxResult.error ?? unreadResult.error ?? sentResult.error ?? professionalApplicationsResult.error;
   if (queryError) throw new Response(queryError.message, { status: 500 });
   const rows = messageResult.data;
-  const allMessages = (rows ?? []).map((row) => normalizeMessage(row as Record<string, unknown>));
+  const professionalEmails = new Set((professionalApplicationsResult.data ?? []).flatMap((application) => typeof application.email === "string" ? [application.email.toLocaleLowerCase("en-US")] : []));
+  const allMessages = (rows ?? []).map((row) => {
+    const message = normalizeMessage(row as Record<string, unknown>);
+    return { ...message, is_professional_correspondence: correspondenceAddresses(message).some((address) => professionalEmails.has(address.toLocaleLowerCase("en-US"))) };
+  });
   const normalizedQuery = query.toLocaleLowerCase("fr-FR");
   const messages = allMessages.filter((message) => {
     if (message.direction !== (view === "sent" ? "outbound" : "inbound")) return false;
@@ -220,9 +243,12 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "delete_message") {
     const parsed = messageActionSchema.safeParse(Object.fromEntries(form));
     if (!parsed.success) return data<MailActionResult>({ ok: false, message: "Message invalide." }, { status: 422 });
-    const before = await client.from("admin_mail_messages").select("id,direction,sender_address,subject,admin_mail_attachments(storage_path)").eq("id", parsed.data.messageId).maybeSingle();
+    const before = await client.from("admin_mail_messages").select("id,direction,sender_address,recipients,subject,admin_mail_attachments(storage_path)").eq("id", parsed.data.messageId).maybeSingle();
     if (before.error) return data<MailActionResult>({ ok: false, message: before.error.message }, { status: 500 });
     if (!before.data) return data<MailActionResult>({ ok: false, message: "Ce message n’existe plus." }, { status: 404 });
+    const protectedMessages = await professionalCorrespondenceIds(client, [normalizeMessage(before.data as Record<string, unknown>)]);
+    if (protectedMessages.error) return data<MailActionResult>({ ok: false, message: protectedMessages.error.message }, { status: 500 });
+    if (protectedMessages.ids.has(parsed.data.messageId)) return data<MailActionResult>({ ok: false, message: "Cet échange professionnel est conservé dans l’espace Communication et ne peut pas être supprimé depuis la messagerie générale." }, { status: 403 });
     const attachmentRows = Array.isArray(before.data.admin_mail_attachments) ? before.data.admin_mail_attachments : [];
     const storagePaths = attachmentRows.flatMap((attachment) => attachment && typeof attachment === "object" && "storage_path" in attachment && typeof attachment.storage_path === "string" ? [attachment.storage_path] : []);
     if (storagePaths.length > 0) {
@@ -238,8 +264,11 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "delete_messages") {
     const parsed = bulkMessageActionSchema.safeParse({ ...Object.fromEntries(form), messageIds: form.getAll("messageIds") });
     if (!parsed.success) return data<MailActionResult>({ ok: false, message: "Sélectionnez au moins un message à supprimer." }, { status: 422 });
-    const before = await client.from("admin_mail_messages").select("id,direction,sender_address,subject,admin_mail_attachments(storage_path)").in("id", parsed.data.messageIds);
+    const before = await client.from("admin_mail_messages").select("id,direction,sender_address,recipients,subject,admin_mail_attachments(storage_path)").in("id", parsed.data.messageIds);
     if (before.error) return data<MailActionResult>({ ok: false, message: before.error.message }, { status: 500 });
+    const protectedMessages = await professionalCorrespondenceIds(client, (before.data ?? []).map((message) => normalizeMessage(message as Record<string, unknown>)));
+    if (protectedMessages.error) return data<MailActionResult>({ ok: false, message: protectedMessages.error.message }, { status: 500 });
+    if (protectedMessages.ids.size > 0) return data<MailActionResult>({ ok: false, message: "La sélection contient des échanges professionnels. Ils sont conservés dans l’espace Communication et ne peuvent pas être supprimés depuis la messagerie générale." }, { status: 403 });
     const storagePaths = (before.data ?? []).flatMap((message) => Array.isArray(message.admin_mail_attachments) ? message.admin_mail_attachments.flatMap((attachment) => attachment && typeof attachment === "object" && "storage_path" in attachment && typeof attachment.storage_path === "string" ? [attachment.storage_path] : []) : []);
     if (storagePaths.length > 0) {
       const removed = await client.storage.from("admin-mail-attachments").remove(storagePaths);
@@ -415,7 +444,7 @@ function MailDetail({ message, view, query, labels, labelFilter }: { message: Ad
     <header className="admin-mail-detail__heading">
       <div><p className="eyebrow">{message.direction === "inbound" ? "Message reçu" : "Message envoyé"}</p><h2>{message.subject}</h2>{message.admin_mail_labels ? <MailLabelBadge label={message.admin_mail_labels} /> : null}</div>
       <div className="admin-mail-detail__actions">
-        {message.direction === "inbound" ? <Link className="ui-button ui-button--outline ui-button--sm" to={`/admin/messagerie?compose=1&reply=${message.id}`}><Reply aria-hidden="true" /> Répondre</Link> : null}
+        {message.direction === "inbound" ? <Link className="ui-button ui-button--ghost ui-button--sm" to={`/admin/messagerie?compose=1&reply=${message.id}`}><Reply aria-hidden="true" /> Répondre</Link> : null}
         <Form method="post">
           <input type="hidden" name="intent" value={message.is_read ? "mark_unread" : "mark_read"} />
           <input type="hidden" name="messageId" value={message.id} />
@@ -424,14 +453,14 @@ function MailDetail({ message, view, query, labels, labelFilter }: { message: Ad
           <input type="hidden" name="label" value={labelFilter} />
           <button className="ui-button ui-button--ghost ui-button--sm" type="submit">{message.is_read ? <><Mail aria-hidden="true" /> Marquer non lu</> : <><MailOpen aria-hidden="true" /> Marquer lu</>}</button>
         </Form>
-        <Form method="post" onSubmit={(event) => { if (!window.confirm(`Supprimer définitivement l’e-mail « ${message.subject} » et ses pièces jointes ?`)) event.preventDefault(); }}>
+        {!message.is_professional_correspondence ? <Form method="post" onSubmit={(event) => { if (!window.confirm(`Supprimer définitivement l’e-mail « ${message.subject} » et ses pièces jointes ?`)) event.preventDefault(); }}>
           <input type="hidden" name="intent" value="delete_message" />
           <input type="hidden" name="messageId" value={message.id} />
           <input type="hidden" name="view" value={view} />
           <input type="hidden" name="q" value={query} />
           <input type="hidden" name="label" value={labelFilter} />
           <button className="ui-button ui-button--danger ui-button--sm" type="submit"><Trash2 aria-hidden="true" /> Supprimer</button>
-        </Form>
+        </Form> : <small className="admin-mail-detail__preserved-message">Échange professionnel conservé dans Communication.</small>}
       </div>
     </header>
     <Form method="post" className="admin-mail-label-assignment">
@@ -445,7 +474,7 @@ function MailDetail({ message, view, query, labels, labelFilter }: { message: Ad
         <option value="">Sans label</option>
         {labels.map((label) => <option key={label.id} value={label.id}>{label.name}</option>)}
       </select>
-      <button className="ui-button ui-button--outline ui-button--sm" type="submit">Appliquer</button>
+      <button className="ui-button ui-button--ghost ui-button--sm" type="submit">Appliquer</button>
     </Form>
     <dl className="admin-mail-detail__meta">
       <div><dt>De</dt><dd>{message.sender_name ? `${message.sender_name} <${message.sender_address}>` : message.sender_address}</dd></div>
@@ -485,8 +514,7 @@ export default function AdminMail() {
         <Form method="get" className="admin-mail-search">
           <input type="hidden" name="view" value={view} />
           <label><span className="sr-only">Rechercher dans la messagerie</span><Search aria-hidden="true" /><input name="q" type="search" defaultValue={query} placeholder="Rechercher…" /></label>
-          <label className="admin-mail-search__label-filter"><span className="sr-only">Filtrer par label</span><Tag aria-hidden="true" /><select name="label" defaultValue={labelFilter}><option value="">Tous les labels</option><option value="none">Sans label</option>{labels.map((label) => <option key={label.id} value={label.id}>{label.name}</option>)}</select></label>
-          <button className="ui-button ui-button--outline ui-button--sm" type="submit">Rechercher</button>
+          <label className="admin-mail-search__label-filter"><span className="sr-only">Filtrer par label</span><Tag aria-hidden="true" /><select name="label" defaultValue={labelFilter} onChange={(event) => event.currentTarget.form?.requestSubmit()}><option value="">Tous les labels</option><option value="none">Sans label</option>{labels.map((label) => <option key={label.id} value={label.id}>{label.name}</option>)}</select></label>
         </Form>
         <Form id="mail-bulk-actions" method="post" className="admin-mail-bulk-actions" onSubmit={(event) => { if (!window.confirm("Supprimer définitivement les messages sélectionnés et leurs pièces jointes ?")) event.preventDefault(); }}>
           <input type="hidden" name="intent" value="delete_messages" />
@@ -500,7 +528,7 @@ export default function AdminMail() {
           {messages.map((message) => {
             const attachmentCount = downloadableAttachments(message).length;
             return <div className="admin-mail-list__row" key={message.id}>
-            <input className="admin-mail-list__checkbox" type="checkbox" name="messageIds" value={message.id} form="mail-bulk-actions" aria-label={`Sélectionner ${message.subject}`} />
+            {!message.is_professional_correspondence ? <input className="admin-mail-list__checkbox" type="checkbox" name="messageIds" value={message.id} form="mail-bulk-actions" aria-label={`Sélectionner ${message.subject}`} /> : <span className="admin-mail-list__checkbox admin-mail-list__checkbox--protected" title="Échange professionnel conservé">●</span>}
             <Form method="post" className="admin-mail-open-form">
               <input type="hidden" name="intent" value="open" />
               <input type="hidden" name="messageId" value={message.id} />
