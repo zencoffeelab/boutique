@@ -217,13 +217,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       .select(mailColumns)
       .eq("sender_address", email)
       .order("created_at", { ascending: false })
-      .limit(100),
+      .limit(40),
     client
       .from("admin_mail_messages")
       .select(mailColumns)
       .eq("direction", "outbound")
+      .contains("recipients", [{ address: email }])
       .order("created_at", { ascending: false })
-      .limit(500),
+      .limit(40),
     client
       .from("professional_quotes")
       .select(
@@ -889,35 +890,29 @@ export default function AdminProfessionalDetail() {
                         )}
                       </time>
                     </div>
-                    <Link
-                      className="admin-professional-detail__message-subject"
-                      to={`/admin/messagerie?view=${message.direction === "outbound" ? "sent" : "inbox"}&q=${encodeURIComponent(email)}&message=${message.id}`}
-                    >
-                      <strong>{message.subject}</strong>
-                    </Link>
-                    {message.direction === "inbound" ? (
-                      <Link
-                        className="admin-professional-detail__message-link"
-                        to={`/admin/messagerie?compose=1&reply=${message.id}`}
-                      >
-                        Répondre
-                      </Link>
-                    ) : null}
-                    <p>
-                      {message.text_body ||
-                        "Aperçu indisponible"}
-                    </p>
-                    {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
-                      <ul className="admin-professional-detail__mail-attachments" aria-label="Pièces jointes">
-                        {message.admin_mail_attachments.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).map((attachment) => (
-                          <li key={attachment.id}>
-                            <a href={`/admin/messagerie/${message.id}/pieces-jointes/${attachment.id}`}>
-                              {attachment.filename}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
+                    <details className="admin-professional-detail__message-preview">
+                      <summary>
+                        <strong>{message.subject}</strong>
+                        <span>{message.text_body || "Aperçu indisponible"}</span>
+                      </summary>
+                      <p>{message.text_body || "Aperçu indisponible"}</p>
+                      {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
+                        <ul className="admin-professional-detail__mail-attachments" aria-label="Pièces jointes">
+                          {message.admin_mail_attachments.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).map((attachment) => (
+                            <li key={attachment.id}>
+                              <a href={`/admin/messagerie/${message.id}/pieces-jointes/${attachment.id}`}>
+                                {attachment.filename}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      {message.direction === "inbound" ? (
+                        <Link className="admin-professional-detail__message-link" to={`/admin/messagerie?compose=1&reply=${message.id}`}>
+                          Répondre
+                        </Link>
+                      ) : null}
+                    </details>
                   </article>
                 ))}
               </div>

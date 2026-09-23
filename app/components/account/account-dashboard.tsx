@@ -170,6 +170,34 @@ export type AccountActionFeedback = {
   mfaEnrollment?: { factorId: string; qrCode: string; secret: string };
 };
 
+export function useProfessionalCommunicationNotification(
+  userId: string | undefined,
+  messages: Array<{ id: string; direction: "inbound" | "outbound" }>,
+  activeSection: AccountSectionId,
+) {
+  const [hasNew, setHasNew] = useState(false);
+  const latestMessageId = messages.find(
+    (message) => message.direction === "outbound",
+  )?.id;
+
+  useEffect(() => {
+    if (!userId || !latestMessageId) {
+      setHasNew(false);
+      return;
+    }
+    const storageKey = `zen-coffee-lab/professional-communication/${userId}`;
+    const lastSeenMessageId = window.localStorage.getItem(storageKey);
+    if (activeSection === "communication" || !lastSeenMessageId) {
+      window.localStorage.setItem(storageKey, latestMessageId);
+      setHasNew(false);
+      return;
+    }
+    setHasNew(lastSeenMessageId !== latestMessageId);
+  }, [activeSection, latestMessageId, userId]);
+
+  return hasNew;
+}
+
 type AccountMutationFormProps = PropsWithChildren<{
   action: string;
   className?: string;
@@ -238,8 +266,7 @@ export function AccountNavigation({
   addressCount,
   professional = false,
   contractual = false,
-  documentCount = 0,
-  communicationCount = 0,
+  communicationHasNew = false,
   activeSection = "orders",
   onSelect = () => undefined,
 }: {
@@ -248,8 +275,7 @@ export function AccountNavigation({
   addressCount: number;
   professional?: boolean;
   contractual?: boolean;
-  documentCount?: number;
-  communicationCount?: number;
+  communicationHasNew?: boolean;
   activeSection?: AccountSectionId;
   onSelect?: (section: AccountSectionId) => void;
 }) {
@@ -299,7 +325,7 @@ export function AccountNavigation({
               {english ? "Invoices and tracking" : "Factures et suivis"}
             </small>
           </span>
-          <em>{orderCount}</em>
+          {!professional ? <em>{orderCount}</em> : null}
           <ChevronRight aria-hidden="true" />
         </>,
       )}
@@ -314,7 +340,7 @@ export function AccountNavigation({
                   {english ? "Your email exchanges" : "Vos échanges par e-mail"}
                 </small>
               </span>
-              <em>{communicationCount}</em>
+              {communicationHasNew ? <span className="account-tab-notification" role="status"><span className="sr-only">{english ? "New message" : "Nouveau message"}</span></span> : null}
               <ChevronRight aria-hidden="true" />
             </>,
           )
@@ -330,7 +356,6 @@ export function AccountNavigation({
                   {english ? "Quotes and invoices" : "Devis et factures"}
                 </small>
               </span>
-              <em>{documentCount}</em>
               <ChevronRight aria-hidden="true" />
             </>,
           )
@@ -345,7 +370,7 @@ export function AccountNavigation({
               {english ? "Saved delivery details" : "Coordonnées enregistrées"}
             </small>
           </span>
-          <em>{addressCount}</em>
+          {!professional ? <em>{addressCount}</em> : null}
           <ChevronRight aria-hidden="true" />
         </>,
       )}
@@ -1234,50 +1259,41 @@ function AccountSections({
                       message.sent_at ?? message.created_at,
                     ).toLocaleString(locale)}
                   </small>
-                  <p>{message.text_body || "—"}</p>
+                  <details className="account-communication-message">
+                    <summary>{message.text_body || "—"}</summary>
+                    <p>{message.text_body || "—"}</p>
+                    {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
+                      <ul className="account-mail-attachments" aria-label={english ? "Attachments" : "Pièces jointes"}>
+                        {message.admin_mail_attachments.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).map((attachment) => (
+                          <li key={attachment.id}>
+                            <a href={`${english ? "/en/my-account/messaging" : "/mon-compte/messagerie"}/${message.id}/${english ? "attachments" : "pieces-jointes"}/${attachment.id}`}>
+                              <Paperclip aria-hidden="true" />
+                              {attachment.filename}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <details className="account-communication-reply-toggle">
+                      <summary className="ui-button ui-button--ghost ui-button--sm">
+                        <Reply aria-hidden="true" />
+                        {english ? "Reply" : "Répondre"}
+                      </summary>
+                      <AccountMutationForm drawer={drawer} method="post" action={accountPath} className="account-communication-reply">
+                        <input type="hidden" name="intent" value="reply_professional_message" />
+                        <input type="hidden" name="messageId" value={message.id} />
+                        <label>
+                          {english ? "Reply" : "Répondre"}
+                          <textarea name="body" rows={3} maxLength={5_000} required />
+                        </label>
+                        <button className="ui-button ui-button--ghost ui-button--sm" type="submit">
+                          <Reply aria-hidden="true" />
+                          {english ? "Send" : "Envoyer"}
+                        </button>
+                      </AccountMutationForm>
+                    </details>
+                  </details>
                 </div>
-                {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
-                  <ul className="account-mail-attachments" aria-label={english ? "Attachments" : "Pièces jointes"}>
-                    {message.admin_mail_attachments.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).map((attachment) => (
-                      <li key={attachment.id}>
-                        <a href={`${english ? "/en/my-account/messaging" : "/mon-compte/messagerie"}/${message.id}/${english ? "attachments" : "pieces-jointes"}/${attachment.id}`}>
-                          <Paperclip aria-hidden="true" />
-                          {attachment.filename}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                <details className="account-communication-reply-toggle">
-                  <summary className="ui-button ui-button--ghost ui-button--sm">
-                    <Reply aria-hidden="true" />
-                    {english ? "Reply" : "Répondre"}
-                  </summary>
-                <AccountMutationForm
-                  drawer={drawer}
-                  method="post"
-                  action={accountPath}
-                  className="account-communication-reply"
-                >
-                  <input
-                    type="hidden"
-                    name="intent"
-                    value="reply_professional_message"
-                  />
-                  <input type="hidden" name="messageId" value={message.id} />
-                  <label>
-                    {english ? "Reply" : "Répondre"}
-                    <textarea name="body" rows={3} maxLength={5_000} required />
-                  </label>
-                  <button
-                    className="ui-button ui-button--ghost ui-button--sm"
-                    type="submit"
-                  >
-                    <Reply aria-hidden="true" />
-                    {english ? "Send" : "Envoyer"}
-                  </button>
-                </AccountMutationForm>
-                </details>
               </article>
             ))}
           </div>
@@ -1654,7 +1670,6 @@ export function AccountDashboard({
     viewer,
     orders,
     addresses,
-    professionalQuotes = [],
     professionalMessages = [],
   } = data;
   const english = locale === "en-GB";
@@ -1670,6 +1685,11 @@ export function AccountDashboard({
       : activeSection === "orders" && viewer.profile?.professional_account_type === "contractual"
         ? "upcoming-order"
         : activeSection,
+  );
+  const communicationHasNew = useProfessionalCommunicationNotification(
+    viewer.profile?.professional_status === "approved" ? viewer.user.id : undefined,
+    professionalMessages,
+    activePageSection,
   );
   const selectPageSection = (section: AccountSectionId) => {
     setActivePageSection(section);
@@ -1735,11 +1755,7 @@ export function AccountDashboard({
             contractual={
               viewer.profile?.professional_account_type === "contractual"
             }
-            documentCount={
-              orders.filter((order) => order.paid_at).length +
-              professionalQuotes.length
-            }
-            communicationCount={professionalMessages.length}
+            communicationHasNew={communicationHasNew}
             activeSection={activePageSection}
             onSelect={selectPageSection}
           />

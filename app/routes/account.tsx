@@ -322,7 +322,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
           .eq("direction", "inbound")
           .eq("sender_address", viewer.user.email ?? "")
           .order("created_at", { ascending: false })
-          .limit(100)
+          .limit(40)
       : Promise.resolve({ data: [] }),
     client && professional
       ? client
@@ -331,8 +331,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
             "id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,sent_at,parent_id,admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)",
           )
           .eq("direction", "outbound")
+          .contains("recipients", [{ address: viewer.user.email ?? "" }])
           .order("created_at", { ascending: false })
-          .limit(500)
+          .limit(40)
       : Promise.resolve({ data: [] }),
     client && contractual
       ? client

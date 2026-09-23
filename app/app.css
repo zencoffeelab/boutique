@@ -3913,6 +3913,19 @@ body.advice-detail-overflow-hidden {
 .account-anchor-nav--tabs button strong { font-size: 0.8rem; }
 .account-anchor-nav--tabs button small { overflow: hidden; color: var(--muted); font-size: 0.66rem; text-overflow: ellipsis; white-space: nowrap; }
 .account-anchor-nav--tabs button em { min-width: 1.65rem; padding: 0.15rem 0.4rem; border-radius: 999px; background: var(--cream-dark); font-size: 0.68rem; font-style: normal; font-weight: 700; text-align: center; }
+.account-tab-notification {
+  width: 0.62rem;
+  height: 0.62rem;
+  margin-left: auto;
+  border-radius: 50%;
+  background: #b74c35;
+  box-shadow: 0 0 0 2px var(--paper);
+}
+.account-drawer__tabs .account-tab-notification {
+  display: inline-block;
+  margin-left: 0.35rem;
+  box-shadow: none;
+}
 .account-sections {
   display: grid;
   min-width: 0;
@@ -7100,25 +7113,43 @@ body.advice-detail-overflow-hidden {
 .admin-professional-detail__message-link:hover {
   background: var(--sand);
 }
-.admin-professional-detail__message-subject {
+.admin-professional-detail__message-preview {
   order: 1;
+  display: grid;
+  gap: 0.75rem;
+}
+.admin-professional-detail__message-preview > summary {
+  cursor: pointer;
+  list-style: none;
   color: var(--ink);
-  text-decoration-color: var(--orange);
-  text-underline-offset: 0.2em;
 }
-.admin-professional-detail__message-subject:hover {
-  color: var(--forest);
+.admin-professional-detail__message-preview > summary::-webkit-details-marker {
+  display: none;
 }
-.admin-professional-detail__timeline article:has(.admin-professional-detail__message-subject) {
+.admin-professional-detail__message-preview > summary strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+.admin-professional-detail__message-preview > summary span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.admin-professional-detail__message-preview[open] > summary span {
+  display: none;
+}
+.admin-professional-detail__timeline article:has(.admin-professional-detail__message-preview) {
   gap: 0.75rem;
   padding: 1rem;
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--paper) 90%, var(--sand));
 }
-.admin-professional-detail__timeline article:has(.admin-professional-detail__message-subject) + article:has(.admin-professional-detail__message-subject) {
+.admin-professional-detail__timeline article:has(.admin-professional-detail__message-preview) + article:has(.admin-professional-detail__message-preview) {
   margin-top: 0.75rem;
 }
-.admin-professional-detail__timeline article:has(.admin-professional-detail__message-subject) p {
+.admin-professional-detail__message-preview > p {
   order: 2;
   max-width: 78ch;
   margin: 0;
@@ -7180,9 +7211,31 @@ body.advice-detail-overflow-hidden {
 .account-communication-list .account-panel small {
   color: var(--muted);
 }
-.account-communication-list .account-panel > div > p:last-child {
-  max-width: 78ch;
+.account-communication-message {
+  display: grid;
+  gap: 0.75rem;
   margin: 0.5rem 0 0;
+}
+.account-communication-message > summary {
+  display: -webkit-box;
+  overflow: hidden;
+  padding: 0.9rem 1rem;
+  border-left: 3px solid var(--orange);
+  background: color-mix(in srgb, var(--sand) 68%, var(--paper));
+  cursor: pointer;
+  list-style: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.account-communication-message > summary::-webkit-details-marker {
+  display: none;
+}
+.account-communication-message > p {
+  max-width: 78ch;
+  margin: 0;
   padding: 0.9rem 1rem;
   border-left: 3px solid var(--orange);
   background: color-mix(in srgb, var(--sand) 68%, var(--paper));

@@ -1,7 +1,10 @@
 import { ExternalLink, LogOut, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useFetcher, useLocation } from "react-router";
-import { AccountDashboard } from "~/components/account/account-dashboard";
+import {
+  AccountDashboard,
+  useProfessionalCommunicationNotification,
+} from "~/components/account/account-dashboard";
 import type {
   AccountActionFeedback,
   AccountDashboardData,
@@ -69,6 +72,13 @@ export function AccountDrawer({
             tab.id !== "communication" &&
             tab.id !== "upcoming-order",
         );
+  const communicationHasNew = useProfessionalCommunicationNotification(
+    data?.viewer?.profile?.professional_status === "approved"
+      ? data.viewer.user.id
+      : undefined,
+    data?.professionalMessages ?? [],
+    activeSection,
+  );
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -202,6 +212,7 @@ export function AccountDrawer({
                 key={tab.id}
               >
                 {english ? tab.en : tab.fr}
+                {tab.id === "communication" && communicationHasNew ? <span className="account-tab-notification" role="status"><span className="sr-only">{english ? "New message" : "Nouveau message"}</span></span> : null}
               </button>
             ))}
           </div>
