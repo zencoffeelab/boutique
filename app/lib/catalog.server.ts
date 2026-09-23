@@ -351,6 +351,39 @@ export async function getAdminProducts(): Promise<Product[]> {
   }));
 }
 
+/** Loads one product for its administration form without transferring the full catalogue. */
+export async function getAdminProductById(productId: string): Promise<Product | null> {
+  if (!hasSupabaseConfig())
+    return (await getRawProducts()).find((product) => product.id === productId) ?? null;
+
+  const client = createServiceSupabase();
+  if (!client) throw new Error("Supabase service configuration is incomplete.");
+  const { data, error } = await client
+    .from("products")
+    .select(`
+      id, slug, status, created_at, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+      thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
+      product_translations(*),
+      product_media(*),
+      product_editorial_blocks(*),
+      product_variants(*, variant_offers(*))
+    `)
+    .eq("id", productId)
+    .maybeSingle();
+  if (error) {
+    // Keep the existing compatibility path for a database schema still being upgraded.
+    if (isMissingRibbonColumnError(error) || error.code === "42703")
+      return (await getAdminProducts()).find((product) => product.id === productId) ?? null;
+    throw new Error(`Unable to load product: ${error.message}`);
+  }
+  if (!data) return null;
+  const product = mapDatabaseProduct(data);
+  return {
+    ...product,
+    variants: product.variants.filter((variant) => variant.offers.some((offer) => offer.active)),
+  };
+}
+
 /** Catalogue réservé aux comptes professionnels validés et aux administrateurs. */
 export async function getProfessionalProducts(
   options: { availableOnly?: boolean } = {},

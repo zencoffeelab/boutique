@@ -108,6 +108,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }, { headers: session.responseHeaders });
 }
 
+export function shouldRevalidate({ formData, formMethod, defaultShouldRevalidate }: {
+  formData?: FormData;
+  formMethod?: string;
+  defaultShouldRevalidate: boolean;
+}) {
+  // Saving a product does not alter the administration shell. Skipping this
+  // revalidation avoids repeating its authentication and catalogue requests.
+  if (formMethod === "POST" && formData?.get("intent") === "save_product") return false;
+  return defaultShouldRevalidate;
+}
+
 export default function App() {
   const { locale, gaMeasurementId, signedIn, professional, professionalUserId, accountInitials, admin, footerProducts, announcement, navigation, comingSoon, instagramUrl } = useLoaderData<typeof loader>();
   const location = useLocation();

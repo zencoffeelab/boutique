@@ -12,6 +12,20 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-admin-products-page-lightened",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Édition des produits allégée",
+    description: "La fiche produit charge uniquement le café demandé et ne relance plus les données du backoffice après son enregistrement, afin de limiter les appels serveur.",
+  },
+  {
+    id: "2026-09-23-product-save-subrequests-reduced",
+    date: "2026-09-23",
+    kind: "Correction",
+    title: "Enregistrement des produits plus fiable",
+    description: "L’enregistrement d’un produit ne réécrit plus ses blocs éditoriaux inchangés, ce qui réduit les appels serveur et évite le dépassement de limite lors de la sauvegarde.",
+  },
+  {
     id: "2026-09-21-checkout-professional-address-access",
     date: "2026-09-21",
     kind: "Correction",

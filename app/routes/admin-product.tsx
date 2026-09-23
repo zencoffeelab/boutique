@@ -23,7 +23,7 @@ import { formatMoney } from "~/domain/money";
 import { buildVariantOffers } from "~/domain/professional-quote";
 import type { Product, ProductEditorialBlock, ProductVariant } from "~/domain/types";
 import { requireAdmin } from "~/lib/auth.server";
-import { getAdminProducts } from "~/lib/catalog.server";
+import { getAdminProductById } from "~/lib/catalog.server";
 import { PUBLIC_MEDIA_CACHE_SECONDS, PUBLIC_MEDIA_MAX_UPLOAD_BYTES, publicMediaOriginUrl } from "~/lib/public-media";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
@@ -423,11 +423,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         variants: [],
       },
     };
-  const product = (await getAdminProducts()).find(
-    (item) => item.id === params.id,
-  );
+  if (!params.id) throw new Response("Produit introuvable.", { status: 404 });
+  const product = await getAdminProductById(params.id);
   if (!product) throw new Response("Produit introuvable.", { status: 404 });
   return { demo: admin.demo, isNew: false, product };
+}
+
+export function shouldRevalidate({ formData, formMethod, defaultShouldRevalidate }: {
+  formData?: FormData;
+  formMethod?: string;
+  defaultShouldRevalidate: boolean;
+}) {
+  // The submitted form already contains the saved values. Avoid immediately
+  // reloading the full editor and its protected data after this specific save.
+  if (formMethod === "POST" && formData?.get("intent") === "save_product") return false;
+  return defaultShouldRevalidate;
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -1067,10 +1077,22 @@ export async function action({ request }: ActionFunctionArgs) {
       const file = uploadedFile(form, `${prefix}File`);
       const hasNewImage = isUploadFile(file) && file.size > 0;
       const hasText = Object.values(rawFields).some((value) => value.trim().length > 0);
-      const existingBlock = existingEditorialBlocks.some(
+      const existingBlock = existingEditorialBlocks.find(
         (block: { position?: number }) => Number(block.position) === position,
       );
+      const textChanged = !existingBlock || [
+        ["title_fr", rawFields.titleFr],
+        ["title_en", rawFields.titleEn],
+        ["body_fr", rawFields.bodyFr],
+        ["body_en", rawFields.bodyEn],
+        ["alt_fr", rawFields.altFr],
+        ["alt_en", rawFields.altEn],
+      ].some(([column, value]) => String(existingBlock[column] ?? "") !== value);
       if (!hasText && !hasNewImage && !existingBlock) continue;
+      // The global product form contains existing editorial-block fields too.
+      // Do not turn an unchanged product save into three requests per block
+      // (read, upsert, audit log).
+      if (!hasNewImage && !textChanged) continue;
       const blockFields = editorialBlockFieldsSchema.safeParse(rawFields);
       if (!blockFields.success)
         return {
