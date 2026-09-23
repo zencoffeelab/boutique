@@ -846,7 +846,7 @@ export default function AdminProfessionalDetail() {
                   <article key={message.id}>
                     <div>
                       <Badge
-                        className={`admin-pro-status admin-pro-status--${message.direction === "outbound" ? "approved" : "pending"}`}
+                        className={`admin-pro-status admin-pro-status--${message.direction === "outbound" ? "approved" : "pending"}${message.direction === "inbound" ? " admin-professional-detail__message-status--received" : ""}`}
                       >
                         {message.direction === "outbound" ? "Envoyé" : "Reçu"}
                       </Badge>

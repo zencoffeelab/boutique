@@ -7319,6 +7319,10 @@ body.advice-detail-overflow-hidden {
   background: #f8d9d5;
   color: #7b2318;
 }
+.admin-professional-detail__message-status--received {
+  background: #f8d9d5;
+  color: #7b2318;
+}
 .admin-empty-state {
   padding: 1.25rem;
 }

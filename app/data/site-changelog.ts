@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-23-professional-received-mail-badge",
+    date: "2026-09-23",
+    kind: "Design",
+    title: "Repère visuel des mails reçus",
+    description: "Dans la fiche d’un compte professionnel, le badge Reçu est désormais affiché sur fond rouge afin de distinguer immédiatement les messages entrants.",
+  },
+  {
     id: "2026-09-23-professional-message-reply-on-demand",
     date: "2026-09-23",
     kind: "Design",
