@@ -12,6 +12,13 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-29-professional-email-threads",
+    date: "2026-09-29",
+    kind: "Fonctionnalité",
+    title: "Conversations e-mail regroupées",
+    description: "Les réponses liées à un même e-mail sont désormais regroupées dans une seule conversation lisible, avec un seul espace de réponse en fin de chaîne dans l’espace professionnel et le back-office.",
+  },
+  {
     id: "2026-09-29-professional-inline-email-replies",
     date: "2026-09-29",
     kind: "Fonctionnalité",

@@ -22,6 +22,7 @@ import {
 import { Form, Link, useFetcher } from "react-router";
 import { AddressAutocomplete } from "~/components/address-autocomplete";
 import { formatMoney } from "~/domain/money";
+import { groupMailThreads } from "~/lib/mail-threads";
 import {
   SHIPPING_COUNTRY_CODES,
   shippingCountryLabel,
@@ -902,6 +903,7 @@ function AccountSections({
     next,
     mfa,
   } = data;
+  const professionalThreads = groupMailThreads(professionalMessages);
   const english = locale === "en-GB";
   const drawer = mode === "drawer";
   const prefix = drawer ? "account-drawer" : "account";
@@ -1241,7 +1243,10 @@ function AccountSections({
             <span>{professionalMessages.length}</span>
           </div>
           <div className="account-communication-list">
-            {professionalMessages.map((message) => (
+            {professionalThreads.map((thread) => {
+              const message = thread.messages.at(-1)!;
+              const threadBody = thread.messages.map((item) => `${item.direction === "outbound" ? "Zen Coffee Lab" : "Vous"} · ${new Date(item.sent_at ?? item.created_at).toLocaleString(locale)}\n${item.text_body || "—"}`).join("\n\n");
+              return (
               <article className="account-panel" key={message.id}>
                 <div>
                   <p className="eyebrow">
@@ -1274,7 +1279,7 @@ function AccountSections({
                       onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
                       aria-label={english ? "Collapse message" : "Réduire le message"}
                     >
-                      {message.text_body || "—"}
+                      {threadBody}
                     </button>
                     {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
                       <ul className="account-mail-attachments" aria-label={english ? "Attachments" : "Pièces jointes"}>
@@ -1303,7 +1308,8 @@ function AccountSections({
                   </details>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
           {professionalMessages.length ? null : (
             <div className="account-panel account-empty-state">

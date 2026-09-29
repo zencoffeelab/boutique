@@ -21,6 +21,7 @@ import {
 import { formatMoney } from "~/domain/money";
 import { SHIPPING_COUNTRY_CODES } from "~/domain/shipping-countries";
 import { requireAdmin } from "~/lib/auth.server";
+import { groupMailThreads } from "~/lib/mail-threads";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
 const idSchema = z.uuid();
@@ -86,6 +87,7 @@ type MailMessage = {
   received_at: string | null;
   sent_at: string | null;
   is_read: boolean;
+  parent_id: string | null;
   admin_mail_attachments?: Array<{
     id: string;
     filename: string;
@@ -177,7 +179,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const orderColumns =
     "id,order_number,status,total_cents,created_at,paid_at,order_lines(product_name,variant_label,quantity,line_total_cents)";
   const mailColumns =
-    "id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,received_at,sent_at,is_read,admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)";
+    "id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,received_at,sent_at,is_read,parent_id,admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)";
   const [
     memberApplications,
     emailApplications,
@@ -380,6 +382,7 @@ export default function AdminProfessionalDetail() {
   const [activeTab, setActiveTab] = useState<
     "information" | "documents" | "orders" | "messages"
   >("messages");
+  const messageThreads = groupMailThreads(messages);
   return (
     <AdminShell active="professionals">
       <header className="admin-heading admin-professional-detail__heading">
@@ -868,7 +871,11 @@ export default function AdminProfessionalDetail() {
           <CardContent>
             {messages.length ? (
               <div className="admin-professional-detail__timeline">
-                {messages.map((message) => (
+                {messageThreads.map((thread) => {
+                  const message = thread.messages.at(-1)!;
+                  const replyTarget = [...thread.messages].reverse().find((item) => item.direction === "inbound");
+                  const threadBody = thread.messages.map((item) => `${item.direction === "outbound" ? "Zen Coffee Lab" : "Client"} · ${formatDate(item.sent_at ?? item.received_at ?? item.created_at)}\n${item.text_body || "Aperçu indisponible"}`).join("\n\n");
+                  return (
                   <article key={message.id}>
                     <div>
                       <Badge
@@ -900,7 +907,7 @@ export default function AdminProfessionalDetail() {
                           Réduire le message
                         </span>
                       </summary>
-                      <p>{message.text_body || "Aperçu indisponible"}</p>
+                      <p>{threadBody}</p>
                       {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
                         <ul className="admin-professional-detail__mail-attachments" aria-label="Pièces jointes">
                           {message.admin_mail_attachments.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).map((attachment) => (
@@ -912,12 +919,12 @@ export default function AdminProfessionalDetail() {
                           ))}
                         </ul>
                       ) : null}
-                      {message.direction === "inbound" ? (
+                      {replyTarget?.id === message.id ? (
                         <Form method="post" action="/admin/messagerie" className="admin-professional-detail__message-reply">
                           <input type="hidden" name="intent" value="send_mail" />
                           <input type="hidden" name="recipient" value={email} />
                           <input type="hidden" name="subject" value={message.subject.startsWith("Re:") ? message.subject : `Re: ${message.subject}`} />
-                          <input type="hidden" name="replyToId" value={message.id} />
+                          <input type="hidden" name="replyToId" value={replyTarget.id} />
                           <input type="hidden" name="composeToken" value={mailComposeTokens[message.id]} />
                           <label>
                             Répondre
@@ -930,7 +937,8 @@ export default function AdminProfessionalDetail() {
                       ) : null}
                     </details>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p>Aucun e-mail lié à cette adresse.</p>
