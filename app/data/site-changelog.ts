@@ -11,6 +11,12 @@ export type ChangelogEntry = Readonly<{
 
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
+  { id: "2026-09-29-professional-email-thread-statuses", date: "2026-09-29", kind: "Design", title: "Statut de chaque message visible", description: "Chaque message des conversations professionnelles affiche désormais son statut Reçu ou Envoyé à côté de sa date, dans l’espace client comme dans le back-office." },
+  { id: "2026-09-29-professional-email-thread-layout-fix", date: "2026-09-29", kind: "Correction", title: "Mise en page des conversations e-mail corrigée", description: "Les règles de mise en page du back-office ne peuvent plus écraser le retrait des messages : les repères orange restent séparés du contenu." },
+  { id: "2026-09-29-professional-email-thread-orange-markers", date: "2026-09-29", kind: "Correction", title: "Repères orange des conversations professionnelles harmonisés", description: "Les messages conservent leur barre orange principale ; les anciens échanges disposent d’un second repère de même couleur, avec un espacement net avant le texte." },
+  { id: "2026-09-29-professional-email-thread-hierarchy-refinement", date: "2026-09-29", kind: "Correction", title: "Lecture des conversations professionnelles simplifiée", description: "La hiérarchie des anciens messages utilise désormais un retrait léger et un seul repère coloré par échange, pour préserver une lecture claire." },
+  { id: "2026-09-29-professional-email-thread-hierarchy", date: "2026-09-29", kind: "Design", title: "Historique des échanges e-mail mieux hiérarchisé", description: "Les messages antérieurs d’une conversation professionnelle disposent désormais d’un second repère orange et d’un espacement renforcé, afin de distinguer plus rapidement l’historique du dernier échange." },
+  { id: "2026-09-29-professional-email-thread-readability", date: "2026-09-29", kind: "Design", title: "Chaînes e-mail professionnelles plus lisibles", description: "Chaque message d’une conversation affiche désormais clairement son expéditeur, sa date et son contenu, séparés par un repère orange à gauche." },
   {
     id: "2026-09-29-professional-email-threads",
     date: "2026-09-29",

@@ -874,7 +874,6 @@ export default function AdminProfessionalDetail() {
                 {messageThreads.map((thread) => {
                   const message = thread.messages.at(-1)!;
                   const replyTarget = [...thread.messages].reverse().find((item) => item.direction === "inbound");
-                  const threadBody = thread.messages.map((item) => `${item.direction === "outbound" ? "Zen Coffee Lab" : "Client"} · ${formatDate(item.sent_at ?? item.received_at ?? item.created_at)}\n${item.text_body || "Aperçu indisponible"}`).join("\n\n");
                   return (
                   <article key={message.id}>
                     <div>
@@ -907,7 +906,7 @@ export default function AdminProfessionalDetail() {
                           Réduire le message
                         </span>
                       </summary>
-                      <p>{threadBody}</p>
+                      <div className="admin-professional-detail__message-thread">{thread.messages.map((item) => <article key={item.id}><strong>{item.direction === "outbound" ? "Zen Coffee Lab" : "Client"}</strong><p className="email-thread-meta"><span className={`email-thread-status email-thread-status--${item.direction}`}>{item.direction === "outbound" ? "Envoyé" : "Reçu"}</span><small>{formatDate(item.sent_at ?? item.received_at ?? item.created_at)}</small></p><p>{item.text_body || "Aperçu indisponible"}</p></article>)}</div>
                       {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
                         <ul className="admin-professional-detail__mail-attachments" aria-label="Pièces jointes">
                           {message.admin_mail_attachments.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).map((attachment) => (

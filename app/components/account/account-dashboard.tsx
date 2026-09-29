@@ -1245,7 +1245,6 @@ function AccountSections({
           <div className="account-communication-list">
             {professionalThreads.map((thread) => {
               const message = thread.messages.at(-1)!;
-              const threadBody = thread.messages.map((item) => `${item.direction === "outbound" ? "Zen Coffee Lab" : "Vous"} · ${new Date(item.sent_at ?? item.created_at).toLocaleString(locale)}\n${item.text_body || "—"}`).join("\n\n");
               return (
               <article className="account-panel" key={message.id}>
                 <div>
@@ -1273,14 +1272,9 @@ function AccountSections({
                         {english ? "Collapse message" : "Réduire le message"}
                       </span>
                     </summary>
-                    <button
-                      className="account-communication-message__body"
-                      type="button"
-                      onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
-                      aria-label={english ? "Collapse message" : "Réduire le message"}
-                    >
-                      {threadBody}
-                    </button>
+                    <div className="account-communication-thread">
+                      {thread.messages.map((item) => <article className="account-communication-thread__message" key={item.id}><strong>{item.direction === "outbound" ? "Zen Coffee Lab" : (english ? "You" : "Vous")}</strong><p className="email-thread-meta"><span className={`email-thread-status email-thread-status--${item.direction}`}>{item.direction === "outbound" ? (english ? "Sent" : "Envoyé") : (english ? "Received" : "Reçu")}</span><small>{new Date(item.sent_at ?? item.created_at).toLocaleString(locale)}</small></p><p>{item.text_body || "—"}</p></article>)}
+                    </div>
                     {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
                       <ul className="account-mail-attachments" aria-label={english ? "Attachments" : "Pièces jointes"}>
                         {message.admin_mail_attachments.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).map((attachment) => (
