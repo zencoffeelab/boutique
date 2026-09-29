@@ -298,6 +298,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     applications,
     orders,
     messages,
+    mailComposeTokens: Object.fromEntries(messages.map((message) => [message.id, crypto.randomUUID()])),
     quotes: quotesResult.data ?? [],
     contracts,
   };
@@ -369,7 +370,7 @@ export const meta: MetaFunction = () => [
 ];
 
 export default function AdminProfessionalDetail() {
-  const { profile, email, applications, orders, messages, quotes, contracts } =
+  const { profile, email, applications, orders, messages, mailComposeTokens, quotes, contracts } =
     useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const latestApplication = applications[0];
@@ -912,9 +913,20 @@ export default function AdminProfessionalDetail() {
                         </ul>
                       ) : null}
                       {message.direction === "inbound" ? (
-                        <Link className="admin-professional-detail__message-link" to={`/admin/messagerie?compose=1&reply=${message.id}`}>
-                          Répondre
-                        </Link>
+                        <Form method="post" action="/admin/messagerie" className="admin-professional-detail__message-reply">
+                          <input type="hidden" name="intent" value="send_mail" />
+                          <input type="hidden" name="recipient" value={email} />
+                          <input type="hidden" name="subject" value={message.subject.startsWith("Re:") ? message.subject : `Re: ${message.subject}`} />
+                          <input type="hidden" name="replyToId" value={message.id} />
+                          <input type="hidden" name="composeToken" value={mailComposeTokens[message.id]} />
+                          <label>
+                            Répondre
+                            <textarea name="body" rows={3} maxLength={20_000} required />
+                          </label>
+                          <button className="ui-button ui-button--ghost ui-button--sm" type="submit">
+                            Envoyer la réponse
+                          </button>
+                        </Form>
                       ) : null}
                     </details>
                   </article>

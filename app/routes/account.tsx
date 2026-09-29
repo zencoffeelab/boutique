@@ -331,9 +331,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
             "id,direction,sender_name,sender_address,recipients,subject,text_body,created_at,sent_at,parent_id,admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)",
           )
           .eq("direction", "outbound")
-          .contains("recipients", [{ address: viewer.user.email ?? "" }])
           .order("created_at", { ascending: false })
-          .limit(40)
+          // Supabase serializes JSON containment filters incorrectly for this
+          // query. Fetch the bounded recent set and retain the recipient's
+          // correspondence below with messageHasRecipient instead.
+          .limit(500)
       : Promise.resolve({ data: [] }),
     client && contractual
       ? client

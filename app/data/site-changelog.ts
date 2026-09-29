@@ -12,6 +12,20 @@ export type ChangelogEntry = Readonly<{
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
   {
+    id: "2026-09-29-professional-inline-email-replies",
+    date: "2026-09-29",
+    kind: "Fonctionnalité",
+    title: "Réponses directement dans les échanges professionnels",
+    description: "Ouvrir un e-mail dans l’espace professionnel ou dans la fiche d’un compte professionnel affiche directement le champ de réponse sous son contenu, sans bouton Répondre intermédiaire.",
+  },
+  {
+    id: "2026-09-29-professional-outbound-message-visibility",
+    date: "2026-09-29",
+    kind: "Correction",
+    title: "Messages envoyés visibles dans les espaces professionnels",
+    description: "Les e-mails envoyés depuis le back-office à un professionnel sont de nouveau chargés avec un filtre compatible avec la messagerie, puis affichés dans son espace Communication.",
+  },
+  {
     id: "2026-09-23-professional-detail-json-filter",
     date: "2026-09-23",
     kind: "Correction",

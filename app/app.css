@@ -7096,23 +7096,6 @@ body.advice-detail-overflow-hidden {
   margin: 0.55rem 0 1rem;
   color: var(--muted);
 }
-.admin-professional-detail__message-link {
-  order: 4;
-  width: fit-content;
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.25rem;
-  padding: 0.4rem 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--orange) 45%, var(--line));
-  background: color-mix(in srgb, var(--paper) 84%, var(--sand));
-  color: var(--ink);
-  font-weight: 700;
-  text-decoration-color: var(--orange);
-  text-underline-offset: 0.2em;
-}
-.admin-professional-detail__message-link:hover {
-  background: var(--sand);
-}
 .admin-professional-detail__message-preview {
   order: 1;
   display: grid;
@@ -7168,6 +7151,25 @@ body.advice-detail-overflow-hidden {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.65;
+}
+.admin-professional-detail__message-reply {
+  order: 4;
+  display: grid;
+  gap: 0.65rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.admin-professional-detail__message-reply label {
+  display: grid;
+  gap: 0.45rem;
+  font-weight: 700;
+}
+.admin-professional-detail__message-reply textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+.admin-professional-detail__message-reply .ui-button {
+  justify-self: start;
 }
 .admin-professional-detail__mail-attachments,
 .account-mail-attachments {
@@ -7288,20 +7290,6 @@ body.advice-detail-overflow-hidden {
   gap: 0.65rem;
   padding-top: 1rem;
   border-top: 1px solid var(--line);
-}
-.account-communication-reply-toggle {
-  margin-top: 0.25rem;
-}
-.account-communication-reply-toggle > summary {
-  width: fit-content;
-  cursor: pointer;
-  list-style: none;
-}
-.account-communication-reply-toggle > summary::-webkit-details-marker {
-  display: none;
-}
-.account-communication-reply-toggle:not([open]) .account-communication-reply {
-  display: none;
 }
 .account-communication-reply label {
   display: grid;

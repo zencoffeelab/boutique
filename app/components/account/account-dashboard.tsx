@@ -1288,12 +1288,7 @@ function AccountSections({
                         ))}
                       </ul>
                     ) : null}
-                    <details className="account-communication-reply-toggle">
-                      <summary className="ui-button ui-button--ghost ui-button--sm">
-                        <Reply aria-hidden="true" />
-                        {english ? "Reply" : "Répondre"}
-                      </summary>
-                      <AccountMutationForm drawer={drawer} method="post" action={accountPath} className="account-communication-reply">
+                    <AccountMutationForm drawer={drawer} method="post" action={accountPath} className="account-communication-reply">
                         <input type="hidden" name="intent" value="reply_professional_message" />
                         <input type="hidden" name="messageId" value={message.id} />
                         <label>
@@ -1304,8 +1299,7 @@ function AccountSections({
                           <Reply aria-hidden="true" />
                           {english ? "Send" : "Envoyer"}
                         </button>
-                      </AccountMutationForm>
-                    </details>
+                    </AccountMutationForm>
                   </details>
                 </div>
               </article>
