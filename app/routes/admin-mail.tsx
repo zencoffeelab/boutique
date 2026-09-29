@@ -40,11 +40,11 @@ type AdminMailMessage = {
   admin_mail_attachments: MailAttachment[];
 };
 
-type MailboxView = "inbox" | "sent";
+type MailboxView = "inbox" | "inbox-pro" | "sent" | "sent-pro";
 type MailActionResult = { ok: boolean; message: string; errors?: Record<string, string[]> };
 
 const mailboxContextSchema = z.object({
-  view: z.enum(["inbox", "sent"]).default("inbox"),
+  view: z.enum(["inbox", "inbox-pro", "sent", "sent-pro"]).default("inbox"),
   q: z.string().trim().max(120).default(""),
   label: z.string().trim().max(40).default(""),
 });
@@ -124,13 +124,14 @@ async function professionalCorrespondenceIds(client: any, messages: Array<Pick<A
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
   const url = new URL(request.url);
-  const view: MailboxView = url.searchParams.get("view") === "sent" ? "sent" : "inbox";
+  const requestedView = url.searchParams.get("view");
+  const view: MailboxView = requestedView === "sent" || requestedView === "inbox-pro" || requestedView === "sent-pro" ? requestedView : "inbox";
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
   const requestedLabel = (url.searchParams.get("label") ?? "").trim();
   const labelFilter = requestedLabel === "none" || z.uuid().safeParse(requestedLabel).success ? requestedLabel : "";
   const selectedId = url.searchParams.get("reply") ?? url.searchParams.get("message");
   const compose = url.searchParams.get("compose") === "1";
-  if (admin.demo) return { demo: true, view, query, labelFilter, labels: [] as MailLabel[], compose, composeToken: crypto.randomUUID(), messages: [] as AdminMailMessage[], selected: null as AdminMailMessage | null, stats: { inbox: 0, unread: 0, sent: 0 } };
+  if (admin.demo) return { demo: true, view, query, labelFilter, labels: [] as MailLabel[], compose, composeToken: crypto.randomUUID(), messages: [] as AdminMailMessage[], selected: null as AdminMailMessage | null, stats: { inbox: 0, inboxPro: 0, unread: 0, sent: 0, sentPro: 0 } };
   const client = createServiceSupabase();
   if (!client) throw new Response("Base de données indisponible.", { status: 503 });
   const [messageResult, labelsResult, inboxResult, unreadResult, sentResult, professionalApplicationsResult] = await Promise.all([
@@ -150,8 +151,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return { ...message, is_professional_correspondence: correspondenceAddresses(message).some((address) => professionalEmails.has(address.toLocaleLowerCase("en-US"))) };
   });
   const normalizedQuery = query.toLocaleLowerCase("fr-FR");
+  const professionalView = view === "inbox-pro" || view === "sent-pro";
+  const sentView = view === "sent" || view === "sent-pro";
   const messages = allMessages.filter((message) => {
-    if (message.direction !== (view === "sent" ? "outbound" : "inbound")) return false;
+    if (message.direction !== (sentView ? "outbound" : "inbound")) return false;
+    if (message.is_professional_correspondence !== professionalView) return false;
     // Automatically classified spam remains accessible through its label, but
     // never clutters the normal inbox.
     if (!labelFilter && message.admin_mail_labels?.name === "Spam") return false;
@@ -173,9 +177,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     messages,
     selected,
     stats: {
-      inbox: inboxResult.count ?? 0,
+      inbox: allMessages.filter((message) => message.direction === "inbound" && !message.is_professional_correspondence).length,
+      inboxPro: allMessages.filter((message) => message.direction === "inbound" && message.is_professional_correspondence).length,
       unread: unreadResult.count ?? 0,
-      sent: sentResult.count ?? 0,
+      sent: allMessages.filter((message) => message.direction === "outbound" && !message.is_professional_correspondence).length,
+      sentPro: allMessages.filter((message) => message.direction === "outbound" && message.is_professional_correspondence).length,
     },
   };
 }
@@ -295,7 +301,9 @@ export async function action({ request }: ActionFunctionArgs) {
     : { data: null, error: null };
   if (parentResult.error) return data<MailActionResult>({ ok: false, message: parentResult.error.message }, { status: 500 });
   const parent = parentResult.data;
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    "X-Zen-Coffee-Mailbox-Archived": "1",
+  };
   if (parent?.message_id_header) {
     headers["In-Reply-To"] = parent.message_id_header;
     headers.References = [parent.references_header, parent.message_id_header].filter(Boolean).join(" ").slice(0, 4_000);
@@ -410,7 +418,7 @@ function MailLabelManager({ labels, view, query, labelFilter, selectedId }: { la
   </details>;
 }
 
-function MailComposer({ replyMessage, composeToken, result }: { replyMessage: AdminMailMessage | null; composeToken: string; result?: MailActionResult }) {
+function MailComposer({ replyMessage, composeToken, result, view }: { replyMessage: AdminMailMessage | null; composeToken: string; result?: MailActionResult; view: MailboxView }) {
   const navigation = useNavigation();
   const sending = navigation.state === "submitting" && navigation.formData?.get("intent") === "send_mail";
   const replyRecipient = replyMessage
@@ -421,7 +429,7 @@ function MailComposer({ replyMessage, composeToken, result }: { replyMessage: Ad
   return <section className="admin-mail-compose" aria-labelledby="mail-compose-title">
     <div className="admin-mail-compose__heading">
       <div><p className="eyebrow">{replyMessage ? "Réponse" : "Nouveau message"}</p><h2 id="mail-compose-title">{replyMessage ? `Répondre à ${participantLabel(replyMessage)}` : "Rédiger un e-mail"}</h2></div>
-      <Link className="ui-button ui-button--ghost ui-button--sm" to={replyMessage ? mailboxUrl(replyMessage.direction === "outbound" ? "sent" : "inbox", "", replyMessage.id) : "/admin/messagerie"}><ArrowLeft aria-hidden="true" /> Annuler</Link>
+      <Link className="ui-button ui-button--ghost ui-button--sm" to={replyMessage ? mailboxUrl(view, "", replyMessage.id) : mailboxUrl(view)}><ArrowLeft aria-hidden="true" /> Annuler</Link>
     </div>
     {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
     <Form method="post" encType="multipart/form-data" className="admin-mail-compose__form">
@@ -507,10 +515,12 @@ export default function AdminMail() {
     <nav className="admin-mail-tabs" aria-label="Dossiers de messagerie">
       <Link className={view === "inbox" ? "is-active" : undefined} aria-current={view === "inbox" ? "page" : undefined} to="/admin/messagerie?view=inbox"><Inbox aria-hidden="true" /> Boîte de réception <span>{stats.inbox}</span></Link>
       <Link className={view === "sent" ? "is-active" : undefined} aria-current={view === "sent" ? "page" : undefined} to="/admin/messagerie?view=sent"><Send aria-hidden="true" /> Envoyés <span>{stats.sent}</span></Link>
+      <Link className={view === "inbox-pro" ? "is-active" : undefined} aria-current={view === "inbox-pro" ? "page" : undefined} to="/admin/messagerie?view=inbox-pro"><Inbox aria-hidden="true" /> Boîte de réception pro <span>{stats.inboxPro}</span></Link>
+      <Link className={view === "sent-pro" ? "is-active" : undefined} aria-current={view === "sent-pro" ? "page" : undefined} to="/admin/messagerie?view=sent-pro"><Send aria-hidden="true" /> Envoyés pro <span>{stats.sentPro}</span></Link>
     </nav>
     <MailLabelManager labels={labels} view={view} query={query} labelFilter={labelFilter} selectedId={selected?.id} />
     <div className="admin-mail-layout">
-      <aside className="admin-mail-list" aria-label={view === "inbox" ? "Messages reçus" : "Messages envoyés"}>
+      <aside className="admin-mail-list" aria-label={view === "inbox" || view === "inbox-pro" ? "Messages reçus" : "Messages envoyés"}>
         <Form method="get" className="admin-mail-search">
           <input type="hidden" name="view" value={view} />
           <label><span className="sr-only">Rechercher dans la messagerie</span><Search aria-hidden="true" /><input name="q" type="search" defaultValue={query} placeholder="Rechercher…" /></label>
@@ -544,11 +554,11 @@ export default function AdminMail() {
               </button>
             </Form>
           </div>})}
-          {messages.length === 0 ? <p className="admin-empty-state">{query || labelFilter ? "Aucun message ne correspond à ces filtres." : view === "inbox" ? "Aucun e-mail reçu pour le moment." : "Aucun e-mail envoyé pour le moment."}</p> : null}
+          {messages.length === 0 ? <p className="admin-empty-state">{query || labelFilter ? "Aucun message ne correspond à ces filtres." : view === "inbox-pro" ? "Aucun e-mail professionnel reçu pour le moment." : view === "sent-pro" ? "Aucun e-mail professionnel envoyé pour le moment." : view === "inbox" ? "Aucun e-mail reçu pour le moment." : "Aucun e-mail envoyé pour le moment."}</p> : null}
         </div>
       </aside>
       <div className="admin-mail-content">
-        {compose ? <MailComposer key={selected?.id ?? "new"} replyMessage={selected} composeToken={composeToken} result={result} /> : selected ? <MailDetail message={selected} view={view} query={query} labels={labels} labelFilter={labelFilter} /> : <div className="admin-mail-empty"><Mail aria-hidden="true" /><h2>Sélectionnez un message</h2><p>Le contenu apparaîtra ici.</p></div>}
+        {compose ? <MailComposer key={selected?.id ?? "new"} replyMessage={selected} composeToken={composeToken} result={result} view={view} /> : selected ? <MailDetail message={selected} view={view} query={query} labels={labels} labelFilter={labelFilter} /> : <div className="admin-mail-empty"><Mail aria-hidden="true" /><h2>Sélectionnez un message</h2><p>Le contenu apparaîtra ici.</p></div>}
       </div>
     </div>
   </AdminShell>;

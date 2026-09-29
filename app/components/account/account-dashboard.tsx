@@ -16,6 +16,8 @@ import {
   useEffect,
   useState,
   type FormEventHandler,
+  type CSSProperties,
+  type MouseEvent,
   type PropsWithChildren,
   type ReactNode,
 } from "react";
@@ -36,6 +38,12 @@ export type AccountSectionId =
   | "communication"
   | "addresses"
   | "settings";
+
+function collapseOpenCommunicationMessage(event: MouseEvent<HTMLDetailsElement>) {
+  const target = event.target as HTMLElement;
+  if (!event.currentTarget.open || target.closest("summary, a, button, input, textarea, select, label, form")) return;
+  event.currentTarget.open = false;
+}
 
 export type AccountMfaState = {
   currentLevel: string | null;
@@ -1263,7 +1271,7 @@ function AccountSections({
                       message.sent_at ?? message.created_at,
                     ).toLocaleString(locale)}
                   </small>
-                  <details className="account-communication-message">
+                  <details className="account-communication-message" onClick={collapseOpenCommunicationMessage}>
                     <summary>
                       <span className="account-communication-message__excerpt">
                         {message.text_body || "—"}
@@ -1273,7 +1281,7 @@ function AccountSections({
                       </span>
                     </summary>
                     <div className="account-communication-thread">
-                      {thread.messages.map((item) => <article className="account-communication-thread__message" key={item.id}><strong>{item.direction === "outbound" ? "Zen Coffee Lab" : (english ? "You" : "Vous")}</strong><p className="email-thread-meta"><span className={`email-thread-status email-thread-status--${item.direction}`}>{item.direction === "outbound" ? (english ? "Sent" : "Envoyé") : (english ? "Received" : "Reçu")}</span><small>{new Date(item.sent_at ?? item.created_at).toLocaleString(locale)}</small></p><p>{item.text_body || "—"}</p></article>)}
+                      {thread.messages.map((item, index) => <article className="account-communication-thread__message" key={item.id} style={{ "--email-thread-rail-count": (index % 9) + 1 } as CSSProperties}><strong>{item.direction === "outbound" ? "Zen Coffee Lab" : (english ? "You" : "Vous")}</strong><p className="email-thread-meta"><span className={`email-thread-status email-thread-status--${item.direction === "outbound" ? "inbound" : "outbound"}`}>{item.direction === "outbound" ? (english ? "Received" : "Reçu") : (english ? "Sent" : "Envoyé")}</span><small>{new Date(item.sent_at ?? item.created_at).toLocaleString(locale)}</small></p><p>{item.text_body || "—"}</p></article>)}
                     </div>
                     {message.admin_mail_attachments?.filter((attachment) => attachment.disposition !== "inline" || !attachment.content_id).length ? (
                       <ul className="account-mail-attachments" aria-label={english ? "Attachments" : "Pièces jointes"}>

@@ -872,14 +872,15 @@ export async function action({ request }: ActionFunctionArgs) {
         message:
           locale === "en-GB" ? "Message not found." : "Message introuvable.",
       };
-    const headers = parent.message_id_header
-      ? {
-          "In-Reply-To": parent.message_id_header,
-          References: [parent.references_header, parent.message_id_header]
-            .filter(Boolean)
-            .join(" "),
-        }
-      : undefined;
+    const headers: Record<string, string> = {
+      "X-Zen-Coffee-Mailbox-Archived": "1",
+    };
+    if (parent.message_id_header) {
+      headers["In-Reply-To"] = parent.message_id_header;
+      headers.References = [parent.references_header, parent.message_id_header]
+        .filter(Boolean)
+        .join(" ");
+    }
     const subject = parent.subject.startsWith("Re:")
       ? parent.subject
       : `Re: ${parent.subject}`;
