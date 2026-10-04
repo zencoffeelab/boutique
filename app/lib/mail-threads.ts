@@ -13,6 +13,19 @@ function messageIdTokens(value: string | null | undefined) {
   return bracketed.length > 0 ? bracketed : value.split(/\s+/).filter(Boolean);
 }
 
+export function splitQuotedMailHistory(value: string | null | undefined) {
+  if (!value) return { body: value, quotedHistory: null };
+  const quotedHistory = /(?:^|\n)(?:(?:Le|On)\s[\s\S]{0,800}?(?:a\s+écrit|wrote)\s*:|-----Original Message-----)\s*(?:\n|$)/i;
+  const match = quotedHistory.exec(value);
+  if (!match) return { body: value, quotedHistory: null };
+  const quotedPart = value.slice(match.index).trim();
+  return { body: value.slice(0, match.index).trimEnd(), quotedHistory: quotedPart };
+}
+
+export function withoutQuotedMailHistory(value: string | null | undefined) {
+  return splitQuotedMailHistory(value).body;
+}
+
 export function groupMailThreads<T extends ThreadableMail>(messages: T[]) {
   const byId = new Map(messages.map((message) => [message.id, message]));
   const byMessageId = new Map(messages.flatMap((message) => messageIdTokens(message.message_id_header).map((header) => [header, message])));

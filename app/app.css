@@ -2373,21 +2373,23 @@ button:disabled {
 .advice-detail-page .advice-detail__action {
   padding-top: 2rem;
 }
-.page-hero:has(+ .product-story + .product-story) + .product-story .product-story-block__copy {
-  order: 2;
-}
-.page-hero:has(+ .product-story + .product-story) + .product-story .product-story-block__media {
-  order: 1;
-  border-right: 1px solid var(--line);
-  border-left: 0;
-}
-.page-hero:has(+ .product-story + .product-story) + .product-story + .product-story .product-story-block__copy {
-  order: 1;
-}
-.page-hero:has(+ .product-story + .product-story) + .product-story + .product-story .product-story-block__media {
-  order: 2;
-  border-right: 0;
-  border-left: 1px solid var(--line);
+@media (min-width: 901px) {
+  .page-hero:has(+ .product-story + .product-story) + .product-story .product-story-block__copy {
+    order: 2;
+  }
+  .page-hero:has(+ .product-story + .product-story) + .product-story .product-story-block__media {
+    order: 1;
+    border-right: 1px solid var(--line);
+    border-left: 0;
+  }
+  .page-hero:has(+ .product-story + .product-story) + .product-story + .product-story .product-story-block__copy {
+    order: 1;
+  }
+  .page-hero:has(+ .product-story + .product-story) + .product-story + .product-story .product-story-block__media {
+    order: 2;
+    border-right: 0;
+    border-left: 1px solid var(--line);
+  }
 }
 .page-hero:has(+ .product-story + .product-story) + .product-story + .product-story + .article-body .advice-detail__back {
   display: inline-flex;
@@ -7335,6 +7337,10 @@ body.advice-detail-overflow-hidden {
 .email-thread-status { display: inline-flex; padding: 0.16rem 0.45rem; border-radius: 999px; font-size: 0.72rem; font-weight: 800; line-height: 1.2; }
 .email-thread-status--inbound { background: #f7d8d2; color: #8c2c1b; }
 .email-thread-status--outbound { background: #dce8d7; color: #31532d; }
+.mail-quoted-history { margin-top: 0.25rem; }
+.mail-quoted-history summary { width: max-content; cursor: pointer; color: var(--muted); font-weight: 800; letter-spacing: 0.08em; }
+.mail-quoted-history[open] summary { margin-bottom: 0.35rem; }
+.mail-quoted-history p { margin: 0; padding: 0.65rem 0.8rem; border-left: 2px solid var(--line); color: var(--muted); font-size: 0.9em; }
 .admin-professional-detail__timeline {
   display: grid;
   gap: 0;
@@ -10230,6 +10236,13 @@ body.advice-detail-overflow-hidden {
   border: 1px dashed #bcc3b8;
   border-radius: 0.65rem;
   background: #f8f8f5;
+}
+.admin-mail-compose__submit-actions,
+.admin-mail-thread__reply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
 }
 
 .admin-mail-compose__attachments > span {

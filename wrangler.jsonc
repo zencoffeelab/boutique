@@ -40,6 +40,6 @@
     "redact_query_string": false
   },
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": ["* * * * *"]
   }
 }

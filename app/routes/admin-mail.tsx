@@ -1,13 +1,14 @@
-import { ArrowLeft, Download, Inbox, Mail, MailOpen, Paperclip, PenLine, Plus, Search, Send, Tag, Trash2, X } from "lucide-react";
+import { ArrowLeft, CalendarClock, Download, Inbox, Mail, MailOpen, Paperclip, PenLine, Plus, Search, Send, Tag, Trash2, X } from "lucide-react";
 import { Resend } from "resend";
 import { type CSSProperties, type MouseEvent } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { data, Form, Link, redirect, useActionData, useLoaderData, useNavigation } from "react-router";
 import { z } from "zod";
 import { AdminShell } from "~/components/admin-shell";
+import { MailThreadBody } from "~/components/mail-thread-body";
 import { requireAdmin } from "~/lib/auth.server";
 import { env } from "~/lib/env.server";
-import { groupMailThreads } from "~/lib/mail-threads";
+import { groupMailThreads, withoutQuotedMailHistory } from "~/lib/mail-threads";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { escapeEmailHtml } from "~/services/email-templates.server";
 
@@ -36,6 +37,8 @@ type AdminMailMessage = {
   raw_size: number;
   received_at: string | null;
   sent_at: string | null;
+  scheduled_at: string | null;
+  scheduled_status: "scheduled" | "sending" | "sent" | "failed" | null;
   created_at: string;
   is_professional_correspondence: boolean;
   admin_mail_attachments: MailAttachment[];
@@ -46,7 +49,7 @@ type MailActionResult = { ok: boolean; message: string; errors?: Record<string, 
 
 function collapseOpenMailThread(event: MouseEvent<HTMLDetailsElement>) {
   const target = event.target as HTMLElement;
-  if (!event.currentTarget.open || target.closest("summary, a, button, input, textarea, select, label, form")) return;
+  if (!event.currentTarget.open || target.closest("summary, details, a, button, input, textarea, select, label, form")) return;
   event.currentTarget.open = false;
 }
 
@@ -75,6 +78,7 @@ const sendSchema = z.object({
   body: z.string().trim().min(1).max(20_000),
   composeToken: z.uuid(),
   replyToId: z.preprocess((value) => value === "" ? undefined : value, z.uuid().optional()),
+  scheduledAt: z.preprocess((value) => value === "" ? undefined : value, z.string().trim().max(40).optional()),
 });
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const MAX_TOTAL_ATTACHMENT_BYTES = 20 * 1024 * 1024;
@@ -142,7 +146,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const client = createServiceSupabase();
   if (!client) throw new Response("Base de données indisponible.", { status: 503 });
   const [messageResult, labelsResult, inboxResult, unreadResult, sentResult, professionalApplicationsResult] = await Promise.all([
-    client.from("admin_mail_messages").select("id,direction,sender_name,sender_address,recipients,cc_addresses,reply_to_address,subject,text_body,html_body,message_id_header,in_reply_to_header,references_header,parent_id,label_id,is_read,provider_id,raw_size,received_at,sent_at,created_at,admin_mail_labels(id,name,color),admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)").order("created_at", { ascending: false }).limit(250),
+    client.from("admin_mail_messages").select("id,direction,sender_name,sender_address,recipients,cc_addresses,reply_to_address,subject,text_body,html_body,message_id_header,in_reply_to_header,references_header,parent_id,label_id,is_read,provider_id,raw_size,received_at,sent_at,scheduled_at,scheduled_status,created_at,admin_mail_labels(id,name,color),admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)").order("created_at", { ascending: false }).limit(250),
     client.from("admin_mail_labels").select("id,name,color").order("name", { ascending: true }),
     client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound"),
     client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound").eq("is_read", false),
@@ -207,6 +211,18 @@ function senderAddress(from: string) {
 
 function emailHtml(body: string) {
   return `<div style="font-family:Arial,sans-serif;font-size:16px;line-height:1.65;color:#1f251d">${escapeEmailHtml(body).replace(/\n/g, "<br>")}</div>`;
+}
+
+function parisDateTimeToIso(value: string) {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(value);
+  if (!match) return null;
+  const utcGuess = new Date(`${match[1]}T${match[2]}:00Z`);
+  if (Number.isNaN(utcGuess.getTime())) return null;
+  const offset = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Paris", timeZoneName: "longOffset" }).formatToParts(utcGuess).find((part) => part.type === "timeZoneName")?.value;
+  const offsetMatch = /^GMT([+-])(\d{2}):(\d{2})$/.exec(offset ?? "");
+  if (!offsetMatch) return null;
+  const minutes = (Number(offsetMatch[2]) * 60 + Number(offsetMatch[3])) * (offsetMatch[1] === "+" ? 1 : -1);
+  return new Date(utcGuess.getTime() - minutes * 60_000).toISOString();
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -297,7 +313,7 @@ export async function action({ request }: ActionFunctionArgs) {
     throw redirect(`${mailboxUrl(parsed.data.view, parsed.data.q, undefined, parsed.data.label)}&confirmation=mail-bulk-deleted`);
   }
 
-  if (intent !== "send_mail") return data<MailActionResult>({ ok: false, message: "Action invalide." }, { status: 400 });
+  if (intent !== "send_mail" && intent !== "schedule_mail") return data<MailActionResult>({ ok: false, message: "Action invalide." }, { status: 400 });
   const parsed = sendSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return data<MailActionResult>({ ok: false, message: "Vérifiez le destinataire, l’objet et le message.", errors: parsed.error.flatten().fieldErrors }, { status: 422 });
   const files = form.getAll("attachments").filter((value): value is File => value instanceof File && value.size > 0);
@@ -312,6 +328,26 @@ export async function action({ request }: ActionFunctionArgs) {
     : { data: null, error: null };
   if (parentResult.error) return data<MailActionResult>({ ok: false, message: parentResult.error.message }, { status: 500 });
   const parent = parentResult.data;
+  if (intent === "schedule_mail") {
+    const scheduledAt = parsed.data.scheduledAt ? parisDateTimeToIso(parsed.data.scheduledAt) : null;
+    if (!scheduledAt || Date.parse(scheduledAt) <= Date.now()) return data<MailActionResult>({ ok: false, message: "Choisissez une date et une heure futures pour planifier l’envoi." }, { status: 422 });
+    const { data: stored, error: storeError } = await client.from("admin_mail_messages").insert({
+      direction: "outbound", sender_name: "Zen Coffee Lab", sender_address: senderAddress(env().CONTACT_FROM_EMAIL),
+      recipients: [{ name: "", address: parsed.data.recipient.toLocaleLowerCase("en-US") }], cc_addresses: [], reply_to_address: senderAddress(env().CONTACT_FROM_EMAIL),
+      subject: parsed.data.subject, text_body: parsed.data.body, html_body: emailHtml(parsed.data.body), parent_id: parent?.id ?? null,
+      is_read: true, read_at: new Date().toISOString(), read_by: admin.id, raw_size: new TextEncoder().encode(parsed.data.body).byteLength + totalAttachmentBytes,
+      scheduled_at: scheduledAt, scheduled_by: admin.id, scheduled_status: "scheduled",
+    }).select("id").single();
+    if (storeError || !stored) return data<MailActionResult>({ ok: false, message: storeError?.message ?? "La planification n’a pas pu être enregistrée." }, { status: 500 });
+    const preparedFiles = await Promise.all(files.map(async (file) => ({ filename: file.name, mimeType: file.type || "application/octet-stream", bytes: new Uint8Array(await file.arrayBuffer()) })));
+    for (const [index, file] of preparedFiles.entries()) {
+      const filename = safeStorageFilename(file.filename, index); const storagePath = `${stored.id}/${String(index + 1).padStart(2, "0")}-${filename}`;
+      const uploaded = await client.storage.from("admin-mail-attachments").upload(storagePath, file.bytes, { contentType: file.mimeType, upsert: true });
+      if (!uploaded.error) await client.from("admin_mail_attachments").insert({ message_id: stored.id, filename: file.filename || filename, mime_type: file.mimeType, size_bytes: file.bytes.byteLength, storage_path: storagePath, content_id: null, disposition: "attachment" });
+    }
+    await client.from("audit_log").insert({ actor_id: admin.id, action: "admin_mail.scheduled", entity_type: "admin_mail_message", entity_id: stored.id, after_data: { recipient: parsed.data.recipient, subject: parsed.data.subject, scheduledAt, attachmentCount: preparedFiles.length } });
+    throw redirect(`/admin/messagerie?view=sent&message=${stored.id}&confirmation=mail-scheduled`);
+  }
   const headers: Record<string, string> = {
     "X-Zen-Coffee-Mailbox-Archived": "1",
   };
@@ -444,14 +480,14 @@ function MailComposer({ replyMessage, composeToken, result, view }: { replyMessa
     </div>
     {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
     <Form method="post" encType="multipart/form-data" className="admin-mail-compose__form">
-      <input type="hidden" name="intent" value="send_mail" />
       <input type="hidden" name="composeToken" value={composeToken} />
       <input type="hidden" name="replyToId" value={replyMessage?.id ?? ""} />
       <label>Destinataire<input name="recipient" type="email" required autoComplete="email" defaultValue={replyRecipient} aria-invalid={Boolean(result?.errors?.recipient) || undefined} /></label>
       <label>Objet<input name="subject" required maxLength={200} defaultValue={replyMessage ? replySubject(replyMessage.subject) : ""} aria-invalid={Boolean(result?.errors?.subject) || undefined} /></label>
       <label>Message<textarea name="body" required rows={12} maxLength={20_000} aria-invalid={Boolean(result?.errors?.body) || undefined} /></label>
       <label className="admin-mail-compose__attachments"><span><Paperclip aria-hidden="true" /> Pièces jointes</span><input name="attachments" type="file" multiple /><small>5 fichiers maximum · 10 Mo par fichier · 20 Mo au total</small></label>
-      <button className="ui-button ui-button--default" type="submit" disabled={sending}>{sending ? "Envoi…" : <><Send aria-hidden="true" /> Envoyer</>}</button>
+      <label>Programmer l’envoi <input name="scheduledAt" type="datetime-local" /></label>
+      <div className="admin-mail-compose__submit-actions"><button className="ui-button ui-button--default" name="intent" value="send_mail" type="submit" disabled={sending}>{sending ? "Envoi…" : <><Send aria-hidden="true" /> Envoyer</>}</button><button className="ui-button ui-button--outline" name="intent" value="schedule_mail" type="submit" disabled={sending}><CalendarClock aria-hidden="true" /> Planifier l’envoi</button></div>
     </Form>
   </section>;
 }
@@ -503,25 +539,25 @@ function MailDetail({ message, thread, composeToken, view, query, labels, labelF
     <details className="admin-mail-thread" open onClick={collapseOpenMailThread}>
       <summary>
         <strong>{latestMessage.subject}</strong>
-        <span className="admin-mail-thread__excerpt">{latestMessage.text_body || "Aperçu indisponible"}</span>
+        <span className="admin-mail-thread__excerpt">{withoutQuotedMailHistory(latestMessage.text_body) || "Aperçu indisponible"}</span>
         <span className="admin-mail-thread__collapse">Réduire la conversation</span>
       </summary>
       <div className="admin-mail-thread__messages">
         {thread.map((item, index) => <article key={item.id} style={{ "--email-thread-rail-count": (index % 9) + 1 } as CSSProperties}>
           <strong>{item.direction === "outbound" ? "Zen Coffee Lab" : participantLabel(item)}</strong>
           <p className="email-thread-meta"><span className={`email-thread-status email-thread-status--${item.direction}`}>{item.direction === "outbound" ? "Envoyé" : "Reçu"}</span><small>{dateFormatter.format(new Date(messageDate(item)))}</small></p>
-          <p>{item.text_body || "Aperçu indisponible"}</p>
+          <MailThreadBody text={item.text_body} fallback="Aperçu indisponible" />
           {downloadableAttachments(item).length > 0 ? <ul className="admin-mail-thread__attachments" aria-label="Pièces jointes">{downloadableAttachments(item).map((attachment) => <li key={attachment.id}><a href={`/admin/messagerie/${item.id}/pieces-jointes/${attachment.id}`}><Paperclip aria-hidden="true" />{attachment.filename} <small>{formatFileSize(attachment.size_bytes)}</small></a></li>)}</ul> : null}
         </article>)}
       </div>
       {latestMessage.direction === "inbound" && replyRecipient ? <Form method="post" className="admin-mail-thread__reply">
-        <input type="hidden" name="intent" value="send_mail" />
         <input type="hidden" name="composeToken" value={composeToken} />
         <input type="hidden" name="replyToId" value={latestMessage.id} />
         <input type="hidden" name="recipient" value={replyRecipient} />
         <input type="hidden" name="subject" value={replySubject(latestMessage.subject)} />
         <label>Répondre<textarea name="body" rows={3} maxLength={20_000} required /></label>
-        <button className="ui-button ui-button--ghost ui-button--sm" type="submit"><Send aria-hidden="true" /> Envoyer la réponse</button>
+        <label>Programmer l’envoi <input name="scheduledAt" type="datetime-local" /></label>
+        <span className="admin-mail-thread__reply-actions"><button className="ui-button ui-button--ghost ui-button--sm" name="intent" value="send_mail" type="submit"><Send aria-hidden="true" /> Envoyer la réponse</button><button className="ui-button ui-button--ghost ui-button--sm" name="intent" value="schedule_mail" type="submit"><CalendarClock aria-hidden="true" /> Planifier</button></span>
       </Form> : null}
     </details>
   </article>;

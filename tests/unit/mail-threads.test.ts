@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupMailThreads } from "../../app/lib/mail-threads";
+import { groupMailThreads, splitQuotedMailHistory } from "../../app/lib/mail-threads";
 
 describe("groupMailThreads", () => {
   it("groups legacy replies through In-Reply-To when parent_id is absent", () => {
@@ -11,5 +11,21 @@ describe("groupMailThreads", () => {
 
     expect(threads).toHaveLength(1);
     expect(threads[0]?.messages.map((message) => message.id)).toEqual(["initial", "reply", "follow-up"]);
+  });
+});
+
+describe("splitQuotedMailHistory", () => {
+  it("separates the new reply from the quoted conversation", () => {
+    expect(splitQuotedMailHistory("Merci pour votre réponse.\n\nLe dim. 4 oct. 2026 à 19:28, Zen Coffee Lab <contact@zencoffeelab.com> a écrit :\n> Tester\n> ce nouveau service")).toEqual({
+      body: "Merci pour votre réponse.",
+      quotedHistory: "Le dim. 4 oct. 2026 à 19:28, Zen Coffee Lab <contact@zencoffeelab.com> a écrit :\n> Tester\n> ce nouveau service",
+    });
+  });
+
+  it("recognizes a reply marker even when the email client wraps it", () => {
+    expect(splitQuotedMailHistory("Bien reçu.\n\nLe dim. 4 oct. 2026 à 19:36, Zen Coffee Lab <contact@zencoffeelab.com> a\nécrit :\nTester\nce nouveau service")).toEqual({
+      body: "Bien reçu.",
+      quotedHistory: "Le dim. 4 oct. 2026 à 19:36, Zen Coffee Lab <contact@zencoffeelab.com> a\nécrit :\nTester\nce nouveau service",
+    });
   });
 });
