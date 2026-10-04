@@ -1,12 +1,13 @@
-import { ArrowLeft, Download, Inbox, Mail, MailOpen, Paperclip, PenLine, Plus, Reply, Search, Send, Tag, Trash2, X } from "lucide-react";
+import { ArrowLeft, Download, Inbox, Mail, MailOpen, Paperclip, PenLine, Plus, Search, Send, Tag, Trash2, X } from "lucide-react";
 import { Resend } from "resend";
+import { type CSSProperties, type MouseEvent } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { data, Form, Link, redirect, useActionData, useLoaderData, useNavigation } from "react-router";
 import { z } from "zod";
-import { AdminEmailBody } from "~/components/admin-email-body";
 import { AdminShell } from "~/components/admin-shell";
 import { requireAdmin } from "~/lib/auth.server";
 import { env } from "~/lib/env.server";
+import { groupMailThreads } from "~/lib/mail-threads";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { escapeEmailHtml } from "~/services/email-templates.server";
 
@@ -42,6 +43,12 @@ type AdminMailMessage = {
 
 type MailboxView = "inbox" | "inbox-pro" | "sent" | "sent-pro";
 type MailActionResult = { ok: boolean; message: string; errors?: Record<string, string[]> };
+
+function collapseOpenMailThread(event: MouseEvent<HTMLDetailsElement>) {
+  const target = event.target as HTMLElement;
+  if (!event.currentTarget.open || target.closest("summary, a, button, input, textarea, select, label, form")) return;
+  event.currentTarget.open = false;
+}
 
 const mailboxContextSchema = z.object({
   view: z.enum(["inbox", "inbox-pro", "sent", "sent-pro"]).default("inbox"),
@@ -131,7 +138,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const labelFilter = requestedLabel === "none" || z.uuid().safeParse(requestedLabel).success ? requestedLabel : "";
   const selectedId = url.searchParams.get("reply") ?? url.searchParams.get("message");
   const compose = url.searchParams.get("compose") === "1";
-  if (admin.demo) return { demo: true, view, query, labelFilter, labels: [] as MailLabel[], compose, composeToken: crypto.randomUUID(), messages: [] as AdminMailMessage[], selected: null as AdminMailMessage | null, stats: { inbox: 0, inboxPro: 0, unread: 0, sent: 0, sentPro: 0 } };
+  if (admin.demo) return { demo: true, view, query, labelFilter, labels: [] as MailLabel[], compose, composeToken: crypto.randomUUID(), messages: [] as AdminMailMessage[], selected: null as AdminMailMessage | null, selectedThread: [] as AdminMailMessage[], stats: { inbox: 0, inboxPro: 0, unread: 0, sent: 0, sentPro: 0 } };
   const client = createServiceSupabase();
   if (!client) throw new Response("Base de données indisponible.", { status: 503 });
   const [messageResult, labelsResult, inboxResult, unreadResult, sentResult, professionalApplicationsResult] = await Promise.all([
@@ -166,6 +173,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return `${message.subject} ${participants}`.toLocaleLowerCase("fr-FR").includes(normalizedQuery);
   });
   const selected = selectedId ? allMessages.find((message) => message.id === selectedId) ?? null : compose ? null : messages[0] ?? null;
+  const selectedThread = selected
+    ? groupMailThreads(allMessages).find((thread) => thread.messages.some((message) => message.id === selected.id))?.messages ?? [selected]
+    : [];
   return {
     demo: false,
     view,
@@ -176,6 +186,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     composeToken: crypto.randomUUID(),
     messages,
     selected,
+    selectedThread,
     stats: {
       inbox: allMessages.filter((message) => message.direction === "inbound" && !message.is_professional_correspondence).length,
       inboxPro: allMessages.filter((message) => message.direction === "inbound" && message.is_professional_correspondence).length,
@@ -445,14 +456,14 @@ function MailComposer({ replyMessage, composeToken, result, view }: { replyMessa
   </section>;
 }
 
-function MailDetail({ message, view, query, labels, labelFilter }: { message: AdminMailMessage; view: MailboxView; query: string; labels: MailLabel[]; labelFilter: string }) {
+function MailDetail({ message, thread, composeToken, view, query, labels, labelFilter }: { message: AdminMailMessage; thread: AdminMailMessage[]; composeToken: string; view: MailboxView; query: string; labels: MailLabel[]; labelFilter: string }) {
   const recipientText = message.recipients.map((recipient) => recipient.name ? `${recipient.name} <${recipient.address}>` : recipient.address).join(", ");
-  const messageAttachments = downloadableAttachments(message);
+  const latestMessage = thread.at(-1) ?? message;
+  const replyRecipient = latestMessage.direction === "inbound" ? latestMessage.reply_to_address || latestMessage.sender_address : latestMessage.recipients[0]?.address || "";
   return <article className="admin-mail-detail">
     <header className="admin-mail-detail__heading">
       <div><p className="eyebrow">{message.direction === "inbound" ? "Message reçu" : "Message envoyé"}</p><h2>{message.subject}</h2>{message.admin_mail_labels ? <MailLabelBadge label={message.admin_mail_labels} /> : null}</div>
       <div className="admin-mail-detail__actions">
-        {message.direction === "inbound" ? <Link className="ui-button ui-button--ghost ui-button--sm" to={`/admin/messagerie?compose=1&reply=${message.id}`}><Reply aria-hidden="true" /> Répondre</Link> : null}
         <Form method="post">
           <input type="hidden" name="intent" value={message.is_read ? "mark_unread" : "mark_read"} />
           <input type="hidden" name="messageId" value={message.id} />
@@ -489,21 +500,35 @@ function MailDetail({ message, view, query, labels, labelFilter }: { message: Ad
       <div><dt>À</dt><dd>{recipientText || "—"}</dd></div>
       <div><dt>Date</dt><dd><time dateTime={messageDate(message)}>{dateFormatter.format(new Date(messageDate(message)))}</time></dd></div>
     </dl>
-    {messageAttachments.length > 0 ? <section className="admin-mail-attachments" aria-label="Pièces jointes">
-      {messageAttachments.map((attachment) => <a key={attachment.id} href={`/admin/messagerie/${message.id}/pieces-jointes/${attachment.id}`}><Paperclip aria-hidden="true" /><span><strong>{attachment.filename}</strong><small>{formatFileSize(attachment.size_bytes)}</small></span><Download aria-hidden="true" /></a>)}
-    </section> : null}
-    <AdminEmailBody
-      key={message.id}
-      messageId={message.id}
-      html={message.html_body}
-      text={message.text_body}
-      attachments={message.admin_mail_attachments}
-    />
+    <details className="admin-mail-thread" open onClick={collapseOpenMailThread}>
+      <summary>
+        <strong>{latestMessage.subject}</strong>
+        <span className="admin-mail-thread__excerpt">{latestMessage.text_body || "Aperçu indisponible"}</span>
+        <span className="admin-mail-thread__collapse">Réduire la conversation</span>
+      </summary>
+      <div className="admin-mail-thread__messages">
+        {thread.map((item, index) => <article key={item.id} style={{ "--email-thread-rail-count": (index % 9) + 1 } as CSSProperties}>
+          <strong>{item.direction === "outbound" ? "Zen Coffee Lab" : participantLabel(item)}</strong>
+          <p className="email-thread-meta"><span className={`email-thread-status email-thread-status--${item.direction}`}>{item.direction === "outbound" ? "Envoyé" : "Reçu"}</span><small>{dateFormatter.format(new Date(messageDate(item)))}</small></p>
+          <p>{item.text_body || "Aperçu indisponible"}</p>
+          {downloadableAttachments(item).length > 0 ? <ul className="admin-mail-thread__attachments" aria-label="Pièces jointes">{downloadableAttachments(item).map((attachment) => <li key={attachment.id}><a href={`/admin/messagerie/${item.id}/pieces-jointes/${attachment.id}`}><Paperclip aria-hidden="true" />{attachment.filename} <small>{formatFileSize(attachment.size_bytes)}</small></a></li>)}</ul> : null}
+        </article>)}
+      </div>
+      {latestMessage.direction === "inbound" && replyRecipient ? <Form method="post" className="admin-mail-thread__reply">
+        <input type="hidden" name="intent" value="send_mail" />
+        <input type="hidden" name="composeToken" value={composeToken} />
+        <input type="hidden" name="replyToId" value={latestMessage.id} />
+        <input type="hidden" name="recipient" value={replyRecipient} />
+        <input type="hidden" name="subject" value={replySubject(latestMessage.subject)} />
+        <label>Répondre<textarea name="body" rows={3} maxLength={20_000} required /></label>
+        <button className="ui-button ui-button--ghost ui-button--sm" type="submit"><Send aria-hidden="true" /> Envoyer la réponse</button>
+      </Form> : null}
+    </details>
   </article>;
 }
 
 export default function AdminMail() {
-  const { demo, view, query, labelFilter, labels, compose, composeToken, messages, selected, stats } = useLoaderData<typeof loader>();
+  const { demo, view, query, labelFilter, labels, compose, composeToken, messages, selected, selectedThread, stats } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   return <AdminShell active="mail" unreadMailCount={stats.unread}>
     <header className="admin-heading">
@@ -558,7 +583,7 @@ export default function AdminMail() {
         </div>
       </aside>
       <div className="admin-mail-content">
-        {compose ? <MailComposer key={selected?.id ?? "new"} replyMessage={selected} composeToken={composeToken} result={result} view={view} /> : selected ? <MailDetail message={selected} view={view} query={query} labels={labels} labelFilter={labelFilter} /> : <div className="admin-mail-empty"><Mail aria-hidden="true" /><h2>Sélectionnez un message</h2><p>Le contenu apparaîtra ici.</p></div>}
+        {compose ? <MailComposer key={selected?.id ?? "new"} replyMessage={selected} composeToken={composeToken} result={result} view={view} /> : selected ? <MailDetail message={selected} thread={selectedThread} composeToken={composeToken} view={view} query={query} labels={labels} labelFilter={labelFilter} /> : <div className="admin-mail-empty"><Mail aria-hidden="true" /><h2>Sélectionnez un message</h2><p>Le contenu apparaîtra ici.</p></div>}
       </div>
     </div>
   </AdminShell>;

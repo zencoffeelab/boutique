@@ -10046,6 +10046,34 @@ body.advice-detail-overflow-hidden {
   overflow-wrap: anywhere;
 }
 
+.admin-mail-thread { display: grid; gap: 0.85rem; margin-top: 1rem; }
+.admin-mail-thread > summary { cursor: pointer; list-style: none; }
+.admin-mail-thread > summary::-webkit-details-marker { display: none; }
+.admin-mail-thread > summary strong { display: block; margin-bottom: 0.35rem; }
+.admin-mail-thread__excerpt { display: -webkit-box; overflow: hidden; color: var(--muted); overflow-wrap: anywhere; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.admin-mail-thread__collapse { display: none; color: var(--muted); font-size: 0.875rem; font-weight: 700; }
+.admin-mail-thread[open] .admin-mail-thread__excerpt { display: none; }
+.admin-mail-thread[open] .admin-mail-thread__collapse { display: inline-block; }
+.admin-mail-thread__messages { display: grid; gap: 0.85rem; }
+.admin-mail-thread__messages article {
+  --email-thread-rail-count: 1;
+  --email-thread-rail-width: 3px;
+  --email-thread-rail-gap: 0.35rem;
+  --email-thread-rail-step: calc(var(--email-thread-rail-width) + var(--email-thread-rail-gap));
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.25rem 0 0.25rem calc(1rem + var(--email-thread-rail-count) * var(--email-thread-rail-step));
+  background: repeating-linear-gradient(to right, var(--orange) 0 var(--email-thread-rail-width), transparent var(--email-thread-rail-width) var(--email-thread-rail-step)) left top / calc(var(--email-thread-rail-count) * var(--email-thread-rail-step)) 100% no-repeat;
+}
+.admin-mail-thread__messages article p { margin: 0.35rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
+.admin-mail-thread__attachments { display: grid; gap: 0.35rem; margin: 0.25rem 0 0; padding: 0; list-style: none; }
+.admin-mail-thread__attachments a { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--ink); font-size: 0.875rem; }
+.admin-mail-thread__attachments small { color: var(--muted); }
+.admin-mail-thread__reply { display: grid; gap: 0.65rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.admin-mail-thread__reply label { display: grid; gap: 0.45rem; font-weight: 700; }
+.admin-mail-thread__reply textarea { min-height: 7rem; resize: vertical; }
+.admin-mail-thread__reply .ui-button { justify-self: start; }
+
 .admin-email-body {
   display: grid;
   gap: 0.75rem;

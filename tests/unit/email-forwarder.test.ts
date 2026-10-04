@@ -65,6 +65,38 @@ describe("email mailbox worker", () => {
     vi.unstubAllGlobals();
   });
 
+  it("links an incoming reply to the stored conversation using email headers", async () => {
+    const parentId = "33333333-3333-4333-8333-333333333333";
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("admin_mail_labels")) return new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+      if (url.includes("admin_mail_messages") && !init?.method) return new Response(JSON.stringify([{ id: parentId }]), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (url.includes("admin_mail_messages") && init?.method === "POST") return new Response(JSON.stringify([{ id: "44444444-4444-4444-8444-444444444444" }]), { status: 201, headers: { "Content-Type": "application/json" } });
+      return new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const raw = [
+      "Message-ID: <reply@example.com>",
+      "In-Reply-To: <initial@example.com>",
+      "References: <initial@example.com> <admin-reply@example.com>",
+      "From: Alice Example <alice@example.com>",
+      "To: contact@zencoffeelab.com",
+      "Subject: Re: Une question café",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "Merci pour votre réponse",
+    ].join("\r\n");
+
+    await persistIncomingEmail({ from: "alice@example.com", to: "contact@zencoffeelab.com", raw: new Blob([raw]).stream(), forward: vi.fn(), setReject: vi.fn() }, {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+    });
+
+    const storedRequest = fetchMock.mock.calls.find(([input, init]) => String(input).includes("admin_mail_messages") && (init as RequestInit | undefined)?.method === "POST")?.[1] as RequestInit;
+    expect(JSON.parse(String(storedRequest.body))).toMatchObject({ parent_id: parentId, in_reply_to_header: "<initial@example.com>" });
+    vi.unstubAllGlobals();
+  });
+
   it("stores inline images with their content identifier", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);

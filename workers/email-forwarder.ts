@@ -99,6 +99,28 @@ async function classificationLabelId(env: EmailForwardingEnv, name: string) {
   return ((await response.json()) as Array<{ id: string }>)[0]?.id ?? null;
 }
 
+function messageIdTokens(value: string | undefined) {
+  if (!value) return [];
+  const bracketed = [...value.matchAll(/<[^<>\s]+>/g)].map((match) => match[0]);
+  return bracketed.length > 0 ? bracketed : value.split(/\s+/).filter(Boolean);
+}
+
+async function parentMessageId(env: EmailForwardingEnv, inReplyTo: string | undefined, references: string | undefined) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  const candidates = [...new Set([...messageIdTokens(inReplyTo), ...messageIdTokens(references).reverse()])];
+  for (const messageIdHeader of candidates) {
+    const url = new URL(`${env.SUPABASE_URL}/rest/v1/admin_mail_messages`);
+    url.searchParams.set("message_id_header", `eq.${messageIdHeader}`);
+    url.searchParams.set("select", "id");
+    url.searchParams.set("limit", "1");
+    const response = await fetch(url, { headers: supabaseHeaders(env) });
+    if (!response.ok) continue;
+    const parent = (await response.json() as Array<{ id: string }>)[0];
+    if (parent?.id) return parent.id;
+  }
+  return null;
+}
+
 async function persistAttachments(env: EmailForwardingEnv, messageId: string, attachments: Attachment[]) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || attachments.length === 0) return;
   const rows: Array<{ message_id: string; filename: string; mime_type: string; size_bytes: number; storage_path: string; content_id: string | null; disposition: "attachment" | "inline" | null }> = [];
@@ -142,6 +164,7 @@ export async function persistIncomingEmail(message: ForwardableEmail, env: Email
   const recipients = flattenAddresses(parsed.to);
   if (recipients.length === 0 && message.to) recipients.push({ name: "", address: message.to.toLocaleLowerCase("en-US") });
   const messageIdHeader = (parsed.messageId || message.headers?.get("message-id") || await stableMessageId(raw)).slice(0, 998);
+  const parentId = await parentMessageId(env, parsed.inReplyTo, parsed.references);
   const receivedDate = parsed.date && !Number.isNaN(Date.parse(parsed.date)) ? new Date(parsed.date).toISOString() : new Date().toISOString();
   const classification = classifyIncomingEmail({ senderAddress: sender.address, recipientAddresses: recipients.map((recipient) => recipient.address), subject: parsed.subject?.trim() || "", text: parsed.text?.trim() || htmlToPlainText(parsed.html), headers: message.headers });
   const labelId = await classificationLabelId(env, classification);
@@ -158,6 +181,7 @@ export async function persistIncomingEmail(message: ForwardableEmail, env: Email
     message_id_header: messageIdHeader,
     in_reply_to_header: parsed.inReplyTo?.slice(0, 998) || null,
     references_header: parsed.references?.slice(0, 4_000) || null,
+    parent_id: parentId,
     label_id: labelId,
     is_read: false,
     raw_size: message.rawSize ?? raw.byteLength,
