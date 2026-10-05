@@ -80,8 +80,8 @@ export default {
     // React Router's server modules read their configuration from process.env,
     // while Workers secrets are supplied as request bindings. Explicitly expose
     // this one server-only secret without replacing process.env wholesale.
-    if (!process.env.RESEND_API_KEY && typeof env.RESEND_API_KEY === "string") {
-      process.env.RESEND_API_KEY = env.RESEND_API_KEY;
+    for (const [name, value] of Object.entries({ RESEND_API_KEY: env.RESEND_API_KEY, CRON_SECRET: env.CRON_SECRET })) {
+      if (!process.env[name] && typeof value === "string") process.env[name] = value;
     }
     const url = new URL(request.url);
     const legacyRedirect = legacyRedirects.get(url.pathname);
@@ -109,10 +109,13 @@ export default {
       console.error("commerce_cron_not_configured");
       return;
     }
-    // Keep scheduled jobs on the canonical host. This avoids a redirect that
-    // would discard the Authorization header before reaching the cron route.
-    const endpoint = new URL("/api/cron/commerce", "https://www.zencoffeelab.com");
-    ctx.waitUntil(fetch(endpoint, { headers: { authorization: `Bearer ${env.CRON_SECRET}` } }).then(async (response) => {
+    // Invoke the application directly: an outgoing request to the public
+    // domain may pass through routing/redirects, whereas this preserves the
+    // Worker bindings and the cron authorization header end-to-end.
+    const request = new Request("https://www.zencoffeelab.com/api/cron/commerce", {
+      headers: { authorization: `Bearer ${env.CRON_SECRET}` },
+    });
+    ctx.waitUntil(requestHandler(request, { cloudflare: { env, ctx } }).then(async (response) => {
       if (!response.ok) throw new Error(`Commerce cron returned ${response.status}: ${await response.text()}`);
     }));
   },

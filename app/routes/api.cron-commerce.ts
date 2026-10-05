@@ -8,7 +8,7 @@ import { processNotificationQueue } from "~/services/notifications.server";
 async function processScheduledMail(client: any) {
   const config = env();
   if (!config.RESEND_API_KEY) return { sent: 0, failed: 0 };
-  const { data: due, error } = await client.from("admin_mail_messages").select("id,sender_address,recipients,subject,text_body,parent_id").eq("direction", "outbound").eq("scheduled_status", "scheduled").is("sent_at", null).lte("scheduled_at", new Date().toISOString()).limit(20);
+  const { data: due, error } = await client.from("admin_mail_messages").select("id,sender_address,recipients,subject,text_body,parent_id").eq("direction", "outbound").eq("scheduled_status", "scheduled").is("provider_id", null).is("sent_at", null).lte("scheduled_at", new Date().toISOString()).limit(20);
   if (error) throw error;
   let sent = 0; let failed = 0;
   for (const message of due ?? []) {
@@ -30,8 +30,10 @@ async function processScheduledMail(client: any) {
   return { sent, failed };
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const config = env(); if (!config.CRON_SECRET || request.headers.get("authorization") !== `Bearer ${config.CRON_SECRET}`) return new Response("Unauthorized.", { status: 401 });
+export async function loader({ request, context }: LoaderFunctionArgs) {
+  const config = env();
+  const cronSecret = context.cloudflare.env.CRON_SECRET ?? config.CRON_SECRET;
+  if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) return new Response("Unauthorized.", { status: 401 });
   const client = createServiceSupabase(); if (!client) return new Response("Database unavailable.", { status: 503 });
   const [{ data: released, error }, { data: expiredProfessionalQuotes, error: professionalQuoteError }] = await Promise.all([client.rpc("release_expired_reservations"), client.rpc("release_expired_professional_quotes")]); if (error || professionalQuoteError) throw new Response(error?.message ?? professionalQuoteError?.message, { status: 500 });
   const [notifications, scheduledMail] = await Promise.all([processNotificationQueue(), processScheduledMail(client)]); await client.from("shipping_quotes").delete().lt("expires_at", new Date(Date.now() - 24 * 60 * 60_000).toISOString());

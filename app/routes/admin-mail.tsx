@@ -331,21 +331,25 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "schedule_mail") {
     const scheduledAt = parsed.data.scheduledAt ? parisDateTimeToIso(parsed.data.scheduledAt) : null;
     if (!scheduledAt || Date.parse(scheduledAt) <= Date.now()) return data<MailActionResult>({ ok: false, message: "Choisissez une date et une heure futures pour planifier l’envoi." }, { status: 422 });
+    if (files.length > 0) return data<MailActionResult>({ ok: false, message: "La planification avec pièces jointes n’est pas disponible. Envoyez ce message immédiatement ou retirez les pièces jointes." }, { status: 422 });
+    const config = env();
+    if (!config.RESEND_API_KEY) return data<MailActionResult>({ ok: false, message: "Resend n’est pas configuré." }, { status: 503 });
+    const headers: Record<string, string> = { "X-Zen-Coffee-Mailbox-Archived": "1" };
+    if (parent?.message_id_header) {
+      headers["In-Reply-To"] = parent.message_id_header;
+      headers.References = [parent.references_header, parent.message_id_header].filter(Boolean).join(" ").slice(0, 4_000);
+    }
+    const scheduled = await new Resend(config.RESEND_API_KEY).emails.send({ from: config.CONTACT_FROM_EMAIL, to: parsed.data.recipient, replyTo: senderAddress(config.CONTACT_FROM_EMAIL), subject: parsed.data.subject, text: parsed.data.body, html: emailHtml(parsed.data.body), headers, scheduledAt }, { idempotencyKey: `admin-mail/${parsed.data.composeToken}` });
+    if (scheduled.error || !scheduled.data?.id) return data<MailActionResult>({ ok: false, message: scheduled.error?.message ?? "La planification n’a pas pu être transmise." }, { status: 502 });
     const { data: stored, error: storeError } = await client.from("admin_mail_messages").insert({
       direction: "outbound", sender_name: "Zen Coffee Lab", sender_address: senderAddress(env().CONTACT_FROM_EMAIL),
       recipients: [{ name: "", address: parsed.data.recipient.toLocaleLowerCase("en-US") }], cc_addresses: [], reply_to_address: senderAddress(env().CONTACT_FROM_EMAIL),
       subject: parsed.data.subject, text_body: parsed.data.body, html_body: emailHtml(parsed.data.body), parent_id: parent?.id ?? null,
       is_read: true, read_at: new Date().toISOString(), read_by: admin.id, raw_size: new TextEncoder().encode(parsed.data.body).byteLength + totalAttachmentBytes,
-      scheduled_at: scheduledAt, scheduled_by: admin.id, scheduled_status: "scheduled",
+      scheduled_at: scheduledAt, scheduled_by: admin.id, scheduled_status: "scheduled", provider_id: scheduled.data.id,
     }).select("id").single();
     if (storeError || !stored) return data<MailActionResult>({ ok: false, message: storeError?.message ?? "La planification n’a pas pu être enregistrée." }, { status: 500 });
-    const preparedFiles = await Promise.all(files.map(async (file) => ({ filename: file.name, mimeType: file.type || "application/octet-stream", bytes: new Uint8Array(await file.arrayBuffer()) })));
-    for (const [index, file] of preparedFiles.entries()) {
-      const filename = safeStorageFilename(file.filename, index); const storagePath = `${stored.id}/${String(index + 1).padStart(2, "0")}-${filename}`;
-      const uploaded = await client.storage.from("admin-mail-attachments").upload(storagePath, file.bytes, { contentType: file.mimeType, upsert: true });
-      if (!uploaded.error) await client.from("admin_mail_attachments").insert({ message_id: stored.id, filename: file.filename || filename, mime_type: file.mimeType, size_bytes: file.bytes.byteLength, storage_path: storagePath, content_id: null, disposition: "attachment" });
-    }
-    await client.from("audit_log").insert({ actor_id: admin.id, action: "admin_mail.scheduled", entity_type: "admin_mail_message", entity_id: stored.id, after_data: { recipient: parsed.data.recipient, subject: parsed.data.subject, scheduledAt, attachmentCount: preparedFiles.length } });
+    await client.from("audit_log").insert({ actor_id: admin.id, action: "admin_mail.scheduled", entity_type: "admin_mail_message", entity_id: stored.id, after_data: { recipient: parsed.data.recipient, subject: parsed.data.subject, scheduledAt, providerId: scheduled.data.id } });
     throw redirect(`/admin/messagerie?view=sent&message=${stored.id}&confirmation=mail-scheduled`);
   }
   const headers: Record<string, string> = {

@@ -1954,6 +1954,18 @@ button:disabled {
   gap: 0.65rem;
   margin-top: 0.7rem;
 }
+.purchase-row .quantity-stepper {
+  grid-template-columns: repeat(3, 2.8rem);
+}
+.purchase-row .quantity-stepper button,
+.purchase-row .quantity-stepper output {
+  display: grid;
+  width: 2.8rem;
+  min-width: 2.8rem;
+  min-height: 2.8rem;
+  place-items: center;
+  text-align: center;
+}
 .quantity-stepper {
   display: flex;
   min-height: 3.5rem;
@@ -9048,6 +9060,9 @@ body.advice-detail-overflow-hidden {
 }
 
 @media (max-width: 700px) {
+  .product-info h1 {
+    font-size: clamp(1.45rem, 8vw, 2.25rem);
+  }
   .cart-line__actions .quantity-stepper {
     grid-template-columns: repeat(3, 2.8rem);
   }
