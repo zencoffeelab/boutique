@@ -27,6 +27,7 @@ import { pageMeta } from "~/lib/seo";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import {
   captchaRejected,
+  isLikelySpamContact,
   verifyPublicCaptcha,
   withinProfessionalContactRateLimit,
 } from "~/lib/antispam.server";
@@ -302,6 +303,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
       },
       { status: 503 },
     );
+  const spamSubmission = !professionalSelection && isLikelySpamContact({ email, message });
   const { data: stored, error } = await client
     .from("contact_messages")
     .insert({
@@ -311,6 +313,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
       phone: phone || null,
       subject,
       message,
+      status: spamSubmission ? "archived" : "new",
     })
     .select("id")
     .single();
@@ -334,6 +337,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
       message,
     });
     const receivedAt = new Date().toISOString();
+    const spamLabel = spamSubmission
+      ? await client.from("admin_mail_labels").select("id").eq("name", "Spam").maybeSingle()
+      : { data: null, error: null };
+    if (spamLabel.error)
+      throw new Error(`Unable to find the spam mailbox label: ${spamLabel.error.message}`);
     const { error: mailboxError } = await client
       .from("admin_mail_messages")
       .insert({
@@ -348,12 +356,22 @@ export async function action({ request, context }: ActionFunctionArgs) {
         html_body: adminEmail.html,
         message_id_header: `<contact-message-${stored.id}@zencoffeelab.com>`,
         provider_id: `contact-message/${stored.id}`,
+        label_id: spamLabel.data?.id ?? null,
         is_read: false,
         raw_size: new TextEncoder().encode(message).byteLength,
         received_at: receivedAt,
       });
     if (mailboxError)
       throw new Error(`Unable to archive contact message in admin mailbox: ${mailboxError.message}`);
+    if (spamSubmission) {
+      return data<Result>(
+        {
+          ok: true,
+          message: english ? "Your message has been sent." : "Votre message a bien été envoyé.",
+        },
+        { status: 201 },
+      );
+    }
     const confirmationEmail = contactMessageReceivedEmail({
       locale,
       name,

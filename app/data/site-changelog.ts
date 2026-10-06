@@ -11,6 +11,7 @@ export type ChangelogEntry = Readonly<{
 
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
+  { id: "2026-10-06-contact-spam-no-autoreply", date: "2026-10-06", kind: "Correction", title: "Spams du formulaire sans e-mail automatique", description: "Les demandes publiques détectées comme spam sont archivées dans le label Spam sans envoyer d’alerte interne ni d’accusé de réception au destinataire suspect." },
   { id: "2026-10-05-coffee-quantity-stepper", date: "2026-10-05", kind: "Design", title: "Sélecteur de quantité harmonisé", description: "Dans les fiches café, les cases moins, quantité et plus ont désormais les mêmes dimensions et un contenu centré, sur mobile comme sur ordinateur." },
   { id: "2026-10-05-mobile-coffee-name-size", date: "2026-10-05", kind: "Design", title: "Noms des cafés agrandis sur mobile", description: "Dans les fiches café, le nom reprend désormais sur mobile la même taille que les notes affichées sous la section Notes de dégustation." },
   { id: "2026-10-05-admin-mail-scheduler-resend", date: "2026-10-05", kind: "Correction", title: "Planification e-mail fiabilisée", description: "Les e-mails planifiés sont désormais confiés directement au planificateur de Resend, le service qui les expédie. Leur envoi ne dépend plus du cron du site." },

@@ -4,6 +4,40 @@ type CaptchaPayload = FormData | Record<string, unknown>;
 type CaptchaAction = "contact";
 type RateLimitAction = CaptchaAction | "professional-contact";
 
+const SMS_GATEWAY_DOMAINS = new Set([
+  "vtext.com",
+  "txt.att.net",
+  "tmomail.net",
+  "messaging.sprintpcs.com",
+  "email.uscc.net",
+]);
+
+const CONTACT_SPAM_TERMS = /\b(buy now|seo service|guest post|backlinks?|crypto(?:currency)?|bitcoin|casino|viagra|loan approval|traffic to your website|rank your website)\b/i;
+const PRICE_PROBE_TERMS = /(?:price|prix|preis|präis|precio|preu|prezo|prezzo|pris|pretium|verð|phraghas|kumukūʻai|գինը|ფასი|giá|прайс|cijenu|cenu|çmimin|cmimin|τιμή|qiymətinizi|árát|harga|cenata|цената|intengo|prezio|ọnụahịa|মূল্য)/iu;
+const PRODUCT_CONTEXT_TERMS = /(?:café|coffee|commande|order|produit|product)/i;
+
+/**
+ * Public forms need a second, server-side filter after Turnstile. It catches
+ * known SMS gateways and the common unsolicited commercial messages that can
+ * still pass a CAPTCHA, without sending any email to their supplied address.
+ */
+export function isLikelySpamContact(input: {
+  email: string;
+  message: string;
+}) {
+  const [localPart = "", domain = ""] = input.email.trim().toLowerCase().split("@");
+  const links = (input.message.match(/https?:\/\//gi) ?? []).length;
+  const priceProbe = input.message.trim().length <= 160
+    && links === 0
+    && PRICE_PROBE_TERMS.test(input.message)
+    && !PRODUCT_CONTEXT_TERMS.test(input.message);
+  return SMS_GATEWAY_DOMAINS.has(domain)
+    || /^\d{7,}$/.test(localPart)
+    || CONTACT_SPAM_TERMS.test(input.message)
+    || links > 2
+    || priceProbe;
+}
+
 function valueOf(payload: CaptchaPayload, key: string) {
   if (payload instanceof FormData) return String(payload.get(key) ?? "").trim();
   return typeof payload[key] === "string" ? payload[key].trim() : "";
