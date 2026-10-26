@@ -118,6 +118,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     content,
     special,
     steps: professionalPage?.steps ?? [],
+    professionalDiscountTable: professionalPage?.discountTable ?? null,
     professionalBanner: professionalPage
       ? {
           eyebrow: professionalPage.bannerEyebrow,
@@ -699,7 +700,7 @@ function ProForm({
 }
 
 export default function Contact() {
-  const { locale, content, special, steps, professionalBanner, products } =
+  const { locale, content, special, steps, professionalDiscountTable, professionalBanner, products } =
     useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const navigation = useNavigation();
@@ -750,7 +751,7 @@ export default function Contact() {
               <article key={index}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <h3>{index === 1 ? (steps[2]?.title ?? step.title) : index === 2 ? (steps[1]?.title ?? step.title) : step.title}</h3>
-                <p>{index === 1 ? (steps[2]?.text ?? step.text) : index === 2 ? (steps[1]?.text ?? step.text) : step.text}</p>{index === 2 ? <ProfessionalDiscountTable english={english} /> : null}
+                <p>{index === 1 ? (steps[2]?.text ?? step.text) : index === 2 ? (steps[1]?.text ?? step.text) : step.text}</p>{index === 2 && professionalDiscountTable ? <ProfessionalDiscountTable content={professionalDiscountTable} /> : null}
               </article>
             ))}
           </section>

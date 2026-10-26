@@ -33,8 +33,12 @@ const requestHandler = createRequestHandler(
 
 const legacyRedirects = new Map<string, { destination: string; status: 301 | 302 }>([
   ["/rooting-boutique", { destination: "/boutique", status: 301 }],
+  ["/rooting/boutique", { destination: "/boutique", status: 301 }],
   ["/faq-page", { destination: "/faq", status: 301 }],
   ["/rooting-conseils", { destination: "/conseils", status: 301 }],
+  ["/node/boutique", { destination: "/boutique", status: 301 }],
+  ["/categorie-produit/archives", { destination: "/archives", status: 301 }],
+  ["/feed", { destination: "/blog", status: 301 }],
   ["/merci", { destination: "/commande/confirmation", status: 302 }],
   ["/en/shop-2", { destination: "/en/shop", status: 301 }],
 ]);
@@ -84,7 +88,7 @@ export default {
       if (!process.env[name] && typeof value === "string") process.env[name] = value;
     }
     const url = new URL(request.url);
-    const legacyRedirect = legacyRedirects.get(url.pathname);
+    const isSafeNavigation = request.method === "GET" || request.method === "HEAD";
 
     if (url.protocol !== "https:" || url.hostname === "zencoffeelab.com") {
       url.protocol = "https:";
@@ -92,8 +96,18 @@ export default {
       return Response.redirect(url, 301);
     }
 
-    if ((request.method === "GET" || request.method === "HEAD") && legacyRedirect) {
-      return Response.redirect(new URL(legacyRedirect.destination, url), legacyRedirect.status);
+    if (isSafeNavigation) {
+      const trackingKeys = [...url.searchParams.keys()].filter((key) => /^(?:utm_.+|gclid|fbclid|mc_cid|mc_eid)$/i.test(key));
+      if (trackingKeys.length) {
+        trackingKeys.forEach((key) => url.searchParams.delete(key));
+        return Response.redirect(url, 301);
+      }
+      const legacyRedirect = legacyRedirects.get(url.pathname.replace(/\/$/, ""));
+      if (legacyRedirect) return Response.redirect(new URL(legacyRedirect.destination, url), legacyRedirect.status);
+      if (url.pathname.length > 1 && url.pathname.endsWith("/") && !url.pathname.startsWith("/media/")) {
+        url.pathname = url.pathname.slice(0, -1);
+        return Response.redirect(url, 301);
+      }
     }
 
     if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith(PUBLIC_MEDIA_ROUTE_PREFIX)) {

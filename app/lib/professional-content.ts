@@ -7,9 +7,15 @@ export type ProfessionalPageContent = {
   success: { eyebrow: string; title: string; text: string; accountLabel: string; shopLabel: string };
   catalog: { eyebrow: string; title: string; lede: string; empty: string };
 };
-export type ProfessionalConnectedPageContent = { eyebrow: string; title: string; lede: string; steps: Array<{ title: string; text: string }>; shopText: string; shopButton: string; contactText: string; contactButton: string; sampleText: string; sampleButton: string; bannerEyebrow: string; bannerTitle: string; bannerText: string };
+export type ProfessionalDiscountTableContent = { summary: string; note: string; tiers: Array<{ quantity: string; discount: string }> };
+export type ProfessionalConnectedPageContent = { eyebrow: string; title: string; lede: string; steps: Array<{ title: string; text: string }>; shopText: string; shopButton: string; contactText: string; contactButton: string; sampleText: string; sampleButton: string; bannerEyebrow: string; bannerTitle: string; bannerText: string; discountTable: ProfessionalDiscountTableContent };
 
-const connectedDefaults: Record<"fr-FR" | "en-GB", ProfessionalConnectedPageContent> = {
+const discountTableDefaults: Record<"fr-FR" | "en-GB", ProfessionalDiscountTableContent> = {
+  "fr-FR": { summary: "Voir le tableau des réductions", note: "N. B. : Une offre de -10% est déjà appliquée en boutique pour les paquets de 1 kg par rapport aux paquets de 200g.", tiers: [{ quantity: "1–5 kg", discount: "-15% supplémentaires" }, { quantity: "5–15 kg", discount: "-20% supplémentaires" }, { quantity: "15–30 kg", discount: "-25% supplémentaires" }, { quantity: "30–60 kg", discount: "-30% supplémentaires" }, { quantity: "60–100 kg", discount: "-35% supplémentaires" }] },
+  "en-GB": { summary: "View the discount table", note: "N.B.: A 10% offer is already applied in the shop for 1 kg packs compared with 200 g packs.", tiers: [{ quantity: "1–5 kg", discount: "Additional 15% off" }, { quantity: "5–15 kg", discount: "Additional 20% off" }, { quantity: "15–30 kg", discount: "Additional 25% off" }, { quantity: "30–60 kg", discount: "Additional 30% off" }, { quantity: "60–100 kg", discount: "Additional 35% off" }] },
+};
+
+const connectedDefaults: Record<"fr-FR" | "en-GB", Omit<ProfessionalConnectedPageContent, "discountTable">> = {
   "fr-FR": { eyebrow: "B2B · Zen Coffee Lab", title: "Du café pensé pour votre établissement", lede: "Des cafés traçables, des profils constants et un accompagnement direct par le torréfacteur.", steps: [{ title: "Présentez votre activité", text: "Complétez le formulaire en quelques minutes." }, { title: "Validation manuelle", text: "Nous étudions chaque demande et revenons vers vous." }, { title: "Accès sécurisé", text: "Définissez votre mot de passe et accédez aux conditions pro." }], shopText: "Vous savez déjà ce que vous voulez, ou vous êtes en quête d’exploration ? Rendez-vous dans la boutique", shopButton: "Rendez-vous dans la boutique", contactText: "Vous ne savez pas quoi choisir, vous nous laissez carte blanche ?", contactButton: "Nous contacter", sampleText: "Besoin d’échantillons ? C’est par ici", sampleButton: "Demander un devis", bannerEyebrow: "Une vraie relation", bannerTitle: "Le café n’est que le début.", bannerText: "Recettes, calibrage, accompagnement des équipes et recommandations de saison." },
   "en-GB": { eyebrow: "B2B · Zen Coffee Lab", title: "Coffee made for your business", lede: "Traceable coffees, consistent profiles and direct support from the roaster.", steps: [{ title: "Tell us about your business", text: "Complete the form in a few minutes." }, { title: "Manual review", text: "We review every request and get back to you." }, { title: "Secure access", text: "Set your password and access professional terms." }], shopText: "Already know what you want, or looking to explore? Visit the shop", shopButton: "Visit the shop", contactText: "Not sure what to choose? Leave it to us.", contactButton: "Contact us", sampleText: "Need samples? This way.", sampleButton: "Request a quote", bannerEyebrow: "A real relationship", bannerTitle: "Coffee is only the beginning.", bannerText: "Recipes, calibration, team guidance and seasonal recommendations." },
 };
@@ -47,8 +53,10 @@ export const professionalPageDefaults = defaults;
 
 export function getProfessionalConnectedPageContent(locale: "fr-FR" | "en-GB", blocks?: Array<{ type?: unknown; content?: unknown }> | null): ProfessionalConnectedPageContent {
   const fallback = connectedDefaults[locale];
+  const discountTableFallback = discountTableDefaults[locale];
   const raw = blocks?.find((block) => block.type === "professionalConnectedPage")?.content;
-  if (!raw || typeof raw !== "object") return fallback;
+  if (!raw || typeof raw !== "object") return { ...fallback, discountTable: discountTableFallback };
   const value = raw as Partial<ProfessionalConnectedPageContent>;
-  return { ...fallback, ...value, steps: Array.isArray(value.steps) && value.steps.length === 3 ? value.steps as ProfessionalConnectedPageContent["steps"] : fallback.steps };
+  const table = value.discountTable;
+  return { ...fallback, ...value, steps: Array.isArray(value.steps) && value.steps.length === 3 ? value.steps as ProfessionalConnectedPageContent["steps"] : fallback.steps, discountTable: { ...discountTableFallback, ...table, tiers: Array.isArray(table?.tiers) && table.tiers.length === 5 ? table.tiers : discountTableFallback.tiers } };
 }

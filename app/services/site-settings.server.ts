@@ -3,10 +3,13 @@ import { createServiceSupabase } from "~/lib/supabase.server";
 import { DEFAULT_SHIPPING_TARIFFS, type ConfiguredShippingService, type ShippingTariffs, type ShippingZone } from "~/domain/shipping-zones";
 
 export type FreeShippingThresholds = { fr: number; euUk: number };
+export type OnSitePickupSettings = { labelFr: string; labelEn: string; amountCents: number };
 
 const settingKeys = ["free_shipping_fr_cents", "free_shipping_eu_uk_cents"] as const;
 const shippingTariffSettingKey = "shipping_tariffs";
 const instagramUrlSettingKey = "instagram_url";
+const onSitePickupSettingKey = "on_site_pickup";
+const defaultOnSitePickupSettings: OnSitePickupSettings = { labelFr: "Retirer sur place", labelEn: "Collect in store", amountCents: 0 };
 export const defaultInstagramUrl = "https://www.instagram.com/zencoffeeclub/";
 const shippingServices: ConfiguredShippingService[] = ["mondial_relay", "fedex", "fedex_signature", "colissimo"];
 
@@ -75,6 +78,26 @@ export async function saveShippingTariffs(tariffs: ShippingTariffs, actorId: str
   const { error } = await client.from("site_settings").upsert({ key: shippingTariffSettingKey, value: tariffs }, { onConflict: "key" });
   if (error) throw new Error(error.message);
   await client.from("audit_log").insert({ actor_id: actorId, action: "shipping.tariffs.updated", entity_type: "site_settings", entity_id: shippingTariffSettingKey, before_data: before, after_data: tariffs });
+}
+
+export async function getOnSitePickupSettings(): Promise<OnSitePickupSettings> {
+  const client = createServiceSupabase();
+  if (!client) return defaultOnSitePickupSettings;
+  const { data, error } = await client.from("site_settings").select("value").eq("key", onSitePickupSettingKey).maybeSingle();
+  const value = data?.value;
+  if (error || !value || typeof value !== "object") return defaultOnSitePickupSettings;
+  const settings = value as Partial<OnSitePickupSettings>;
+  const amountCents = settings.amountCents;
+  return { labelFr: typeof settings.labelFr === "string" && settings.labelFr.trim() ? settings.labelFr.trim() : defaultOnSitePickupSettings.labelFr, labelEn: typeof settings.labelEn === "string" && settings.labelEn.trim() ? settings.labelEn.trim() : defaultOnSitePickupSettings.labelEn, amountCents: typeof amountCents === "number" && Number.isSafeInteger(amountCents) && amountCents >= 0 ? amountCents : defaultOnSitePickupSettings.amountCents };
+}
+
+export async function saveOnSitePickupSettings(settings: OnSitePickupSettings, actorId: string) {
+  const client = createServiceSupabase();
+  if (!client) throw new Error("Base indisponible.");
+  const before = await getOnSitePickupSettings();
+  const { error } = await client.from("site_settings").upsert({ key: onSitePickupSettingKey, value: settings }, { onConflict: "key" });
+  if (error) throw new Error(error.message);
+  await client.from("audit_log").insert({ actor_id: actorId, action: "shipping.on_site_pickup.updated", entity_type: "site_settings", entity_id: onSitePickupSettingKey, before_data: before, after_data: settings });
 }
 
 export async function getInstagramUrl(): Promise<string> {

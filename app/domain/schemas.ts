@@ -37,6 +37,7 @@ export const shippingQuoteSchema = z.object({
   lines: z.array(cartLineSchema).min(1).max(100),
   address: shippingAddressSchema,
   pickupPointId: pickupPointIdSchema.optional(),
+  onSitePickup: z.boolean().optional().default(false),
 });
 
 export const checkoutSchema = shippingQuoteSchema.extend({

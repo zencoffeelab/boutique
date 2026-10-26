@@ -7,7 +7,7 @@ import { AdminShell } from "~/components/admin-shell";
 import { requireAdmin } from "~/lib/auth.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { DEFAULT_SHIPPING_TARIFFS, type ConfiguredShippingService, type ShippingTariffs, type ShippingZone } from "~/domain/shipping-zones";
-import { getFreeShippingThresholds, getShippingTariffs, saveFreeShippingThresholds, saveShippingTariffs } from "~/services/site-settings.server";
+import { getFreeShippingThresholds, getOnSitePickupSettings, getShippingTariffs, saveFreeShippingThresholds, saveOnSitePickupSettings, saveShippingTariffs } from "~/services/site-settings.server";
 
 type PackagingPresetRow = {
   id: string;
@@ -34,6 +34,7 @@ const presetSchema = z.object({
 
 const deletePresetSchema = z.object({ intent: z.literal("delete_preset"), id: z.uuid() });
 const thresholdsSchema = z.object({ intent: z.literal("save_thresholds"), france: z.coerce.number().finite().nonnegative().max(100_000), europe: z.coerce.number().finite().nonnegative().max(100_000) });
+const onSitePickupSchema = z.object({ intent: z.literal("save_on_site_pickup"), labelFr: z.string().trim().min(2).max(100), labelEn: z.string().trim().min(2).max(100), price: z.coerce.number().finite().nonnegative().max(100_000) });
 
 const shippingZoneRows: Array<{ zone: ShippingZone; countries: string; services: Array<{ id: ConfiguredShippingService; label: string }> }> = [
   { zone: 1, countries: "France", services: [{ id: "mondial_relay", label: "Mondial Relay" }, { id: "fedex", label: "FedEx" }] },
@@ -68,12 +69,12 @@ export function canDeletePackagingPreset(presetActive: boolean, activePresetCoun
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
-  if (admin.demo) return { demo: true, presets: [] as PackagingPresetRow[], thresholds: await getFreeShippingThresholds(), tariffs: DEFAULT_SHIPPING_TARIFFS };
+  if (admin.demo) return { demo: true, presets: [] as PackagingPresetRow[], thresholds: await getFreeShippingThresholds(), tariffs: DEFAULT_SHIPPING_TARIFFS, onSitePickup: await getOnSitePickupSettings() };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
   const { data, error } = await client.from("packaging_presets").select("*").order("max_net_weight_grams");
   if (error) throw new Response(error.message, { status: 500 });
-  return { demo: false, presets: (data ?? []) as PackagingPresetRow[], thresholds: await getFreeShippingThresholds(), tariffs: await getShippingTariffs() };
+  return { demo: false, presets: (data ?? []) as PackagingPresetRow[], thresholds: await getFreeShippingThresholds(), tariffs: await getShippingTariffs(), onSitePickup: await getOnSitePickupSettings() };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -92,6 +93,15 @@ export async function action({ request }: ActionFunctionArgs) {
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : "Seuils non enregistrés." };
     }
+  }
+
+  if (form.intent === "save_on_site_pickup") {
+    const parsed = onSitePickupSchema.safeParse(form);
+    if (!parsed.success) return { ok: false, message: "Renseignez un libellé et un prix valides." };
+    try {
+      await saveOnSitePickupSettings({ labelFr: parsed.data.labelFr, labelEn: parsed.data.labelEn, amountCents: Math.round(parsed.data.price * 100) }, admin.id);
+      return { ok: true, message: "Retrait sur place enregistré." };
+    } catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Retrait sur place non enregistré." }; }
   }
 
   if (form.intent === "save_tariffs") {
@@ -179,7 +189,7 @@ export function ShippingHelp({ presets, thresholds }: { presets: PackagingPreset
 }
 
 export default function AdminShipping() {
-  const { demo, presets, thresholds, tariffs } = useLoaderData<typeof loader>();
+  const { demo, presets, thresholds, tariffs, onSitePickup } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const activePresetCount = presets.filter((preset) => preset.active).length;
   return <AdminShell active="shipping">
@@ -187,6 +197,7 @@ export default function AdminShipping() {
     {demo ? <p className="admin-notice">Connectez Supabase pour modifier les emballages.</p> : null}
     {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
     <section className="ui-card admin-editor"><h2>Seuils de livraison gratuite</h2><p>Modifiez les montants à partir desquels la livraison la moins chère devient gratuite.</p><Form method="post" className="form-grid"><input type="hidden" name="intent" value="save_thresholds" /><div className="field"><label>France (€)<input name="france" type="number" min="0" max="100000" step="0.01" defaultValue={(thresholds.fr / 100).toFixed(2)} required /></label></div><div className="field"><label>Europe et Royaume-Uni (€)<input name="europe" type="number" min="0" max="100000" step="0.01" defaultValue={(thresholds.euUk / 100).toFixed(2)} required /></label></div><div><button className="ui-button ui-button--default" type="submit" disabled={demo}>Enregistrer les seuils</button></div></Form></section>
+    <section className="ui-card admin-editor"><h2>Retrait sur place</h2><p>Cette option apparaît à la commande en France. Modifiez son libellé et le prix facturé au client.</p><Form method="post" className="form-grid"><input type="hidden" name="intent" value="save_on_site_pickup" /><div className="field"><label>Libellé français<input name="labelFr" defaultValue={onSitePickup.labelFr} required /></label></div><div className="field"><label>Libellé anglais<input name="labelEn" defaultValue={onSitePickup.labelEn} required /></label></div><div className="field"><label>Prix (€)<input name="price" type="number" min="0" max="100000" step="0.01" defaultValue={(onSitePickup.amountCents / 100).toFixed(2)} required /></label></div><div><button className="ui-button ui-button--default" type="submit" disabled={demo}>Enregistrer le retrait sur place</button></div></Form></section>
     <ShippingTariffGrid tariffs={tariffs} demo={demo} />
     <section className="admin-content-list" aria-label="Emballages">{presets.map((preset) => {
       const canDelete = canDeletePackagingPreset(preset.active, activePresetCount);

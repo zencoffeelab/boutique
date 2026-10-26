@@ -21,6 +21,7 @@ export async function action({ request, params, context }: ActionFunctionArgs) {
   const { data: quote } = await client.from("shipping_quotes").select("rates,address,lines,parcels").eq("id", order.shipping_quote_id).single();
   const rate = (quote?.rates as any[])?.find((item) => item.id === order.shipping_rate_id);
   if (!rate || !quote?.address || !quote?.lines || !quote?.parcels) return Response.json({ ok: false, message: "Shipping rate snapshot not found." }, { status: 409 });
+  if (rate.deliveryMethod === "on_site_pickup") return Response.json({ ok: false, message: "Cette commande est à retirer sur place et ne nécessite pas d’étiquette d’expédition." }, { status: 409 });
 
   const provider = labelProviderForRate(rate);
   const providerRateIds = provider === "shippo" ? rate.shippoRateIds as string[] | undefined : rate.sendcloudShippingOptionCodes as string[] | undefined;

@@ -208,7 +208,7 @@ export type ShippingRate = Readonly<{
   provider: "sendcloud" | "shippo" | "mock";
   carrier: string;
   service: string;
-  deliveryMethod: "home" | "pickup";
+  deliveryMethod: "home" | "pickup" | "on_site_pickup";
   pickupPoint?: PickupPoint;
   amountCents: number;
   currency: "EUR";

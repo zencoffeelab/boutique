@@ -8,7 +8,7 @@ import { getPackagingPresets, resolveCartLines } from "~/lib/catalog.server";
 import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { getPickupPointById } from "~/services/pickup-points.server";
-import { getFreeShippingThresholds, getShippingTariffs } from "~/services/site-settings.server";
+import { getFreeShippingThresholds, getOnSitePickupSettings, getShippingTariffs } from "~/services/site-settings.server";
 
 export type QuoteAddress = {
   firstName: string; lastName: string; company?: string; email: string; phone: string;
@@ -203,14 +203,18 @@ async function storeQuote(quote: ShippingQuoteRecord) {
   if (error) throw new Error(`Unable to store shipping quote: ${error.message}`);
 }
 
-export async function createShippingQuote(input: { cartId: string; locale: Locale; audience: Audience; address: QuoteAddress; pickupPointId?: string; lines: { productId: string; variantId: string; audience: Audience; quantity: number }[] }) {
+export async function createShippingQuote(input: { cartId: string; locale: Locale; audience: Audience; address: QuoteAddress; pickupPointId?: string; onSitePickup?: boolean; lines: { productId: string; variantId: string; audience: Audience; quantity: number }[] }) {
+  if (input.onSitePickup && input.address.countryCode !== "FR") throw new Response("On-site pickup is only available in France.", { status: 422 });
   const lines = await resolveCartLines(input.lines, input.locale, input.audience);
   const subtotalCents = lines.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0);
   const parcels = packCartByWeight(lines, await getPackagingPresets());
   const pickupPoint = input.pickupPointId ? await getPickupPointById({ id: input.pickupPointId, locale: input.locale, countryCode: input.address.countryCode }) : undefined;
   const tariffs = await getShippingTariffs();
   let rates: StoredRate[];
-  if (env().SHIPPING_MOCK) rates = await mockRates(parcels, subtotalCents, input.address.countryCode, pickupPoint, tariffs);
+  if (input.onSitePickup) {
+    const settings = await getOnSitePickupSettings();
+    rates = [{ id: randomUUID(), provider: "mock", carrier: "Zen Coffee Lab", service: input.locale === "en-GB" ? settings.labelEn : settings.labelFr, deliveryMethod: "on_site_pickup", amountCents: settings.amountCents, currency: "EUR", estimatedDays: null, freeShippingApplied: false }];
+  } else if (env().SHIPPING_MOCK) rates = await mockRates(parcels, subtotalCents, input.address.countryCode, pickupPoint, tariffs);
   else {
     rates = await applyFreeShipping(await sendcloudRates(parcels, input.address, pickupPoint, tariffs), input.address.countryCode, subtotalCents);
   }
