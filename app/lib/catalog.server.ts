@@ -284,9 +284,16 @@ export async function getLatestPublishedProducts(limit = 4): Promise<Product[]> 
     thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
     product_translations(*), product_media(*), product_editorial_blocks(*), product_variants(*, variant_offers(*))
   `;
-  const { data, error } = await client.from("products").select(select).eq("status", "published").order("published_at", { ascending: false }).limit(limit);
-  if (error) throw new Error(`Unable to load latest published products: ${error.message}`);
-  return (data ?? []).map((row) => mapDatabaseProduct({ ...row, created_at: row.published_at ?? row.created_at }));
+  const result = await client.from("products").select(select).eq("status", "published").order("published_at", { ascending: false }).limit(limit);
+  if (!result.error) return (result.data ?? []).map((row) => mapDatabaseProduct({ ...row, created_at: row.published_at ?? row.created_at }));
+  // Some long-lived catalogues predate the publication timestamp. Keep the
+  // export available there and use the creation date as the documented
+  // fallback rather than returning an unhandled 500 response.
+  if (result.error.code !== "42703") throw new Error(`Unable to load latest published products: ${result.error.message}`);
+  const legacySelect = select.replace("published_at, ", "");
+  const legacyResult = await client.from("products").select(legacySelect).eq("status", "published").order("created_at", { ascending: false }).limit(limit);
+  if (legacyResult.error) throw new Error(`Unable to load latest published products: ${legacyResult.error.message}`);
+  return (legacyResult.data ?? []).map(mapDatabaseProduct);
 }
 
 export function hasPurchasableVariant(
