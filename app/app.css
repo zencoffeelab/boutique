@@ -1264,7 +1264,7 @@ button:disabled {
 
 .latest-coffees-print { background: var(--paper); }
 .product-print-toolbar { display: flex; justify-content: center; padding: 1.25rem; }
-.product-print-page { margin: 0 auto; padding: 2.5rem 0; border-top: 3px solid var(--green); break-after: page; page-break-after: always; }
+.product-print-page { margin: 0 auto; padding: 3.5rem 0 2.5rem; border-top: 6px double var(--green); break-after: page; page-break-after: always; }
 .product-print-page:first-of-type { border-top: 0; }
 .product-print-page .variant-selector button:disabled { opacity: 1; color: var(--ink); cursor: default; }
 @media print {
