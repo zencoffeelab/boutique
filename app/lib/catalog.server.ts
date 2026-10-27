@@ -271,11 +271,16 @@ async function getRawProducts(includeProfessionalPublished = false): Promise<Pro
 
 /** Latest retail coffees, ordered by their public publication date. */
 export async function getLatestPublishedProducts(limit = 4): Promise<Product[]> {
+  const isRoastingTest = (product: Product) => product.translations["fr-FR"].name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleLowerCase("fr-FR") === "test de torrefaction";
+  const pickLatest = (products: Product[]) => products.filter((product) => !isRoastingTest(product)).slice(0, limit);
   if (!hasSupabaseConfig()) {
-    return (await getRawProducts())
+    return pickLatest((await getRawProducts())
       .filter((product) => product.status === "published")
-      .toSorted((left, right) => Date.parse(right.publishedAt ?? "") - Date.parse(left.publishedAt ?? ""))
-      .slice(0, limit);
+      .toSorted((left, right) => Date.parse(right.publishedAt ?? "") - Date.parse(left.publishedAt ?? "")));
   }
   const client = createServiceSupabase();
   if (!client) throw new Error("Supabase service configuration is incomplete.");
@@ -284,16 +289,17 @@ export async function getLatestPublishedProducts(limit = 4): Promise<Product[]> 
     thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
     product_translations(*), product_media(*), product_editorial_blocks(*), product_variants(*, variant_offers(*))
   `;
-  const result = await client.from("products").select(select).eq("status", "published").order("published_at", { ascending: false }).limit(limit);
-  if (!result.error) return (result.data ?? []).map((row) => mapDatabaseProduct({ ...row, created_at: row.published_at ?? row.created_at }));
+  const candidateLimit = Math.max(limit + 8, 12);
+  const result = await client.from("products").select(select).eq("status", "published").order("published_at", { ascending: false }).limit(candidateLimit);
+  if (!result.error) return pickLatest((result.data ?? []).map((row) => mapDatabaseProduct({ ...row, created_at: row.published_at ?? row.created_at })));
   // Some long-lived catalogues predate the publication timestamp. Keep the
   // export available there and use the creation date as the documented
   // fallback rather than returning an unhandled 500 response.
   if (result.error.code !== "42703") throw new Error(`Unable to load latest published products: ${result.error.message}`);
   const legacySelect = select.replace("published_at, ", "");
-  const legacyResult = await client.from("products").select(legacySelect).eq("status", "published").order("created_at", { ascending: false }).limit(limit);
+  const legacyResult = await client.from("products").select(legacySelect).eq("status", "published").order("created_at", { ascending: false }).limit(candidateLimit);
   if (legacyResult.error) throw new Error(`Unable to load latest published products: ${legacyResult.error.message}`);
-  return (legacyResult.data ?? []).map(mapDatabaseProduct);
+  return pickLatest((legacyResult.data ?? []).map(mapDatabaseProduct));
 }
 
 export function hasPurchasableVariant(
