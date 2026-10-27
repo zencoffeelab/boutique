@@ -1262,6 +1262,15 @@ button:disabled {
   padding: 0;
 }
 
+.latest-coffees-print { background: var(--paper); }
+.product-print-toolbar { display: flex; justify-content: center; padding: 1.25rem; }
+.product-print-page { break-after: page; page-break-after: always; }
+@media print {
+  .product-print-toolbar { display: none; }
+  .product-print-page { break-after: page; page-break-after: always; }
+  .product-print-page:last-child { break-after: auto; page-break-after: auto; }
+}
+
 .hero {
   border-bottom: 1px solid var(--line);
 }

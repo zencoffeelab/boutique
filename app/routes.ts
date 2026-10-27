@@ -31,7 +31,7 @@ export default [
   route("activation/mot-de-passe", "routes/password-setup.tsx"),
   route("admin", "routes/admin.tsx"),
   route("admin/produits", "routes/admin-products.tsx"),
-  route("admin/produits/pdf", "routes/admin-latest-coffees-pdf.ts"),
+  route("admin/produits/pdf", "routes/admin-latest-coffees-pdf.tsx"),
   route("admin/produits/:id", "routes/admin-product.tsx"),
   route("admin/commandes", "routes/admin-orders.tsx"),
   route("admin/commandes.csv", "routes/admin-orders-csv.ts"),
