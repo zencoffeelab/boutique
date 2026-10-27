@@ -4,6 +4,7 @@ import {
   PUBLIC_MEDIA_ROUTE_PREFIX,
   publicMediaOriginUrl,
 } from "../app/lib/public-media";
+import { runCommerceMaintenance } from "../app/services/commerce-maintenance.server";
 
 interface CloudflareRuntimeEnv {
   CRON_SECRET?: string;
@@ -123,14 +124,11 @@ export default {
       console.error("commerce_cron_not_configured");
       return;
     }
-    // Invoke the application directly: an outgoing request to the public
-    // domain may pass through routing/redirects, whereas this preserves the
-    // Worker bindings and the cron authorization header end-to-end.
-    const request = new Request("https://www.zencoffeelab.com/api/cron/commerce", {
-      headers: { authorization: `Bearer ${env.CRON_SECRET}` },
-    });
-    ctx.waitUntil(requestHandler(request, { cloudflare: { env, ctx } }).then(async (response) => {
-      if (!response.ok) throw new Error(`Commerce cron returned ${response.status}: ${await response.text()}`);
+    // Do not enter the React Router build here. The former route also drained
+    // mail queues and decoded attachments, which could exceed the cron CPU
+    // budget. Resend now schedules mail itself; cron is database maintenance.
+    ctx.waitUntil(runCommerceMaintenance().then((result) => {
+      if (!result.available) throw new Error("Commerce maintenance database is unavailable");
     }));
   },
 };

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Archive, GripVertical, MoveDown, MoveUp, PackageOpen, Plus, Save, Trash2 } from "lucide-react";
+import { Archive, FileDown, GripVertical, MoveDown, MoveUp, PackageOpen, Plus, Save, Trash2 } from "lucide-react";
 import { z } from "zod";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { Form, Link, useActionData, useFetcher, useLoaderData } from "react-router";
@@ -300,14 +300,19 @@ export default function AdminProducts() {
               stock.
             </p>
           </div>
-          <Link
-            className={`ui-button ui-button--default${demo ? " is-disabled" : ""}`}
-            to="/admin/produits/nouveau"
-            aria-disabled={demo}
-            onClick={demo ? (event) => event.preventDefault() : undefined}
-          >
-            <Plus aria-hidden="true" /> Ajouter un café
-          </Link>
+          <div className="admin-heading__actions">
+            <Link
+              className={`ui-button ui-button--default${demo ? " is-disabled" : ""}`}
+              to="/admin/produits/nouveau"
+              aria-disabled={demo}
+              onClick={demo ? (event) => event.preventDefault() : undefined}
+            >
+              <Plus aria-hidden="true" /> Ajouter un café
+            </Link>
+            <Link className="ui-button ui-button--default" to="/admin/produits/pdf" reloadDocument>
+              <FileDown aria-hidden="true" /> Créer un PDF
+            </Link>
+          </div>
         </header>
         {demo ? (
           <p className="admin-notice">

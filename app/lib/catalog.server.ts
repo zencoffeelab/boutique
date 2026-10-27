@@ -269,6 +269,26 @@ async function getRawProducts(includeProfessionalPublished = false): Promise<Pro
   }
 }
 
+/** Latest retail coffees, ordered by their public publication date. */
+export async function getLatestPublishedProducts(limit = 4): Promise<Product[]> {
+  if (!hasSupabaseConfig()) {
+    return (await getRawProducts())
+      .filter((product) => product.status === "published")
+      .toSorted((left, right) => Date.parse(right.publishedAt ?? "") - Date.parse(left.publishedAt ?? ""))
+      .slice(0, limit);
+  }
+  const client = createServiceSupabase();
+  if (!client) throw new Error("Supabase service configuration is incomplete.");
+  const select = `
+    id, slug, status, published_at, created_at, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+    thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
+    product_translations(*), product_media(*), product_editorial_blocks(*), product_variants(*, variant_offers(*))
+  `;
+  const { data, error } = await client.from("products").select(select).eq("status", "published").order("published_at", { ascending: false }).limit(limit);
+  if (error) throw new Error(`Unable to load latest published products: ${error.message}`);
+  return (data ?? []).map((row) => mapDatabaseProduct({ ...row, created_at: row.published_at ?? row.created_at }));
+}
+
 export function hasPurchasableVariant(
   product: Product,
   audience: Audience,
