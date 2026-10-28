@@ -440,7 +440,7 @@ export function shouldRevalidate({ formData, formMethod, defaultShouldRevalidate
   return defaultShouldRevalidate;
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   const admin = await requireAdmin(request);
   if (admin.demo)
     return {

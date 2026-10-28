@@ -21,6 +21,7 @@
     "check": "npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
+    "@cloudflare/puppeteer": "^1.4.0",
     "@react-pdf/renderer": "^4.3.1",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.8",
