@@ -1,4 +1,5 @@
 import PostalMime, { type Address, type Attachment } from "postal-mime";
+import { decodeEmailEntities } from "../app/lib/email-text";
 
 export interface EmailForwardingEnv {
   SUPABASE_URL?: string;
@@ -47,6 +48,10 @@ function htmlToPlainText(html: string | undefined) {
     .replace(/&#39;/gi, "'")
     .replace(HTML_SPACING, "\n\n")
     .trim();
+}
+
+function readableTextBody(text: string | undefined, html: string | undefined) {
+  return decodeEmailEntities(text?.trim() || htmlToPlainText(html));
 }
 
 function safeFilename(filename: string | null, index: number) {
@@ -166,7 +171,8 @@ export async function persistIncomingEmail(message: ForwardableEmail, env: Email
   const messageIdHeader = (parsed.messageId || message.headers?.get("message-id") || await stableMessageId(raw)).slice(0, 998);
   const parentId = await parentMessageId(env, parsed.inReplyTo, parsed.references);
   const receivedDate = parsed.date && !Number.isNaN(Date.parse(parsed.date)) ? new Date(parsed.date).toISOString() : new Date().toISOString();
-  const classification = classifyIncomingEmail({ senderAddress: sender.address, recipientAddresses: recipients.map((recipient) => recipient.address), subject: parsed.subject?.trim() || "", text: parsed.text?.trim() || htmlToPlainText(parsed.html), headers: message.headers });
+  const textBody = readableTextBody(parsed.text, parsed.html);
+  const classification = classifyIncomingEmail({ senderAddress: sender.address, recipientAddresses: recipients.map((recipient) => recipient.address), subject: decodeEmailEntities(parsed.subject?.trim() || ""), text: textBody, headers: message.headers });
   const labelId = await classificationLabelId(env, classification);
   const body = {
     direction: "inbound",
@@ -175,8 +181,8 @@ export async function persistIncomingEmail(message: ForwardableEmail, env: Email
     recipients,
     cc_addresses: flattenAddresses(parsed.cc),
     reply_to_address: replyTo,
-    subject: (parsed.subject?.trim() || "(Sans objet)").slice(0, 998),
-    text_body: (parsed.text?.trim() || htmlToPlainText(parsed.html)).slice(0, 2_000_000) || null,
+    subject: decodeEmailEntities(parsed.subject?.trim() || "(Sans objet)").slice(0, 998),
+    text_body: textBody.slice(0, 2_000_000) || null,
     html_body: parsed.html?.slice(0, 2_000_000) || null,
     message_id_header: messageIdHeader,
     in_reply_to_header: parsed.inReplyTo?.slice(0, 998) || null,

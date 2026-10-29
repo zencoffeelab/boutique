@@ -39,7 +39,7 @@ describe("email mailbox worker", () => {
       "Subject: Une question café",
       "Content-Type: text/plain; charset=utf-8",
       "",
-      "Bonjour Zen Coffee Lab",
+      "Bonjour Zen Coffee Lab, des caf&#233;s de sp&#233;cialit&#233;.",
     ].join("\r\n");
 
     await expect(persistIncomingEmail({
@@ -59,7 +59,7 @@ describe("email mailbox worker", () => {
       direction: "inbound",
       sender_address: "alice@example.com",
       subject: "Une question café",
-      text_body: "Bonjour Zen Coffee Lab",
+      text_body: "Bonjour Zen Coffee Lab, des cafés de spécialité.",
       message_id_header: "<incoming-test@example.com>",
     });
     vi.unstubAllGlobals();

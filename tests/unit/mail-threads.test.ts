@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { groupMailThreads, splitQuotedMailHistory } from "../../app/lib/mail-threads";
+import { decodeEmailEntities } from "../../app/lib/email-text";
+
+describe("decodeEmailEntities", () => {
+  it("decodes decimal, hexadecimal and common named entities from plain-text emails", () => {
+    expect(decodeEmailEntities("caf&#233;s, d&#xE9;gustation &amp; th&#233; &agrave; emporter")).toBe("cafés, dégustation & thé à emporter");
+  });
+
+  it("leaves malformed or unsafe code points untouched", () => {
+    expect(decodeEmailEntities("&#xD800; &unknown; &#nope;")).toBe("&#xD800; &unknown; &#nope;");
+  });
+});
 
 describe("groupMailThreads", () => {
   it("groups legacy replies through In-Reply-To when parent_id is absent", () => {
