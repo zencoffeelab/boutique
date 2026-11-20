@@ -5055,6 +5055,12 @@ body.advice-detail-overflow-hidden {
   color: var(--green);
   font: 400 0.9rem/1.35 var(--serif);
 }
+.professional-discount-table--direct table {
+  position: static;
+  display: table;
+  min-width: 0;
+  box-shadow: none;
+}
 .professional-discount-table:hover table,
 .professional-discount-table:focus-within table,
 .professional-discount-table[open] table {

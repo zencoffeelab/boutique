@@ -7,12 +7,12 @@ export type ProfessionalPageContent = {
   success: { eyebrow: string; title: string; text: string; accountLabel: string; shopLabel: string };
   catalog: { eyebrow: string; title: string; lede: string; empty: string };
 };
-export type ProfessionalDiscountTableContent = { summary: string; note: string; tiers: Array<{ quantity: string; discount: string }> };
+export type ProfessionalDiscountTableContent = { tiers: Array<{ quantity: string; discount: string }> };
 export type ProfessionalConnectedPageContent = { eyebrow: string; title: string; lede: string; steps: Array<{ title: string; text: string }>; shopText: string; shopButton: string; contactText: string; contactButton: string; sampleText: string; sampleButton: string; bannerEyebrow: string; bannerTitle: string; bannerText: string; discountTable: ProfessionalDiscountTableContent };
 
 const discountTableDefaults: Record<"fr-FR" | "en-GB", ProfessionalDiscountTableContent> = {
-  "fr-FR": { summary: "Voir le tableau des réductions", note: "N. B. : Une offre de -10% est déjà appliquée en boutique pour les paquets de 1 kg par rapport aux paquets de 200g.", tiers: [{ quantity: "1–5 kg", discount: "-15% supplémentaires" }, { quantity: "5–15 kg", discount: "-20% supplémentaires" }, { quantity: "15–30 kg", discount: "-25% supplémentaires" }, { quantity: "30–60 kg", discount: "-30% supplémentaires" }, { quantity: "60–100 kg", discount: "-35% supplémentaires" }] },
-  "en-GB": { summary: "View the discount table", note: "N.B.: A 10% offer is already applied in the shop for 1 kg packs compared with 200 g packs.", tiers: [{ quantity: "1–5 kg", discount: "Additional 15% off" }, { quantity: "5–15 kg", discount: "Additional 20% off" }, { quantity: "15–30 kg", discount: "Additional 25% off" }, { quantity: "30–60 kg", discount: "Additional 30% off" }, { quantity: "60–100 kg", discount: "Additional 35% off" }] },
+  "fr-FR": { tiers: [{ quantity: "5–15 kg", discount: "-20% supplémentaires" }, { quantity: "15–30 kg", discount: "-25% supplémentaires" }, { quantity: "30–60 kg", discount: "-30% supplémentaires" }, { quantity: "60–100 kg", discount: "-35% supplémentaires" }] },
+  "en-GB": { tiers: [{ quantity: "5–15 kg", discount: "Additional 20% off" }, { quantity: "15–30 kg", discount: "Additional 25% off" }, { quantity: "30–60 kg", discount: "Additional 30% off" }, { quantity: "60–100 kg", discount: "Additional 35% off" }] },
 };
 
 const connectedDefaults: Record<"fr-FR" | "en-GB", Omit<ProfessionalConnectedPageContent, "discountTable">> = {
@@ -58,5 +58,6 @@ export function getProfessionalConnectedPageContent(locale: "fr-FR" | "en-GB", b
   if (!raw || typeof raw !== "object") return { ...fallback, discountTable: discountTableFallback };
   const value = raw as Partial<ProfessionalConnectedPageContent>;
   const table = value.discountTable;
-  return { ...fallback, ...value, steps: Array.isArray(value.steps) && value.steps.length === 3 ? value.steps as ProfessionalConnectedPageContent["steps"] : fallback.steps, discountTable: { ...discountTableFallback, ...table, tiers: Array.isArray(table?.tiers) && table.tiers.length === 5 ? table.tiers : discountTableFallback.tiers } };
+  const tiers = Array.isArray(table?.tiers) ? (table.tiers.length === 5 ? table.tiers.slice(1) : table.tiers.length === 4 ? table.tiers : discountTableFallback.tiers) : discountTableFallback.tiers;
+  return { ...fallback, ...value, steps: Array.isArray(value.steps) && value.steps.length === 3 ? value.steps as ProfessionalConnectedPageContent["steps"] : fallback.steps, discountTable: { tiers } };
 }
