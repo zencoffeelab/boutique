@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { formatMoney, formatSignedMoney } from "~/domain/money";
 import { requireAdmin } from "~/lib/auth.server";
+import { countUnreadNonSpamMail } from "~/lib/admin-mail-notifications.server";
 import { getAdminProducts } from "~/lib/catalog.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
@@ -20,11 +21,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     client.from("orders").select("id", { count: "exact", head: true }).not("paid_at", "is", null).in("status", ["paid", "preparing", "ready_to_ship"]),
     client.from("professional_applications").select("id").eq("status", "pending"),
     client.rpc("commerce_dashboard_stats"),
-    client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound").eq("is_read", false),
-  ]) : Promise.resolve([{ data: [] }, { count: 0 }, { data: [] }, { data: null }, { count: 0 }] as const);
-  const [products, [{ data: orders }, { count: ordersToPrepareCount }, { data: applications }, { data: commerceStats }, { count: unreadMail }]] = await Promise.all([
+  ]) : Promise.resolve([{ data: [] }, { count: 0 }, { data: [] }, { data: null }] as const);
+  const unreadMailData = client ? countUnreadNonSpamMail(client) : Promise.resolve({ count: 0, error: null });
+  const [products, [{ data: orders }, { count: ordersToPrepareCount }, { data: applications }, { data: commerceStats }], unreadMailResult] = await Promise.all([
     getAdminProducts(),
     dashboardData,
+    unreadMailData,
   ]);
   const variants = products.flatMap((product) => product.variants);
   const totals = commerceStats as { revenue_cents?: number; orders?: number; contribution_cents?: number } | null;
@@ -45,7 +47,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       lowStock,
       proApplications: (applications ?? []).length,
       ordersToPrepare,
-      unreadMail: unreadMail ?? 0,
+      unreadMail: unreadMailResult.error ? 0 : unreadMailResult.count,
     },
     recentOrders: (orders ?? []).slice(0, 8),
   };

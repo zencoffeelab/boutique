@@ -1979,6 +1979,13 @@ button:disabled {
   grid-template-columns: repeat(2, 1fr);
   gap: 0.65rem;
 }
+.purchase-panel__label {
+  margin: 0 0 0.45rem;
+  font: 600 0.9rem/1.3 var(--sans);
+}
+.purchase-panel__label--roast {
+  margin-top: 1.1rem;
+}
 .variant-selector button {
   display: flex;
   justify-content: space-between;

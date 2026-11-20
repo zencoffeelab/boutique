@@ -103,8 +103,8 @@ export function productReturnLink(locale: Locale, audience: Audience, archived =
   }
   if (audience === "professional") {
     return locale === "en-GB"
-      ? { href: "/en/professional", label: "Professional coffees" }
-      : { href: "/professionnel", label: "Cafés professionnels" };
+      ? { href: "/en/professional", label: "All coffees" }
+      : { href: "/professionnel", label: "Tous les cafés" };
   }
   return locale === "en-GB"
     ? { href: "/en/shop", label: "All coffees" }

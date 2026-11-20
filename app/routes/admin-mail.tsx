@@ -4,12 +4,13 @@ import { type CSSProperties, type MouseEvent } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { data, Form, Link, redirect, useActionData, useLoaderData, useNavigation } from "react-router";
 import { z } from "zod";
+import { AdminEmailBody } from "~/components/admin-email-body";
 import { AdminShell } from "~/components/admin-shell";
-import { MailThreadBody } from "~/components/mail-thread-body";
 import { requireAdmin } from "~/lib/auth.server";
 import { env } from "~/lib/env.server";
 import { groupMailThreads, withoutQuotedMailHistory } from "~/lib/mail-threads";
 import { createServiceSupabase } from "~/lib/supabase.server";
+import { countUnreadNonSpamMail } from "~/lib/admin-mail-notifications.server";
 import { escapeEmailHtml } from "~/services/email-templates.server";
 
 type MailAddress = { name?: string; address: string };
@@ -145,13 +146,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (admin.demo) return { demo: true, view, query, labelFilter, labels: [] as MailLabel[], compose, composeToken: crypto.randomUUID(), messages: [] as AdminMailMessage[], selected: null as AdminMailMessage | null, selectedThread: [] as AdminMailMessage[], stats: { inbox: 0, inboxPro: 0, unread: 0, sent: 0, sentPro: 0 } };
   const client = createServiceSupabase();
   if (!client) throw new Response("Base de données indisponible.", { status: 503 });
-  const [messageResult, labelsResult, inboxResult, unreadResult, sentResult, professionalApplicationsResult] = await Promise.all([
+  const [messageResult, labelsResult, inboxResult, sentResult, professionalApplicationsResult, unreadResult] = await Promise.all([
     client.from("admin_mail_messages").select("id,direction,sender_name,sender_address,recipients,cc_addresses,reply_to_address,subject,text_body,html_body,message_id_header,in_reply_to_header,references_header,parent_id,label_id,is_read,provider_id,raw_size,received_at,sent_at,scheduled_at,scheduled_status,created_at,admin_mail_labels(id,name,color),admin_mail_attachments(id,filename,mime_type,size_bytes,content_id,disposition)").order("created_at", { ascending: false }).limit(250),
     client.from("admin_mail_labels").select("id,name,color").order("name", { ascending: true }),
     client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound"),
-    client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound").eq("is_read", false),
     client.from("admin_mail_messages").select("id", { count: "exact", head: true }).eq("direction", "outbound"),
     client.from("professional_applications").select("email"),
+    countUnreadNonSpamMail(client),
   ]);
   const queryError = messageResult.error ?? labelsResult.error ?? inboxResult.error ?? unreadResult.error ?? sentResult.error ?? professionalApplicationsResult.error;
   if (queryError) throw new Response(queryError.message, { status: 500 });
@@ -550,7 +551,7 @@ function MailDetail({ message, thread, composeToken, view, query, labels, labelF
         {thread.map((item, index) => <article key={item.id} style={{ "--email-thread-rail-count": (index % 9) + 1 } as CSSProperties}>
           <strong>{item.direction === "outbound" ? "Zen Coffee Lab" : participantLabel(item)}</strong>
           <p className="email-thread-meta"><span className={`email-thread-status email-thread-status--${item.direction}`}>{item.direction === "outbound" ? "Envoyé" : "Reçu"}</span><small>{dateFormatter.format(new Date(messageDate(item)))}</small></p>
-          <MailThreadBody text={item.text_body} fallback="Aperçu indisponible" />
+          <AdminEmailBody messageId={item.id} html={item.html_body} text={item.text_body} attachments={item.admin_mail_attachments} />
           {downloadableAttachments(item).length > 0 ? <ul className="admin-mail-thread__attachments" aria-label="Pièces jointes">{downloadableAttachments(item).map((attachment) => <li key={attachment.id}><a href={`/admin/messagerie/${item.id}/pieces-jointes/${attachment.id}`}><Paperclip aria-hidden="true" />{attachment.filename} <small>{formatFileSize(attachment.size_bytes)}</small></a></li>)}</ul> : null}
         </article>)}
       </div>

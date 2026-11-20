@@ -9,7 +9,7 @@ import { pageMeta } from "~/lib/seo";
 export async function loader({ request }: LoaderFunctionArgs) {
   const locale = getLocale(request);
   const viewer = await getViewer(request);
-  const professional = viewer?.profile?.professional_status === "approved" || viewer?.profile?.role === "admin";
+  const professional = viewer?.profile?.professional_status === "approved";
   return {
     locale,
     audience: professional ? "professional" as const : "retail" as const,

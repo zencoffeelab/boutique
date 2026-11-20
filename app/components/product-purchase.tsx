@@ -20,6 +20,7 @@ export function ProductPurchase({ product, locale, audience = "retail" }: { prod
     return offer ? variant.stockOnHand - variant.stockReserved >= offer.minimumQuantity : false;
   });
   const [variantId, setVariantId] = useState(firstAvailableVariant?.id ?? variants[0]?.id ?? "");
+  const [roast, setRoast] = useState<"filter" | "espresso">("filter");
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const { addItem, hydrated } = useCart();
@@ -28,6 +29,7 @@ export function ProductPurchase({ product, locale, audience = "retail" }: { prod
   const available = variant ? variant.stockOnHand - variant.stockReserved : 0;
   const minimum = offer?.minimumQuantity ?? 1;
   const t = dictionary[locale];
+  const isRoastingTest = product.slug === "test-de-torrefaction";
   if (!variant || !offer) return <p>{t.soldOut}</p>;
   const add = () => {
     addItem(buildProductCartLine({ product, variant, offer, audience: offer.audience, quantity: Math.max(minimum, quantity) }));
@@ -35,12 +37,20 @@ export function ProductPurchase({ product, locale, audience = "retail" }: { prod
   };
   return (
     <section className="purchase-panel" aria-label={locale === "fr-FR" ? "Options d’achat" : "Purchase options"}>
+      <p className="purchase-panel__label">{locale === "fr-FR" ? "Quantité :" : "Quantity:"}</p>
       <div className="variant-selector" role="group" aria-label={t.weight}>
         {variants.map((candidate) => {
           const candidateOffer = offerFor(candidate)!;
           return <button key={candidate.id} className={candidate.id === variantId ? "is-selected" : undefined} type="button" onClick={() => { setVariantId(candidate.id); setQuantity(candidateOffer.minimumQuantity); setAdded(false); }}><span>{candidate.label}</span><strong>{formatMoney(candidateOffer.price.amount, locale)}</strong></button>;
         })}
       </div>
+      {isRoastingTest ? null : <>
+        <p className="purchase-panel__label purchase-panel__label--roast">{locale === "fr-FR" ? "Torréfaction :" : "Roast:"}</p>
+        <div className="variant-selector" role="group" aria-label={locale === "fr-FR" ? "Torréfaction" : "Roast"}>
+          <button className={roast === "filter" ? "is-selected" : undefined} type="button" onClick={() => setRoast("filter")}>Filtre</button>
+          <button className={roast === "espresso" ? "is-selected" : undefined} type="button" onClick={() => setRoast("espresso")}>Espresso</button>
+        </div>
+      </>}
       <div className="purchase-row">
         <div className="quantity-stepper" aria-label={t.quantity}>
           <button type="button" onClick={() => setQuantity((value) => Math.max(minimum, value - 1))} aria-label="Moins"><Minus aria-hidden="true" /></button>
