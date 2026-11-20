@@ -5,11 +5,11 @@ describe("product return navigation", () => {
   it("returns to the professional catalogue from a professional product", () => {
     expect(productReturnLink("fr-FR", "professional")).toEqual({
       href: "/professionnel",
-      label: "Cafés professionnels",
+      label: "Tous les cafés",
     });
     expect(productReturnLink("en-GB", "professional")).toEqual({
       href: "/en/professional",
-      label: "Professional coffees",
+      label: "All coffees",
     });
   });
 

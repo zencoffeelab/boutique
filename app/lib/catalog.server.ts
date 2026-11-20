@@ -17,7 +17,7 @@ import { createPublicSupabase, createServiceSupabase } from "./supabase.server";
 import { paragraphsToRichTextDocument, parseRichTextInput, richTextPlainText, storedBlocksToRichTextDocument } from "./rich-text";
 
 const editorialArticleSummaries: Record<string, Record<"fr-FR" | "en-GB", string>> = {
-  "recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france": {
+  "recette-d-extraction-pour-v60": {
     "fr-FR": "Nous partageons avec vous deux recettes que nous utilisons au V60, avec nos repères de mouture, 12 g de café lavé ou 13,5 g de café nature, 200 ml d’eau à 91–93 °C et un versement en plusieurs étapes.",
     "en-GB": "We use two V60 recipes ourselves and share them here, with our grind settings, 12 g of washed coffee or 13.5 g of natural coffee, 200 ml of water at 91–93°C and a staged pour.",
   },
@@ -94,8 +94,8 @@ function mapDatabaseProduct(row: any): Product {
         "en-GB": "Our filter/V60 brewing recipe",
       },
       href: {
-        "fr-FR": "/blog/recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france",
-        "en-GB": "/en/blog/recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france",
+        "fr-FR": "/blog/recette-d-extraction-pour-v60",
+        "en-GB": "/en/blog/recette-d-extraction-pour-v60",
       },
       label: { "fr-FR": "Lire le guide", "en-GB": "Read the guide" },
     },

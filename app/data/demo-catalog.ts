@@ -275,8 +275,8 @@ export const demoProducts: Product[] = inputs.map((input) => {
         "en-GB": "Our filter/V60 brewing recipe",
       },
       href: {
-        "fr-FR": "/blog/recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france",
-        "en-GB": "/en/blog/recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france",
+        "fr-FR": "/blog/recette-d-extraction-pour-v60",
+        "en-GB": "/en/blog/recette-d-extraction-pour-v60",
       },
       label: { "fr-FR": "Lire le guide", "en-GB": "Read the guide" },
     },
@@ -369,7 +369,7 @@ export const demoPackagingPresets: PackagingPreset[] = [
 
 export const demoArticles: AdviceArticle[] = [
   {
-    slug: "recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france",
+    slug: "recette-d-extraction-pour-v60",
     pinned: false,
     publishedAt: "2026-03-20",
     summary: {

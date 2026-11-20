@@ -47,7 +47,7 @@ export function ProductPurchase({ product, locale, audience = "retail" }: { prod
       {isRoastingTest ? null : <>
         <p className="purchase-panel__label purchase-panel__label--roast">{locale === "fr-FR" ? "Torréfaction :" : "Roast:"}</p>
         <div className="variant-selector" role="group" aria-label={locale === "fr-FR" ? "Torréfaction" : "Roast"}>
-          <button className={roast === "filter" ? "is-selected" : undefined} type="button" onClick={() => setRoast("filter")}>Filtre</button>
+          <button className={roast === "filter" ? "is-selected" : undefined} type="button" onClick={() => setRoast("filter")}>{locale === "fr-FR" ? "Filtre" : "Filter"}</button>
           <button className={roast === "espresso" ? "is-selected" : undefined} type="button" onClick={() => setRoast("espresso")}>Espresso</button>
         </div>
       </>}

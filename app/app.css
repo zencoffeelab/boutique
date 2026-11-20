@@ -1491,11 +1491,8 @@ button:disabled {
   transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .product-card__image--sold-out .product-card__original-image,
-.product-gallery__image--sold-out,
 .product-card__image--sold-out .product-card__pack,
-.product-card__image--sold-out .product-card__label,
-.product-gallery__composed--sold-out .product-gallery__pack,
-.product-gallery__composed--sold-out .product-gallery__label {
+.product-card__image--sold-out .product-card__label {
   filter: grayscale(1);
 }
 .product-card:hover .product-card__original-image,

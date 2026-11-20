@@ -21,6 +21,10 @@ export function multiplyCents(unitAmount: number, quantity: number): number {
 }
 
 export function formatMoney(cents: number, locale: string): string {
+  if (locale === "en-GB") {
+    const amount = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(assertCents(cents) / 100);
+    return `${amount} €`;
+  }
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "EUR",
@@ -29,6 +33,10 @@ export function formatMoney(cents: number, locale: string): string {
 
 export function formatSignedMoney(cents: number, locale: string): string {
   if (!Number.isSafeInteger(cents)) throw new RangeError("A signed monetary amount must be an integer in cents.");
+  if (locale === "en-GB") {
+    const amount = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(cents) / 100);
+    return `${cents < 0 ? "−" : ""}${amount} €`;
+  }
   return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(cents / 100);
 }
 

@@ -105,6 +105,8 @@ describe("administrator mailbox", () => {
           select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "22222222-2222-4222-8222-222222222222", direction: "inbound", sender_address: "client@example.com", subject: "Question", admin_mail_attachments: [{ storage_path: "22222222/message.pdf" }] }, error: null }) }) }),
           delete: () => ({ eq: deleteEq }),
         };
+        if (table === "admin_mail_labels") return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) };
+        if (table === "professional_applications") return { select: async () => ({ data: [], error: null }) };
         if (table === "audit_log") return { insert: auditInsert };
         throw new Error(`Unexpected table: ${table}`);
       }),

@@ -1623,12 +1623,12 @@ function ProductExtractionGuideEditor() {
       <div>
         <p className="eyebrow">Français</p>
         <h3>Notre recette d'extraction pour filtre/v60</h3>
-        <a className="text-link" href="/blog/recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france" target="_blank" rel="noreferrer">Lire le guide →</a>
+        <a className="text-link" href="/blog/recette-d-extraction-pour-v60" target="_blank" rel="noreferrer">Lire le guide →</a>
       </div>
       <div>
         <p className="eyebrow">English</p>
         <h3>Our filter/V60 brewing recipe</h3>
-        <a className="text-link" href="/en/blog/recette-d-extraction-pour-v60-zen-coffee-lab-torrefacteur-de-cafes-de-specialite-en-france" target="_blank" rel="noreferrer">Read the guide →</a>
+        <a className="text-link" href="/en/blog/recette-d-extraction-pour-v60" target="_blank" rel="noreferrer">Read the guide →</a>
       </div>
     </div>
   </section>;

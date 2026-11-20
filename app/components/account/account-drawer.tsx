@@ -44,7 +44,7 @@ export function AccountDrawer({
   );
   const [closing, setClosing] = useState(false);
   const [activeSection, setActiveSection] =
-    useState<AccountSectionId>("communication");
+    useState<AccountSectionId>("orders");
   const accountFetcher = useFetcher<AccountDrawerResponse>({
     key: "account-drawer-data",
   });

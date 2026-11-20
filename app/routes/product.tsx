@@ -12,7 +12,6 @@ import { getAdminProducts, getProducts, getProfessionalCartProducts, hasPurchasa
 import { getFaqItemByFrenchQuestion } from "~/lib/content.server";
 import { getLocale } from "~/lib/i18n";
 import { getRelatedProducts } from "~/lib/product-recommendations";
-import { isProductSoldOut } from "~/lib/product-ribbons";
 import { displayTastingNote } from "~/lib/product-text";
 import { JsonLd, pageMeta, productStructuredData } from "~/lib/seo";
 
@@ -216,11 +215,10 @@ function ProductFreshnessFaq({
 export function ProductGallery({ product, locale }: { product: Product; locale: Locale }) {
   const labelUrl = product.thumbnailLabelUrl;
   const translation = product.translations[locale];
-  const soldOut = isProductSoldOut(product.stockOnHandGrams, product.status);
   return <div className="product-gallery">
     <ProductRibbons product={product} locale={locale} />
     {labelUrl ? <div
-      className={`product-gallery__composed${soldOut ? " product-gallery__composed--sold-out" : ""}`}
+      className="product-gallery__composed"
       style={{ "--product-thumbnail-color": product.thumbnailBackgroundColor } as CSSProperties}
     >
       <ProductPackArtwork
@@ -232,7 +230,7 @@ export function ProductGallery({ product, locale }: { product: Product; locale: 
       />
     </div> : null}
     {product.hoverImageUrl ? <img
-      className={soldOut ? "product-gallery__hover-image product-gallery__image--sold-out" : "product-gallery__hover-image"}
+      className="product-gallery__hover-image"
       src={product.hoverImageUrl}
       alt={translation.name}
       width={900}
@@ -240,7 +238,6 @@ export function ProductGallery({ product, locale }: { product: Product; locale: 
       loading="lazy"
     /> : null}
     {product.media.map((media, index) => <img
-      className={soldOut && !labelUrl && index === 0 ? "product-gallery__image--sold-out" : undefined}
       key={media.id}
       src={media.url}
       alt={media.alt[locale]}
