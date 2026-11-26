@@ -7,6 +7,7 @@ import { env } from "~/lib/env.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { createStripe } from "~/lib/stripe.server";
 import { getLatestShippingQuote } from "~/services/shipping.server";
+import { resolvePromotion } from "~/services/promotions.server";
 
 export const temporaryOrderPrefix = "ZCL-TMP-";
 
@@ -35,7 +36,7 @@ export async function resolveCheckoutOrderNumber(sessionId: string) {
   }
 }
 
-export async function createCheckout(input: { cartId: string; shippingRateId: string; audience: Audience; profileId?: string }) {
+export async function createCheckout(input: { cartId: string; shippingRateId: string; audience: Audience; profileId?: string; promotionCode?: string }) {
   const config = env(); const quote = await getLatestShippingQuote(input.cartId);
   if (!quote || quote.audience !== input.audience) throw new Response("Shipping quote not found.", { status: 404 });
   if (new Date(quote.expiresAt).getTime() <= Date.now()) throw new Response("Shipping quote has expired.", { status: 409 });
@@ -43,6 +44,7 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
   if (!rate) throw new Response("Shipping rate is not part of this quote.", { status: 409 });
   const shippingAddress = rate.deliveryMethod === "pickup" && rate.pickupPoint ? { ...quote.address, pickupPoint: rate.pickupPoint } : quote.address;
   const pricing = professionalVolumePricing(quote.lines, quote.audience === "professional");
+  const promotion = await resolvePromotion(input.promotionCode, pricing.subtotalCents);
   if (config.PAYMENTS_MOCK) {
     const order = `ZCL-DEMO-${randomUUID().slice(0, 8).toUpperCase()}`;
     return { ok: true, confirmationUrl: `${config.VITE_SITE_URL}${quote.locale === "en-GB" ? "/en/order/confirmation" : "/commande/confirmation"}?order=${encodeURIComponent(order)}` };
@@ -51,14 +53,16 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
   const supabase = createServiceSupabase(); if (!supabase) throw new Error("Supabase service access is required for checkout.");
   const { data: order, error } = await supabase.rpc("create_checkout_order", { p_cart_id: quote.cartId, p_quote_id: quote.id, p_audience: quote.audience, p_locale: quote.locale, p_address: shippingAddress, p_lines: quote.lines, p_shipping_rate: rate, p_reservation_minutes: 30, p_profile_id: input.profileId ?? null });
   if (error || !order) throw new Response(error?.message ?? "Unable to reserve stock.", { status: 409 });
+  const { error: promotionError } = await supabase.from("orders").update({ promotion_code: promotion.code, promotion_discount_cents: promotion.discountCents, subtotal_cents: pricing.subtotalCents - promotion.discountCents, total_cents: pricing.subtotalCents - promotion.discountCents + rate.amountCents }).eq("id", order.id);
+  if (promotionError) { await supabase.rpc("release_order_reservation", { p_order_id: order.id, p_reason: "promotion_update_failed" }); throw promotionError; }
   const stripe = createStripe(config.STRIPE_SECRET_KEY);
   try {
-    let remainingDiscount = pricing.discountCents;
+    let remainingDiscount = pricing.discountCents + promotion.discountCents;
     const coffeeLineItems = quote.lines.map((line, index) => {
       const lineTotal = line.unitPriceCents * line.quantity;
       const lineDiscount = index === quote.lines.length - 1
         ? remainingDiscount
-        : Math.min(remainingDiscount, Math.round(pricing.discountCents * lineTotal / pricing.subtotalBeforeDiscountCents));
+        : Math.min(remainingDiscount, Math.round((pricing.discountCents + promotion.discountCents) * lineTotal / pricing.subtotalBeforeDiscountCents));
       remainingDiscount -= lineDiscount;
       return {
         quantity: 1,
@@ -92,7 +96,7 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
       console.error("stripe_paypal_unavailable_fallback_to_card", { message: cause instanceof Error ? cause.message : String(cause) });
       session = await stripe.checkout.sessions.create({ ...sessionParams, payment_method_types: ["card"] });
     }
-    const { error: paymentError } = await supabase.from("payments").insert({ order_id: order.id, provider: "stripe", provider_checkout_id: session.id, status: "pending", amount_cents: pricing.subtotalCents + rate.amountCents });
+    const { error: paymentError } = await supabase.from("payments").insert({ order_id: order.id, provider: "stripe", provider_checkout_id: session.id, status: "pending", amount_cents: pricing.subtotalCents - promotion.discountCents + rate.amountCents });
     if (paymentError) { await stripe.checkout.sessions.expire(session.id); throw paymentError; }
     if (!session.url) throw new Error("Stripe did not return a checkout URL.");
     return { ok: true, checkoutUrl: session.url };

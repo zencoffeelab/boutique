@@ -198,7 +198,7 @@ export default function Checkout() {
     try {
       const response = await fetch("/api/checkout/payment-intent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(formRef.current), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, onSitePickup: deliveryMethod === "on_site_pickup", shippingRateId: selectedRate, acceptTerms: true, createAccount: !account && createAccount, accountPassword: !account && createAccount ? String(new FormData(formRef.current).get("accountPassword") ?? "") : undefined }),
+        body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(formRef.current), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, onSitePickup: deliveryMethod === "on_site_pickup", shippingRateId: selectedRate, acceptTerms: true, promotionCode: String(new FormData(formRef.current).get("promotionCode") ?? ""), createAccount: !account && createAccount, accountPassword: !account && createAccount ? String(new FormData(formRef.current).get("accountPassword") ?? "") : undefined }),
       });
       const data = await response.json() as CheckoutResponse;
       if (!response.ok || !data.ok) throw new Error(data.message || "Checkout unavailable");
@@ -213,7 +213,8 @@ export default function Checkout() {
   return <>
     <header className="page-hero"><p className="eyebrow">{english ? "Secure checkout" : "Commande sécurisée"}</p><h1>{english ? "Delivery & payment" : "Livraison & paiement"}</h1></header>
     <div className="checkout-layout">
-      <form ref={formRef} onSubmit={requestQuote}>
+      <div className="checkout-promotion field"><label htmlFor="promotionCode">{english ? "Promotion code" : "Code de réduction"}</label><input id="promotionCode" name="promotionCode" form="checkout-form" autoComplete="off" placeholder={english ? "Enter your code" : "Saisissez votre code"} /></div>
+      <form id="checkout-form" ref={formRef} onSubmit={requestQuote}>
         <section className="checkout-section" onChange={invalidateQuote}>
           <h2>1. {english ? "Contact" : "Coordonnées"}</h2>
           <div className="form-grid">

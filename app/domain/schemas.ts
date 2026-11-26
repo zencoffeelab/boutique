@@ -45,6 +45,7 @@ export const checkoutSchema = shippingQuoteSchema.extend({
   acceptTerms: z.literal(true),
   createAccount: z.boolean().optional().default(false),
   accountPassword: z.string().max(200).optional(),
+  promotionCode: z.string().trim().max(40).optional().default(""),
 }).superRefine((value, context) => {
   if (value.createAccount && (!value.accountPassword || value.accountPassword.length < 10)) {
     context.addIssue({ code: "custom", path: ["accountPassword"], message: "Use at least 10 characters." });

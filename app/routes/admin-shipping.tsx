@@ -8,6 +8,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 import { DEFAULT_SHIPPING_TARIFFS, type ConfiguredShippingService, type ShippingTariffs, type ShippingZone } from "~/domain/shipping-zones";
 import { getFreeShippingThresholds, getOnSitePickupSettings, getShippingTariffs, saveFreeShippingThresholds, saveOnSitePickupSettings, saveShippingTariffs } from "~/services/site-settings.server";
+import { normalizePromotionCode, type PromotionCode } from "~/services/promotions.server";
 
 type PackagingPresetRow = {
   id: string;
@@ -35,6 +36,8 @@ const presetSchema = z.object({
 const deletePresetSchema = z.object({ intent: z.literal("delete_preset"), id: z.uuid() });
 const thresholdsSchema = z.object({ intent: z.literal("save_thresholds"), france: z.coerce.number().finite().nonnegative().max(100_000), europe: z.coerce.number().finite().nonnegative().max(100_000) });
 const onSitePickupSchema = z.object({ intent: z.literal("save_on_site_pickup"), labelFr: z.string().trim().min(2).max(100), labelEn: z.string().trim().min(2).max(100), price: z.coerce.number().finite().nonnegative().max(100_000) });
+const promotionSchema = z.object({ intent: z.literal("create_promotion"), code: z.string().trim().min(3).max(40), discountType: z.enum(["percent", "fixed"]), value: z.coerce.number().positive().max(100_000) });
+const deletePromotionSchema = z.object({ intent: z.literal("delete_promotion"), id: z.uuid() });
 
 const shippingZoneRows: Array<{ zone: ShippingZone; countries: string; services: Array<{ id: ConfiguredShippingService; label: string }> }> = [
   { zone: 1, countries: "France", services: [{ id: "mondial_relay", label: "Mondial Relay" }, { id: "fedex", label: "FedEx" }] },
@@ -69,12 +72,14 @@ export function canDeletePackagingPreset(presetActive: boolean, activePresetCoun
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const admin = await requireAdmin(request);
-  if (admin.demo) return { demo: true, presets: [] as PackagingPresetRow[], thresholds: await getFreeShippingThresholds(), tariffs: DEFAULT_SHIPPING_TARIFFS, onSitePickup: await getOnSitePickupSettings() };
+  if (admin.demo) return { demo: true, presets: [] as PackagingPresetRow[], promotions: [] as PromotionCode[], thresholds: await getFreeShippingThresholds(), tariffs: DEFAULT_SHIPPING_TARIFFS, onSitePickup: await getOnSitePickupSettings() };
   const client = createServiceSupabase();
   if (!client) throw new Response("Database unavailable.", { status: 503 });
   const { data, error } = await client.from("packaging_presets").select("*").order("max_net_weight_grams");
   if (error) throw new Response(error.message, { status: 500 });
-  return { demo: false, presets: (data ?? []) as PackagingPresetRow[], thresholds: await getFreeShippingThresholds(), tariffs: await getShippingTariffs(), onSitePickup: await getOnSitePickupSettings() };
+  const { data: promotions, error: promotionError } = await client.from("promotion_codes").select("*").order("created_at", { ascending: false });
+  if (promotionError) throw new Response(promotionError.message, { status: 500 });
+  return { demo: false, presets: (data ?? []) as PackagingPresetRow[], promotions: (promotions ?? []) as PromotionCode[], thresholds: await getFreeShippingThresholds(), tariffs: await getShippingTariffs(), onSitePickup: await getOnSitePickupSettings() };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -83,6 +88,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const form = Object.fromEntries(await request.formData());
   const client = createServiceSupabase();
   if (!client) return { ok: false, message: "Base indisponible." };
+  if (form.intent === "create_promotion") { const parsed = promotionSchema.safeParse(form); if (!parsed.success) return { ok: false, message: "Code ou réduction invalide." }; const code = normalizePromotionCode(parsed.data.code); const value = parsed.data.discountType === "percent" ? Math.round(parsed.data.value) : Math.round(parsed.data.value * 100); if (!code || (parsed.data.discountType === "percent" && value > 100)) return { ok: false, message: "Code ou réduction invalide." }; const { error } = await client.from("promotion_codes").insert({ code, discount_type: parsed.data.discountType, discount_value: value }); return error ? { ok: false, message: error.message } : { ok: true, message: "Code ajouté." }; }
+  if (form.intent === "delete_promotion") { const parsed = deletePromotionSchema.safeParse(form); if (!parsed.success) return { ok: false, message: "Code invalide." }; const { error } = await client.from("promotion_codes").delete().eq("id", parsed.data.id); return error ? { ok: false, message: error.message } : { ok: true, message: "Code supprimé." }; }
 
   if (form.intent === "save_thresholds") {
     const parsed = thresholdsSchema.safeParse(form);
@@ -189,7 +196,7 @@ export function ShippingHelp({ presets, thresholds }: { presets: PackagingPreset
 }
 
 export default function AdminShipping() {
-  const { demo, presets, thresholds, tariffs, onSitePickup } = useLoaderData<typeof loader>();
+  const { demo, presets, promotions, thresholds, tariffs, onSitePickup } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const activePresetCount = presets.filter((preset) => preset.active).length;
   return <AdminShell active="shipping">
@@ -197,6 +204,7 @@ export default function AdminShipping() {
     {demo ? <p className="admin-notice">Connectez Supabase pour modifier les emballages.</p> : null}
     {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
     <section className="ui-card admin-editor"><h2>Seuils de livraison gratuite</h2><p>Modifiez les montants à partir desquels la livraison la moins chère devient gratuite.</p><Form method="post" className="form-grid"><input type="hidden" name="intent" value="save_thresholds" /><div className="field"><label>France (€)<input name="france" type="number" min="0" max="100000" step="0.01" defaultValue={(thresholds.fr / 100).toFixed(2)} required /></label></div><div className="field"><label>Europe et Royaume-Uni (€)<input name="europe" type="number" min="0" max="100000" step="0.01" defaultValue={(thresholds.euUk / 100).toFixed(2)} required /></label></div><div><button className="ui-button ui-button--default" type="submit" disabled={demo}>Enregistrer les seuils</button></div></Form></section>
+    <section className="ui-card admin-editor"><h2>Codes de réduction</h2><p>Ajoutez les codes valables à la commande. Une suppression les rend immédiatement invalides.</p><Form method="post" className="form-grid"><input type="hidden" name="intent" value="create_promotion" /><div className="field"><label>Code<input name="code" placeholder="BIENVENUE10" required /></label></div><div className="field"><label>Type<select name="discountType"><option value="percent">Pourcentage</option><option value="fixed">Montant (€)</option></select></label></div><div className="field"><label>Réduction<input name="value" type="number" min="0.01" step="0.01" required /></label></div><div><button className="ui-button ui-button--default" type="submit" disabled={demo}>Ajouter</button></div></Form>{promotions.map((promotion) => <div className="admin-inline-actions" key={promotion.id}><strong>{promotion.code}</strong><span>{promotion.discount_type === "percent" ? `${promotion.discount_value} %` : `${(promotion.discount_value / 100).toFixed(2)} €`}</span><Form method="post"><input type="hidden" name="intent" value="delete_promotion" /><input type="hidden" name="id" value={promotion.id} /><button className="ui-button ui-button--danger ui-button--sm" type="submit" disabled={demo}>Supprimer</button></Form></div>)}</section>
     <section className="ui-card admin-editor"><h2>Retrait sur place</h2><p>Cette option apparaît à la commande en France. Modifiez son libellé et le prix facturé au client.</p><Form method="post" className="form-grid"><input type="hidden" name="intent" value="save_on_site_pickup" /><div className="field"><label>Libellé français<input name="labelFr" defaultValue={onSitePickup.labelFr} required /></label></div><div className="field"><label>Libellé anglais<input name="labelEn" defaultValue={onSitePickup.labelEn} required /></label></div><div className="field"><label>Prix (€)<input name="price" type="number" min="0" max="100000" step="0.01" defaultValue={(onSitePickup.amountCents / 100).toFixed(2)} required /></label></div><div><button className="ui-button ui-button--default" type="submit" disabled={demo}>Enregistrer le retrait sur place</button></div></Form></section>
     <ShippingTariffGrid tariffs={tariffs} demo={demo} />
     <section className="admin-content-list" aria-label="Emballages">{presets.map((preset) => {

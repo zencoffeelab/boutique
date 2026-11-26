@@ -4784,6 +4784,9 @@ body.advice-detail-overflow-hidden {
   border: 1px solid var(--line);
   background: var(--paper);
 }
+.checkout-layout > form { grid-row: span 2; }
+.checkout-promotion { grid-column: 2; margin-bottom: -1.2rem; }
+.checkout-promotion input { text-transform: uppercase; }
 .summary-card h2 {
   margin-bottom: 1.25rem;
   font-size: clamp(1.75rem, 3vw, 2.4rem);
@@ -4810,7 +4813,14 @@ body.advice-detail-overflow-hidden {
   text-align: center;
 }
 .archives-empty-space {
-  padding: 4rem 1rem;
+  max-width: 25rem;
+  margin: 4rem auto;
+  padding: 2rem 1.5rem;
+  border: 1px solid var(--line);
+  text-align: center;
+}
+.archives-empty-space h2 {
+  font-size: clamp(1.3rem, 2vw, 1.6rem);
 }
 .order-confirmation__details {
   display: grid;
