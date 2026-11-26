@@ -635,7 +635,9 @@ export async function resolveCartLines(
       hsCode: variant.hsCode,
       customsOriginCountry: variant.customsOriginCountry,
       availableStock,
-      imageUrl: product.media[0]?.url ?? "",
+      // Stripe displays one image per line. Prefer the label used to build the
+      // coffee-pack visual over the first gallery asset, which can be a diagram.
+      imageUrl: product.thumbnailLabelUrl ?? product.media[0]?.url ?? "",
     };
   });
 }

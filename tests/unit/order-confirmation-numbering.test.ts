@@ -26,7 +26,7 @@ describe("order confirmation numbering", () => {
 
     const result = await loader({ request: new Request("https://www.zencoffeelab.com/commande/confirmation?order=ZCL-TMP-ABC&session_id=cs_live_123"), params: {}, context: {} } as never);
 
-    expect(result).toMatchObject({ order: null, paymentConfirmed: true, orderNumberPending: true });
+    expect(result).toMatchObject({ order: null, paymentConfirmed: false, orderNumberPending: true });
   });
 
   it("keeps demo and legacy confirmation links compatible", async () => {

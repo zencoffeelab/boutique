@@ -12,7 +12,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const legacyOrder = url.searchParams.get("order");
   const fallbackOrder = legacyOrder && !isTemporaryOrderNumber(legacyOrder) ? legacyOrder : null;
   const order = sessionId ? (await resolveCheckoutOrderNumber(sessionId)) ?? fallbackOrder : fallbackOrder;
-  return { locale: getLocale(request), order, paymentConfirmed: Boolean(sessionId || order), orderNumberPending: Boolean(sessionId && !order) };
+  return { locale: getLocale(request), order, paymentConfirmed: Boolean(order), orderNumberPending: Boolean(sessionId && !order) };
 }
 export const meta: MetaFunction = () => [{ title: "Commande confirmée — Zen Coffee Lab" }, { name: "robots", content: "noindex" }];
 export default function Confirmation() {

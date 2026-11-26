@@ -68,7 +68,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const search = url.searchParams.get("q")?.trim() ?? "";
   const status = url.searchParams.get("status") ?? "";
   const requestedView = url.searchParams.get("view");
-  const view = requestedView === "archived" || requestedView === "preparing" || requestedView === "to_ship" ? requestedView : "active";
+  const view = requestedView === "archived" || requestedView === "cancelled" || requestedView === "preparing" || requestedView === "to_ship" ? requestedView : "active";
   const pageSize = 50;
   const page = view === "archived" ? Math.max(0, Math.min(Number(url.searchParams.get("page") ?? 0) || 0, 100_000)) : 0;
   if (admin.demo) return { demo: true, orders: [], search, status, view, pagination: { page, pageSize, total: 0, hasNext: false, hasPrevious: page > 0 }, cartStats: { unvalidated: 0, total: 0 } };
@@ -87,9 +87,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     .limit(view === "archived" ? 0 : 100);
   if (view !== "archived") {
     query = query.is("archived_at", null).neq("status", "pending_payment");
-    if (view === "active") query = query.not("status", "in", "(preparing,ready_to_ship)");
+    if (view === "active") query = query.not("status", "in", "(preparing,ready_to_ship,canceled,partially_refunded,refunded)");
     if (view === "preparing") query = query.eq("status", "preparing");
     if (view === "to_ship") query = query.eq("status", "ready_to_ship");
+    if (view === "cancelled") query = query.in("status", ["canceled", "partially_refunded", "refunded"]);
   }
   const safeSearch = search.replace(/[^\p{L}\p{N}@._+\- ]/gu, "").slice(0, 120);
   if (view === "archived") query = query.not("archived_at", "is", null);
@@ -586,7 +587,7 @@ export default function AdminOrders() {
       <header className="admin-heading">
         <div>
           <p className="eyebrow">Commerce</p>
-          <h1>{view === "archived" ? "Commandes archivées" : view === "preparing" ? "Commandes en préparation" : view === "to_ship" ? "Commandes à expédier" : "Commandes"}</h1>
+          <h1>{view === "archived" ? "Commandes archivées" : view === "cancelled" ? "Commandes annulées" : view === "preparing" ? "Commandes en préparation" : view === "to_ship" ? "Commandes à expédier" : "Commandes"}</h1>
           <p className="admin-order-cart-indicator" aria-live="polite"><strong>{cartStats.unvalidated}/{cartStats.total}</strong><span>paniers non validés / commandes validées + paniers non validés</span></p>
         </div>
         <a className="ui-button ui-button--outline" href="/admin/commandes.csv">
@@ -607,6 +608,7 @@ export default function AdminOrders() {
         <a className={view === "active" ? "is-active" : ""} href="/admin/commandes">Actives</a>
         <a className={view === "preparing" ? "is-active" : ""} href="/admin/commandes?view=preparing">En préparation</a>
         <a className={view === "to_ship" ? "is-active" : ""} href="/admin/commandes?view=to_ship">À expédier</a>
+        <a className={view === "cancelled" ? "is-active" : ""} href="/admin/commandes?view=cancelled">Annulées</a>
         <a className={view === "archived" ? "is-active" : ""} href="/admin/commandes?view=archived">Archivées</a>
       </nav>
       {orders.length > 0 ? (
@@ -615,7 +617,7 @@ export default function AdminOrders() {
             <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllOrders} />
             {allVisibleSelected ? "Tout désélectionner" : "Tout sélectionner"}
           </label>
-          <Form id="bulk-archive-form" method="post" onSubmit={(event) => {
+          {view !== "cancelled" ? <Form id="bulk-archive-form" method="post" onSubmit={(event) => {
             const actionLabel = view === "archived" ? "Désarchiver" : "Archiver";
             if (!selectedOrderIds.length || !window.confirm(`${actionLabel} ${selectedOrderIds.length} commande${selectedOrderIds.length > 1 ? "s" : ""} ?`)) event.preventDefault();
           }}>
@@ -623,7 +625,7 @@ export default function AdminOrders() {
             <button className="ui-button ui-button--outline ui-button--sm" type="submit" disabled={!selectedOrderIds.length}>
               {view === "archived" ? <><ArchiveRestore aria-hidden="true" /> Désarchiver la sélection</> : <><Archive aria-hidden="true" /> Archiver la sélection</>} ({selectedOrderIds.length})
             </button>
-          </Form>
+          </Form> : null}
           {view === "active" ? (
             <Form method="post" onSubmit={(event) => {
               if (!selectedOrderIds.length || !window.confirm("Calculer les quantités sélectionnées et passer ces commandes en préparation ?")) event.preventDefault();
@@ -660,7 +662,7 @@ export default function AdminOrders() {
         </div>
       ) : null}
       <Form className="admin-filter" method="get">
-        {view === "archived" ? <input type="hidden" name="view" value="archived" /> : null}
+        {view !== "active" ? <input type="hidden" name="view" value={view} /> : null}
         <label>
           <span className="sr-only">Rechercher</span>
           <input name="q" defaultValue={search} placeholder="N° ou e-mail" />
@@ -697,7 +699,7 @@ export default function AdminOrders() {
                 </span>
                 <OrderStatusBadge status={order.status as OrderStatus} />
                 <strong>{formatMoney(order.total_cents, "fr-FR")}</strong>
-                {view !== "archived" ? (
+                {view !== "archived" && view !== "cancelled" ? (
                   <Form method="post" onClick={(event) => event.stopPropagation()} onSubmit={(event) => {
                     if (!window.confirm("Archiver cette commande ? Elle restera consultable dans Archivées.")) event.preventDefault();
                   }}>

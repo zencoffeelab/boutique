@@ -143,6 +143,8 @@ export type CartLine = Readonly<{
     variantLabel: string;
     unitPriceCents: number;
     imageUrl: string;
+    thumbnailLabelUrl?: string | null;
+    thumbnailBackgroundColor?: string;
   }>;
 }>;
 

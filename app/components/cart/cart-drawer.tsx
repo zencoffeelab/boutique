@@ -115,6 +115,8 @@ export function CartDrawer({ open, locale, onClose }: { open: boolean; locale: L
     unitPriceCents: line.preview.unitPriceCents,
     availableStock: Number.POSITIVE_INFINITY,
     imageUrl: line.preview.imageUrl,
+    thumbnailLabelUrl: line.preview.thumbnailLabelUrl,
+    thumbnailBackgroundColor: line.preview.thumbnailBackgroundColor,
   }] : []);
   const previewLinesByKey = new Map(cachedPreviewLines.map((line) => [lineKey(line), line]));
   for (const line of preview.lines ?? []) previewLinesByKey.set(lineKey(line), line);

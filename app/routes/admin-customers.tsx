@@ -1,6 +1,7 @@
-import { BadgeCheck, CircleDollarSign, Search, ShoppingBag, UserRound, Users } from "lucide-react";
-import type { LoaderFunctionArgs, MetaFunction } from "react-router";
-import { Form, Link, useLoaderData } from "react-router";
+import { BadgeCheck, CircleDollarSign, Search, ShoppingBag, Trash2, UserRound, Users } from "lucide-react";
+import { z } from "zod";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
+import { Form, Link, useActionData, useLoaderData } from "react-router";
 import { AdminMemberRoleForm } from "~/components/admin-member-role-form";
 import { AdminShell } from "~/components/admin-shell";
 import { Badge } from "~/components/ui/badge";
@@ -39,6 +40,7 @@ type CustomerOrder = {
 };
 
 const CUSTOMER_DATE_FORMATTER = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" });
+const deleteCustomerSchema = z.object({ intent: z.literal("delete_customer"), customerId: z.uuid() });
 
 function normalizeEmail(value: string | undefined | null) {
   return value?.trim().toLocaleLowerCase("fr-FR") ?? "";
@@ -93,6 +95,47 @@ export function buildRetailCustomers(profiles: CustomerProfile[], users: Custome
       location: [latestAddress?.city, latestAddress?.countryCode].filter((value): value is string => typeof value === "string" && Boolean(value)).join(" · "),
     }];
   }).toSorted((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  const admin = await requireAdmin(request);
+  if (admin.demo) return { ok: false, message: "Les suppressions sont désactivées en mode démonstration." };
+  const parsed = deleteCustomerSchema.safeParse(Object.fromEntries(await request.formData()));
+  if (!parsed.success) return { ok: false, message: "Compte client invalide." };
+  if (parsed.data.customerId === admin.id) return { ok: false, message: "Vous ne pouvez pas supprimer votre propre compte." };
+
+  const client = createServiceSupabase();
+  if (!client) return { ok: false, message: "Base de données indisponible." };
+  const { data: profile, error: profileError } = await client.from("profiles").select("id,role,professional_status").eq("id", parsed.data.customerId).maybeSingle();
+  if (profileError) return { ok: false, message: profileError.message };
+  if (!profile) return { ok: false, message: "Compte client introuvable." };
+  if (profile.role === "admin" || profile.professional_status) return { ok: false, message: "Ce compte ne peut pas être supprimé depuis Clients." };
+
+  const { data: authUser, error: authUserError } = await client.auth.admin.getUserById(profile.id);
+  if (authUserError) return { ok: false, message: authUserError.message };
+  const email = authUser.user?.email;
+  if (!email) return { ok: false, message: "Aucune adresse e-mail n’est associée à ce compte." };
+
+  const referenceUpdates = await Promise.all([
+    client.from("orders").update({ profile_id: null }).eq("profile_id", profile.id),
+    client.from("stock_movements").update({ actor_id: null }).eq("actor_id", profile.id),
+    client.from("audit_log").update({ actor_id: null }).eq("actor_id", profile.id),
+    client.from("professional_applications").delete().eq("invited_user_id", profile.id),
+    client.from("professional_applications").delete().eq("email", email),
+  ]);
+  const referenceError = referenceUpdates.find((result) => result.error)?.error;
+  if (referenceError) return { ok: false, message: referenceError.message };
+
+  const { error: deleteError } = await client.auth.admin.deleteUser(profile.id, false);
+  if (deleteError) return { ok: false, message: deleteError.message };
+  await client.from("audit_log").insert({
+    actor_id: admin.id,
+    action: "customer.deleted",
+    entity_type: "profile",
+    entity_id: profile.id,
+    before_data: { email },
+  });
+  return { ok: true, message: "Le compte client a été supprimé. Cette adresse e-mail peut de nouveau être utilisée pour créer un compte." };
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -153,9 +196,11 @@ function formatDate(value: string | null) {
 
 export default function AdminCustomers() {
   const { demo, adminId, query, status, summary, customers } = useLoaderData<typeof loader>();
+  const result = useActionData<typeof action>();
   return <AdminShell active="customers">
     <header className="admin-heading"><div><p className="eyebrow">Comptes & fidélité</p><h1>Clients</h1><p className="admin-heading__description">Comptes particuliers créés depuis une commande ou depuis la page Mon compte.</p></div><Link className="ui-button ui-button--outline ui-button--sm" to="/mon-compte">Voir Mon compte</Link></header>
     {demo ? <p className="admin-notice">Connectez Supabase pour consulter les comptes clients.</p> : null}
+    {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
     <section className="stats-grid" aria-label="Indicateurs clients">
       <Card><CardContent><Users aria-hidden="true" /><p className="stat-label">Comptes clients</p><p className="stat-value">{summary.customers}</p></CardContent></Card>
       <Card><CardContent><BadgeCheck aria-hidden="true" /><p className="stat-label">E-mails confirmés</p><p className="stat-value">{summary.confirmed}</p></CardContent></Card>
@@ -175,7 +220,7 @@ export default function AdminCustomers() {
         <TableCell><Badge className={customer.emailConfirmed ? "admin-pro-status admin-pro-status--approved" : "admin-customer-status--pending"}>{customer.emailConfirmed ? "Confirmé" : "À confirmer"}</Badge>{customer.role === "admin" ? <><br /><Badge className="admin-member-role-badge">Administrateur</Badge></> : null}<br /><small>Inscription : {customer.signupSource}<br />{formatDate(customer.createdAt)}</small></TableCell>
         <TableCell><strong>{customer.orderCount}</strong><br /><small>{formatMoney(customer.totalSpentCents, "fr-FR")}</small></TableCell>
         <TableCell>Commande : {formatDate(customer.lastOrderAt)}<br /><small>Connexion : {formatDate(customer.lastSignInAt)}</small></TableCell>
-        <TableCell><div className="admin-customer-actions"><AdminMemberRoleForm memberId={customer.id} role={customer.role} currentAdminId={adminId} memberLabel={[customer.firstName, customer.lastName].filter(Boolean).join(" ") || customer.email} /><Link className="text-link" to={`/admin/commandes?q=${encodeURIComponent(customer.email)}`}><ShoppingBag aria-hidden="true" /> Voir les commandes</Link><a className="text-link" href={`mailto:${customer.email}`}><UserRound aria-hidden="true" /> Contacter</a></div></TableCell>
+        <TableCell><div className="admin-customer-actions"><AdminMemberRoleForm memberId={customer.id} role={customer.role} currentAdminId={adminId} memberLabel={[customer.firstName, customer.lastName].filter(Boolean).join(" ") || customer.email} /><Link className="text-link" to={`/admin/commandes?q=${encodeURIComponent(customer.email)}`}><ShoppingBag aria-hidden="true" /> Voir les commandes</Link><a className="text-link" href={`mailto:${customer.email}`}><UserRound aria-hidden="true" /> Contacter</a>{customer.role !== "admin" && customer.id !== adminId ? <Form method="post" onSubmit={(event) => { if (!window.confirm(`Supprimer définitivement le compte de ${customer.email} ? Le client pourra se réinscrire avec cette même adresse e-mail.`)) event.preventDefault(); }}><input type="hidden" name="intent" value="delete_customer" /><input type="hidden" name="customerId" value={customer.id} /><button className="ui-button ui-button--danger ui-button--sm" type="submit"><Trash2 aria-hidden="true" /> Supprimer le compte</button></Form> : null}</div></TableCell>
       </TableRow>)}</TableBody></Table>{customers.length ? null : <p className="admin-empty-state">Aucun client ne correspond aux filtres.</p>}</CardContent>
     </Card>
   </AdminShell>;

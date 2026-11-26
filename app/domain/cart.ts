@@ -12,6 +12,8 @@ export function buildProductCartLine({ product, variant, offer, audience, quanti
       variantLabel: variant.label,
       unitPriceCents: offer.price.amount,
       imageUrl: product.media[0]?.url ?? "",
+      thumbnailLabelUrl: product.thumbnailLabelUrl,
+      thumbnailBackgroundColor: product.thumbnailBackgroundColor,
     },
   };
 }
