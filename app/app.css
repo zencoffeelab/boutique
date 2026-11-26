@@ -4784,9 +4784,9 @@ body.advice-detail-overflow-hidden {
   border: 1px solid var(--line);
   background: var(--paper);
 }
-.checkout-layout > form { grid-row: span 2; }
-.checkout-promotion { grid-column: 2; margin-bottom: -1.2rem; }
-.checkout-promotion input { text-transform: uppercase; }
+.checkout-layout > .checkout-promotion { display: none; }
+.summary-card .checkout-promotion { display: grid; gap: 0.4rem; margin: 1.15rem 0; padding: 1rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.summary-card .checkout-promotion input { text-transform: uppercase; }
 .summary-card h2 {
   margin-bottom: 1.25rem;
   font-size: clamp(1.75rem, 3vw, 2.4rem);
