@@ -78,7 +78,7 @@ export default function Home() {
             <p className="eyebrow">{english ? "Micro-roastery" : "micro-torréfacteur"} · Tours</p>
             <h1>{english ? <>A roast tailored to the <em>origin.</em></> : <>Une torréfaction pensée pour l’<em>origine.</em></>}</h1>
             <div className="hero__actions">
-              <Link className="button hero__button hero__button--primary" to={english ? "/en/shop" : "/boutique"}>{english ? "Shop our coffees" : "Découvrir les cafés"}<ArrowRight aria-hidden="true" /></Link>
+              <Link className="button hero__button hero__button--secondary" to={english ? "/en/shop" : "/boutique"}>{english ? "Shop our coffees" : "Découvrir les cafés"}<ArrowRight aria-hidden="true" /></Link>
               <Link className="button hero__button hero__button--secondary" to={english ? "/en/about-us" : "/a-propos"}>{english ? "Our approach" : "Notre approche"}<ArrowRight aria-hidden="true" /></Link>
             </div>
           </div>

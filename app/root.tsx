@@ -115,7 +115,7 @@ export function shouldRevalidate({ formData, formMethod, defaultShouldRevalidate
 }) {
   // Saving a product does not alter the administration shell. Skipping this
   // revalidation avoids repeating its authentication and catalogue requests.
-  if (formMethod === "POST" && formData?.get("intent") === "save_product") return false;
+  if (formMethod === "POST" && ["save_product", "update_variants"].includes(String(formData?.get("intent")))) return false;
   return defaultShouldRevalidate;
 }
 

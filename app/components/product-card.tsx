@@ -24,13 +24,12 @@ function ProductCardQuickAdd({ product, locale, audience }: { product: Product; 
     return Boolean(offer) && variant.stockOnHand - variant.stockReserved >= offer!.minimumQuantity;
   });
   const [menuOpen, setMenuOpen] = useState(false);
-  const { addItem, hydrated, openDrawer } = useCart();
+  const { addItem, hydrated } = useCart();
   const add = (variant: Product["variants"][number]) => {
     const offer = variant.offers.find((candidate) => candidate.audience === audience && candidate.active);
     if (!offer || variant.stockOnHand - variant.stockReserved < offer.minimumQuantity) return;
     addItem(buildProductCartLine({ product, variant, offer, audience, quantity: offer.minimumQuantity }));
     setMenuOpen(false);
-    openDrawer();
   };
   const toggleMenu = () => {
     if (menuOpen) {

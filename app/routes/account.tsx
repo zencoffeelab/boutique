@@ -200,6 +200,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const passwordResetComplete =
     url.searchParams.get("password-reset") === "complete";
   const authError = url.searchParams.get("auth_error");
+  const registering = url.searchParams.get("register") === "1";
   const next = safeInternalPath(url.searchParams.get("next"), accountPath);
   if (!viewer)
     return {
@@ -215,6 +216,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       passwordRecovery,
       passwordResetComplete,
       authError,
+      registering,
       next,
       mfa: null,
     };
@@ -260,6 +262,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         passwordRecovery,
         passwordResetComplete,
         authError,
+        registering,
         next,
         mfa,
       };
@@ -370,6 +373,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     passwordRecovery,
     passwordResetComplete,
     authError,
+    registering,
     next,
     mfa,
   };
@@ -1293,6 +1297,7 @@ export default function Account() {
     passwordRecovery,
     passwordResetComplete,
     authError,
+    registering,
     next,
     mfa,
   } = useLoaderData<typeof loader>();
@@ -1339,10 +1344,34 @@ export default function Account() {
       />
     );
   }
+  const accountPath = english ? "/en/my-account" : "/mon-compte";
+  const loginPath = next === accountPath ? accountPath : `${accountPath}?next=${encodeURIComponent(next)}`;
+  const registrationPath = `${accountPath}?register=1${next === accountPath ? "" : `&next=${encodeURIComponent(next)}`}`;
+  if (registering) {
+    return (
+      <>
+        <header className="page-hero account-welcome-hero">
+          <p className="eyebrow">{english ? "Private space" : "Espace privé"}</p>
+          <h1>{english ? "Create an account" : "Créer un compte"}</h1>
+          <p className="lede">{english ? "Create your account to find your orders, invoices, addresses and tracking." : "Créez votre compte pour retrouver vos commandes, factures, adresses et suivis."}</p>
+        </header>
+        <Form method="post" className="form-card">
+          <input type="hidden" name="next" value={next} />
+          <h2>{english ? "Your details" : "Vos informations"}</h2>
+          {result?.message ? <p className={result.ok ? "form-message" : "form-message form-error"} role="status">{result.message}</p> : null}
+          <div className="form-grid">
+            <div className="field field--wide"><label htmlFor="account-email">Email</label><input id="account-email" name="email" type="email" required autoComplete="email" /></div>
+            <div className="field field--wide"><label htmlFor="account-password">{english ? "Password" : "Mot de passe"}</label><SignInPasswordInput english={english} /></div>
+          </div>
+          <div className="account-login-actions"><button className="button button--dark" name="intent" value="register" type="submit">{english ? "Create an account" : "Créer un compte"}</button></div>
+          <p className="account-login-return"><Link className="button account-login-return__button" to={loginPath}><span>{english ? "Already have an account?" : "Vous avez déjà un compte ?"}</span><span>{english ? "Sign in" : "Se connecter"}</span></Link></p>
+        </Form>
+      </>
+    );
+  }
   return (
     <>
       <header className="page-hero account-welcome-hero">
-        <AccountLanguageSwitch english={english} />
         <p className="eyebrow">{english ? "Private space" : "Espace privé"}</p>
         <h1>{english ? "Your account" : "Votre compte"}</h1>
         <p className="lede">
@@ -1406,15 +1435,14 @@ export default function Account() {
             {english ? "Sign in" : "Se connecter"}
           </button>
           <button
-            className="button button--ghost"
-            name="intent"
-            value="register"
-            type="submit"
+            className="button button--dark"
+            type="button"
+            onClick={() => window.location.assign(registrationPath)}
           >
             {english ? "Create an account" : "Créer un compte"}
           </button>
           <button
-            className="button button--ghost"
+            className="button button--dark"
             formNoValidate
             name="intent"
             value="reset"

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authConfirmationErrorMessage } from "~/routes/auth-confirm";
+import { authConfirmationErrorMessage, isAlreadyProcessedConfirmationLink } from "~/routes/auth-confirm";
 
 describe("authConfirmationErrorMessage", () => {
   it("replaces the PKCE implementation detail with recovery guidance", () => {
@@ -8,5 +8,10 @@ describe("authConfirmationErrorMessage", () => {
 
   it("keeps unrelated authentication errors available to the customer", () => {
     expect(authConfirmationErrorMessage(new Error("Confirmation link has expired."), "/en/my-account")).toBe("Confirmation link has expired.");
+  });
+
+  it("turns an already processed email link into a confirmation message", () => {
+    expect(isAlreadyProcessedConfirmationLink("Email link is invalid or has expired")).toBe(true);
+    expect(authConfirmationErrorMessage("Email link is invalid or has expired", "/mon-compte")).toContain("compte est activé");
   });
 });

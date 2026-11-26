@@ -8,8 +8,18 @@ import { createRequestSupabase, passwordRecoveryCookie } from "~/lib/supabase.se
 
 const otpType = z.enum(["signup", "invite", "magiclink", "recovery", "email_change", "email"]);
 
+export function isAlreadyProcessedConfirmationLink(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /email link is invalid or has expired|token has expired or is invalid|otp_expired/i.test(message);
+}
+
 export function authConfirmationErrorMessage(error: unknown, next: string) {
   const message = error instanceof Error ? error.message : String(error);
+  if (isAlreadyProcessedConfirmationLink(message)) {
+    return next.startsWith("/en/")
+      ? "This confirmation link has already been processed. Your account is ready: you can sign in."
+      : "Ce lien de confirmation a déjà été traité. Votre compte est activé : vous pouvez vous connecter.";
+  }
   if (/PKCE code verifier not found|code verifier|flow_state_(?:not_found|expired)/i.test(message)) {
     return next.startsWith("/en/")
       ? "This confirmation link must be opened in the same browser and on the same device where the request was made. Your email address may already be confirmed: sign in to continue."
@@ -47,6 +57,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export default function AuthConfirmation() {
   const { clientRecovery, next } = useLoaderData<typeof loader>();
   const [message, setMessage] = useState("Validation du lien en cours…");
+  const [alreadyConfirmed, setAlreadyConfirmed] = useState(false);
 
   useEffect(() => {
     if (!clientRecovery) return;
@@ -56,7 +67,8 @@ export default function AuthConfirmation() {
     const errorDescription = hash.get("error_description");
 
     if (errorDescription) {
-      setMessage(errorDescription);
+      setAlreadyConfirmed(isAlreadyProcessedConfirmationLink(errorDescription));
+      setMessage(authConfirmationErrorMessage(errorDescription, next));
       return;
     }
     if (!accessToken || !refreshToken) {
@@ -69,6 +81,7 @@ export default function AuthConfirmation() {
     });
     void supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken }).then(({ error }) => {
       if (error) {
+        setAlreadyConfirmed(isAlreadyProcessedConfirmationLink(error));
         setMessage(authConfirmationErrorMessage(error, next));
         return;
       }
@@ -76,5 +89,5 @@ export default function AuthConfirmation() {
     });
   }, [clientRecovery, next]);
 
-  return <main className="page-shell"><section className="form-card"><p className="eyebrow">Zen Coffee Lab</p><h1>Confirmation</h1><p className="form-message" role="status">{message}</p></section></main>;
+  return <main className="page-shell"><section className="form-card"><p className="eyebrow">Zen Coffee Lab</p><h1>Confirmation</h1><p className="form-message" role="status">{message}</p>{alreadyConfirmed ? <a className="button button--dark" href={next}>{next.startsWith("/en/") ? "Sign in" : "Se connecter"}</a> : null}</section></main>;
 }

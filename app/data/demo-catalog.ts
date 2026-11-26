@@ -187,6 +187,8 @@ export const demoProducts: Product[] = inputs.map((input) => {
     ribbonNew: false,
     ribbonBackSoon: false,
     professionalEnabled: true,
+    showFilterRoastOption: true,
+    showEspressoRoastOption: true,
     stockOnHandGrams: 4800,
     stockReservedGrams: 0,
     lowStockThresholdGrams: 1000,

@@ -5,6 +5,12 @@ import { env } from "./env.server";
 export const passwordRecoveryCookieName = "zcl_password_recovery";
 type PasswordRecoverySession = { access_token: string; refresh_token: string };
 
+const fetchFreshly: typeof fetch = (input, init) => {
+  const request = new Request(input, init);
+  request.headers.set("Cache-Control", "no-cache");
+  return fetch(request, { cache: "no-store" });
+};
+
 function parseCookies(header: string | null): Array<{ name: string; value: string }> {
   if (!header) return [];
   return header.split(";").flatMap((part) => {
@@ -76,6 +82,7 @@ export function createServiceSupabase() {
   if (!config.VITE_SUPABASE_URL || !config.SUPABASE_SERVICE_ROLE_KEY) return null;
   return createClient(config.VITE_SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: fetchFreshly },
   });
 }
 

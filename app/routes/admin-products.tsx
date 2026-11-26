@@ -66,35 +66,16 @@ export async function action({ request }: ActionFunctionArgs) {
   const client = createServiceSupabase();
   if (!client) return { ok: false, message: "Base de données indisponible." };
   const stockRows = productUpdates.filter((update): update is { success: true; data: z.infer<typeof productStockUpdateSchema> } => update.success).map(({ data }) => data);
-  const { data: currentProducts, error: readError } = await client.from("products").select("id,stock_reserved_grams").in("id", stockRows.map((row) => row.productId));
-  if (readError) return { ok: false, message: readError.message };
-  for (const row of stockRows) {
-    const current = currentProducts?.find((product) => product.id === row.productId);
-    if (!current || row.stockOnHandGrams < Number(current.stock_reserved_grams ?? 0)) return { ok: false, message: "Le stock total ne peut pas être inférieur au stock réservé." };
-    const { error } = await client.from("products").update({ stock_on_hand_grams: row.stockOnHandGrams, low_stock_threshold_grams: row.lowStockThresholdGrams, updated_at: new Date().toISOString() }).eq("id", row.productId);
-    if (error) return { ok: false, message: error.message };
-  }
   const variantRows = updates.filter((update): update is { success: true; data: z.infer<typeof variantUpdateSchema> } => update.success).map(({ data }) => data);
-  for (const row of variantRows) {
-    const { error } = await client.from("product_variants").update({ internal_cost_cents: row.internalCostCents, updated_at: new Date().toISOString() }).eq("id", row.variantId);
-    if (error) return { ok: false, message: error.message };
-    const { error: offerError } = await client.from("variant_offers").upsert({
-      variant_id: row.variantId,
-      audience: "retail",
-      price_cents: row.internalCostCents,
-      minimum_quantity: 1,
-      active: true,
-    }, { onConflict: "variant_id,audience" });
-    if (offerError) return { ok: false, message: offerError.message };
-    const { error: professionalOfferError } = await client.from("variant_offers")
-      .update({ price_cents: row.internalCostCents })
-      .eq("variant_id", row.variantId)
-      .eq("audience", "professional");
-    if (professionalOfferError) return { ok: false, message: professionalOfferError.message };
-  }
-  await client.from("audit_log").insert({ actor_id: admin.id, action: "product.stock_updated", entity_type: "products", entity_id: stockRows[0].productId, after_data: { products: stockRows } });
+  // One transactional RPC replaces the former per-product and per-variant
+  // requests, which could exhaust the production Worker concurrency limit.
+  const { error } = await client.rpc("admin_update_catalogue_quickly", {
+    p_actor_id: admin.id,
+    p_products: stockRows,
+    p_variants: variantRows,
+  });
+  if (error) return { ok: false, message: error.message };
   return { ok: true, message: `${stockRows.length} stock${stockRows.length > 1 ? "s" : ""} café et ${variantRows.length} variante${variantRows.length > 1 ? "s" : ""} enregistrés.` };
-
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {

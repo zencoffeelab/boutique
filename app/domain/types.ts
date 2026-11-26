@@ -105,6 +105,8 @@ export type Product = Readonly<{
   ribbonNew: boolean;
   ribbonBackSoon: boolean;
   professionalEnabled: boolean;
+  showFilterRoastOption: boolean;
+  showEspressoRoastOption: boolean;
   thumbnailLabelUrl: string | null;
   thumbnailBackgroundColor: string;
   hoverImageUrl: string | null;

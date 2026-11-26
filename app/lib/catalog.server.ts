@@ -31,6 +31,10 @@ function isMissingRibbonColumnError(error: { code?: string; message?: string } |
   return Boolean(error && (error.code === "42703" || error.code === "PGRST204") && /ribbon_(new|back_soon)/.test(error.message ?? ""));
 }
 
+function isMissingRoastOptionColumnError(error: { code?: string; message?: string } | null | undefined) {
+  return Boolean(error && (error.code === "42703" || error.code === "PGRST204") && /show_(filter|espresso)_roast_option/.test(error.message ?? ""));
+}
+
 function mapDatabaseProduct(row: any): Product {
   const stockOnHandGrams = Number(row.stock_on_hand_grams ?? (row.product_variants ?? []).reduce((total: number, variant: any) => total + Number(variant.stock_on_hand ?? 0) * Number(variant.weight_grams ?? 0), 0));
   const stockReservedGrams = Number(row.stock_reserved_grams ?? (row.product_variants ?? []).reduce((total: number, variant: any) => total + Number(variant.stock_reserved ?? 0) * Number(variant.weight_grams ?? 0), 0));
@@ -64,6 +68,8 @@ function mapDatabaseProduct(row: any): Product {
     ribbonNew: Boolean(row.ribbon_new),
     ribbonBackSoon: Boolean(row.ribbon_back_soon),
     professionalEnabled: row.professional_enabled ?? false,
+    showFilterRoastOption: row.show_filter_roast_option ?? true,
+    showEspressoRoastOption: row.show_espresso_roast_option ?? true,
     thumbnailLabelUrl: row.thumbnail_label_public_url ? publicMediaDeliveryUrl(row.thumbnail_label_public_url) : null,
     thumbnailBackgroundColor: row.thumbnail_background_color ?? "#d9ddd3",
     hoverImageUrl: row.hover_image_public_url ? publicMediaDeliveryUrl(row.hover_image_public_url) : null,
@@ -138,7 +144,7 @@ async function databaseProducts(includeDrafts = false, includeProfessionalPublis
     .from("products")
     .select(
       `
-      id, slug, status, created_at, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+      id, slug, status, created_at, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, show_filter_roast_option, show_espresso_roast_option, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
       thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
       product_translations(*),
       product_media(*),
@@ -149,7 +155,7 @@ async function databaseProducts(includeDrafts = false, includeProfessionalPublis
     .in("status", statuses)
     .order("display_order", { ascending: true })
     .order("created_at", { ascending: false });
-  if (isMissingRibbonColumnError(error)) {
+  if (isMissingRibbonColumnError(error) || isMissingRoastOptionColumnError(error)) {
     const compatibleResult = await client
       .from("products")
       .select(`
@@ -394,7 +400,7 @@ export async function getAdminProductById(productId: string): Promise<Product | 
   const { data, error } = await client
     .from("products")
     .select(`
-      id, slug, status, created_at, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
+      id, slug, status, created_at, display_order, altitude_meters, featured, ribbon_new, ribbon_back_soon, professional_enabled, show_filter_roast_option, show_espresso_roast_option, professional_stock_kg, professional_stock_reserved_kg, stock_on_hand_grams, stock_reserved_grams, low_stock_threshold_grams,
       thumbnail_label_public_url, thumbnail_background_color, hover_image_public_url,
       product_translations(*),
       product_media(*),

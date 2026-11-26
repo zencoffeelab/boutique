@@ -122,6 +122,8 @@ const productSchema = z.object({
   ribbonNew: z.string().optional().transform(Boolean),
   ribbonBackSoon: z.string().optional().transform(Boolean),
   professionalEnabled: z.string().optional().transform(Boolean),
+  showFilterRoastOption: z.string().optional().transform(Boolean),
+  showEspressoRoastOption: z.string().optional().transform(Boolean),
   nameFr: optionalText(180), nameEn: optionalText(180),
   shortFr: optionalText(8_000), shortEn: optionalText(8_000),
   producerFr: optionalText(180), producerEn: optionalText(180),
@@ -411,6 +413,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         ribbonNew: false,
         ribbonBackSoon: false,
         professionalEnabled: false,
+        showFilterRoastOption: true,
+        showEspressoRoastOption: true,
         thumbnailLabelUrl: null,
         thumbnailBackgroundColor: "#d9ddd3",
         hoverImageUrl: null,
@@ -1136,9 +1140,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
     ribbon_new: parsed.data.ribbonNew,
     ribbon_back_soon: parsed.data.ribbonBackSoon,
     professional_enabled: parsed.data.professionalEnabled,
+    show_filter_roast_option: parsed.data.showFilterRoastOption,
+    show_espresso_roast_option: parsed.data.showEspressoRoastOption,
     updated_at: new Date().toISOString(),
   };
-  const { ribbon_new: _ribbonNew, ribbon_back_soon: _ribbonBackSoon, ...legacyProductMutation } = productMutation;
+  const { ribbon_new: _ribbonNew, ribbon_back_soon: _ribbonBackSoon, show_filter_roast_option: _showFilterRoastOption, show_espresso_roast_option: _showEspressoRoastOption, ...legacyProductMutation } = productMutation;
   let mutation = creating
     ? await client
         .from("products")
@@ -2149,7 +2155,15 @@ export default function AdminProduct() {
               type="checkbox"
               defaultChecked={product.professionalEnabled}
             />{" "}
-            Activer sur la boutique professionnelle
+            Rendre disponible aux professionnels
+          </label>
+          <label>
+            <input name="showFilterRoastOption" type="checkbox" defaultChecked={product.showFilterRoastOption} />{" "}
+            Afficher l’option de torréfaction « Filtre »
+          </label>
+          <label>
+            <input name="showEspressoRoastOption" type="checkbox" defaultChecked={product.showEspressoRoastOption} />{" "}
+            Afficher l’option de torréfaction « Espresso »
           </label>
           <input type="hidden" name="featured" value={product.featured ? "true" : ""} />
           <label>
