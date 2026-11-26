@@ -4789,7 +4789,6 @@ body.advice-detail-overflow-hidden {
 .summary-card .checkout-promotion input { text-transform: uppercase; }
 .checkout-promotion__entry { display: flex; gap: .5rem; }
 .checkout-promotion__entry input { min-width: 0; }
-.checkout-promotion__entry .button { width: auto; margin: 0; white-space: nowrap; }
 .summary-card h2 {
   margin-bottom: 1.25rem;
   font-size: clamp(1.75rem, 3vw, 2.4rem);
