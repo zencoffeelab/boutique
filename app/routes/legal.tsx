@@ -118,7 +118,7 @@ export function TermsConditionsDocument({ blocks, english = false }: { blocks: A
   </section>;
 }
 
-function EnglishLegalDocument({ blocks, titles, label }: { blocks: Array<{ type?: unknown; content?: unknown }>; titles: Record<string, string>; label: string }) {
+export function EnglishLegalDocument({ blocks, titles, label }: { blocks: Array<{ type?: unknown; content?: unknown }>; titles: Record<string, string>; label: string }) {
   const text = richTextPlainText(storedBlocksToRichTextDocument(blocks)).replace(/\u00a0/g, " ").trim();
   const matches = [...text.matchAll(/(?:^|\n)(\d+)\.\s*/g)];
   if (!matches.length) return <ContentBlocks blocks={blocks} className="legal-document" />;
@@ -127,8 +127,12 @@ function EnglishLegalDocument({ blocks, titles, label }: { blocks: Array<{ type?
     const body = text.slice((match.index ?? 0) + match[0].length, matches[index + 1]?.index).trim();
     const title = titles[number] ?? `${label} ${number}`;
     const withoutRepeatedTitle = body.replace(new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i"), "");
-    return { number, title: `${number}. ${title}`, paragraphs: withoutRepeatedTitle.split(/\n+/).map((paragraph) => paragraph.trim()).filter(Boolean) };
-  });
+    return {
+      number,
+      title: `${number}. ${title}`,
+      paragraphs: [...new Set(withoutRepeatedTitle.split(/\n+/).map((paragraph) => paragraph.trim()).filter(Boolean))],
+    };
+  }).filter((section, index, allSections) => allSections.findIndex((candidate) => candidate.number === section.number) === index);
   return <section className="article-body rich-text-content legal-document" aria-label={label}>
     {sections.map((section) => <section key={section.number}><h2>{section.title}</h2>{section.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</section>)}
   </section>;
