@@ -122,6 +122,7 @@ export default function Checkout() {
   const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([]); const [selectedPickupPointId, setSelectedPickupPointId] = useState("");
   const [pickupBusy, setPickupBusy] = useState(false); const [pickupError, setPickupError] = useState("");
   const [createAccount, setCreateAccount] = useState(false);
+  const [promotionCode, setPromotionCode] = useState(""); const [promotionDiscount, setPromotionDiscount] = useState(0); const [promotionMessage, setPromotionMessage] = useState("");
   const pickupAvailable = pickupConfigured && supportsPickupDelivery(countryCode);
   const onSitePickupAvailable = countryCode === "FR";
   const deliveryPreferenceAvailable = pickupAvailable || onSitePickupAvailable;
@@ -149,6 +150,7 @@ export default function Checkout() {
   const professionalPricing = professionalVolumePricing(resolved.map(({ line, variant, offer }) => ({ quantity: line.quantity, unitWeightGrams: variant.weightGrams, unitPriceCents: offer.price.amount })), audience === "professional");
   const estimatedShippingWeight = Math.min(30_000, resolved.reduce((sum, item) => sum + item.variant.weightGrams * item.line.quantity, 0) + 500);
   const selectedShippingRate = quote?.rates?.find((rate) => rate.id === selectedRate);
+  const applyPromotion = async () => { setPromotionMessage(""); try { const response = await fetch("/api/promotion/validate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: promotionCode, subtotalCents: professionalPricing.subtotalCents }) }); const data = await response.json() as { ok: boolean; discountCents?: number; message?: string }; if (!response.ok || !data.ok) throw new Error(data.message); setPromotionDiscount(data.discountCents ?? 0); setPromotionMessage(english ? "Code applied." : "Code appliqué."); } catch (cause) { setPromotionDiscount(0); setPromotionMessage(cause instanceof Error ? cause.message : String(cause)); } };
 
   const invalidateQuote = () => { setQuote(null); setSelectedRate(""); };
   const resetPickup = () => { setPickupPoints([]); setSelectedPickupPointId(""); setPickupError(""); };
@@ -261,11 +263,12 @@ export default function Checkout() {
       <aside className="summary-card">
         <h2>{english ? "Your order" : "Votre commande"}</h2>
         {resolved.map(({ line, product, variant, offer }) => <div className="summary-row" key={variant.id}><span>{line.quantity} × {product.translations[locale].name} · {variant.label}</span><strong>{formatMoney(line.quantity * offer.price.amount, locale)}</strong></div>)}
-        <div className="checkout-promotion field"><label htmlFor="promotionCode">{english ? "Promotion code" : "Code de réduction"}</label><input id="promotionCode" name="promotionCode" form="checkout-form" autoComplete="off" placeholder={english ? "Enter your code" : "Saisissez votre code"} /></div>
-        <div className="summary-row"><span>{english ? "Subtotal" : "Sous-total"}</span><strong>{formatMoney(subtotal, locale)}</strong></div>
+        <div className="checkout-promotion field"><label htmlFor="promotionCode">{english ? "Promotion code" : "Code de réduction"}</label><div className="checkout-promotion__entry"><input id="promotionCode" name="promotionCode" form="checkout-form" value={promotionCode} onChange={(event) => { setPromotionCode(event.currentTarget.value); setPromotionDiscount(0); setPromotionMessage(""); }} autoComplete="off" placeholder={english ? "Enter your code" : "Saisissez votre code"} /><button type="button" className="button button--ghost" onClick={applyPromotion}>{english ? "Apply" : "Appliquer"}</button></div>{promotionMessage ? <small className={promotionDiscount ? "form-message" : "form-message form-error"}>{promotionMessage}</small> : null}</div>
+        <div className="summary-row"><span>{english ? "Subtotal" : "Sous-total"}</span><strong>{formatMoney(subtotal - promotionDiscount, locale)}</strong></div>
+        {promotionDiscount ? <div className="summary-row"><span>{english ? "Promotion" : "Réduction"}</span><strong>−{formatMoney(promotionDiscount, locale)}</strong></div> : null}
         {professionalPricing.discountCents ? <div className="summary-row"><span>{english ? "Professional offer" : "Offre professionnelle"} ({professionalPricing.percent} %)</span><strong>−{formatMoney(professionalPricing.discountCents, locale)}</strong></div> : null}
         <div className="summary-row"><span>{english ? "Shipping" : "Livraison"}</span><span className="summary-shipping-price"><strong>{selectedShippingRate ? formatMoney(selectedShippingRate.amountCents, locale) : "—"}</strong>{selectedShippingRate && shippingRatePromotionLabel(selectedShippingRate, locale) ? <small className="shipping-free-label">{shippingRatePromotionLabel(selectedShippingRate, locale)}</small> : null}</span></div>
-        <div className="summary-row summary-total"><span>Total</span><strong>{formatMoney(professionalPricing.subtotalCents + (selectedShippingRate?.amountCents ?? 0), locale)}</strong></div>
+        <div className="summary-row summary-total"><span>Total</span><strong>{formatMoney(professionalPricing.subtotalCents - promotionDiscount + (selectedShippingRate?.amountCents ?? 0), locale)}</strong></div>
         <p><small>{english ? "By paying, you accept the terms and acknowledge that UK duties remain payable by the recipient." : "En payant, vous acceptez les CGV. Les éventuels droits au Royaume-Uni restent à la charge du destinataire."}</small></p><button className="button button--dark" type="button" onClick={pay} disabled={!selectedRate || busy}>{english ? "Pay securely" : "Payer en toute sécurité"}</button>
       </aside>
     </div>
