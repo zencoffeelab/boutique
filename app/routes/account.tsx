@@ -200,6 +200,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const passwordResetComplete =
     url.searchParams.get("password-reset") === "complete";
   const authError = url.searchParams.get("auth_error");
+  const accountActivated = url.searchParams.get("account") === "activated";
   const registering = url.searchParams.get("register") === "1";
   const next = safeInternalPath(url.searchParams.get("next"), accountPath);
   if (!viewer)
@@ -216,6 +217,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       passwordRecovery,
       passwordResetComplete,
       authError,
+      accountActivated,
       registering,
       next,
       mfa: null,
@@ -262,6 +264,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         passwordRecovery,
         passwordResetComplete,
         authError,
+        accountActivated,
         registering,
         next,
         mfa,
@@ -373,6 +376,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     passwordRecovery,
     passwordResetComplete,
     authError,
+    accountActivated,
     registering,
     next,
     mfa,
@@ -977,7 +981,7 @@ export async function action({ request }: ActionFunctionArgs) {
           password,
           options: {
             data: { signup_source: "account", welcome_drawer_pending: true },
-            emailRedirectTo: authConfirmationUrl(request, accountPath),
+            emailRedirectTo: authConfirmationUrl(request, `${accountPath}?account=activated`),
           },
         })
       : await supabase.client.auth.signInWithPassword({ email, password });
@@ -1297,6 +1301,7 @@ export default function Account() {
     passwordRecovery,
     passwordResetComplete,
     authError,
+    accountActivated,
     registering,
     next,
     mfa,
@@ -1337,6 +1342,7 @@ export default function Account() {
           professionalMessages,
           upcomingContract,
           setPassword,
+          accountActivated,
           next,
           mfa,
         }}
@@ -1363,7 +1369,7 @@ export default function Account() {
             <div className="field field--wide"><label htmlFor="account-email">Email</label><input id="account-email" name="email" type="email" required autoComplete="email" /></div>
             <div className="field field--wide"><label htmlFor="account-password">{english ? "Password" : "Mot de passe"}</label><SignInPasswordInput english={english} /></div>
           </div>
-          <div className="account-login-actions"><button className="button button--dark" name="intent" value="register" type="submit">{english ? "Create an account" : "Créer un compte"}</button></div>
+          <div className="account-login-actions account-registration-actions"><button className="button button--dark" name="intent" value="register" type="submit">{english ? "Create an account" : "Créer un compte"}</button></div>
           <p className="account-login-return"><Link className="button account-login-return__button" to={loginPath}><span>{english ? "Already have an account?" : "Vous avez déjà un compte ?"}</span><span>{english ? "Sign in" : "Se connecter"}</span></Link></p>
         </Form>
       </>

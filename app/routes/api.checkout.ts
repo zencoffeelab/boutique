@@ -22,7 +22,7 @@ export async function action({ request }: ActionFunctionArgs) {
       password: parsed.data.accountPassword!,
       options: {
         data: { first_name: parsed.data.address.firstName, last_name: parsed.data.address.lastName, phone: parsed.data.address.phone, signup_source: "checkout", welcome_drawer_pending: true },
-        emailRedirectTo: authConfirmationUrl(request, accountPath),
+        emailRedirectTo: authConfirmationUrl(request, `${accountPath}?account=activated`),
       },
     });
     if (error) {

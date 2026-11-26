@@ -9,8 +9,8 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { LoaderFunctionArgs, MetaFunction } from "react-router";
-import { Form, Link, useLoaderData } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
+import { Form, Link, useActionData, useLoaderData } from "react-router";
 import { AdminShell } from "~/components/admin-shell";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
@@ -27,6 +27,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { createServiceSupabase } from "~/lib/supabase.server";
 
 type DocumentType = "invoice" | "quote";
+type DocumentLabel = "test" | "client" | "client_pro";
 type DocumentStatus =
   | "issued"
   | "pending_payment"
@@ -54,7 +55,7 @@ type AdminDocumentPreview = {
 type AdminDocument = {
   id: string;
   type: DocumentType;
-  label: string;
+  label: DocumentLabel;
   number: string;
   date: string;
   customer: string;
@@ -78,6 +79,7 @@ const quoteStatuses: DocumentStatus[] = [
   "expired",
   "canceled",
 ];
+const documentLabels: DocumentLabel[] = ["test", "client", "client_pro"];
 
 function includesSearch(document: AdminDocument, query: string) {
   if (!query) return true;
@@ -87,6 +89,7 @@ function includesSearch(document: AdminDocument, query: string) {
     document.customer,
     document.email,
     document.type === "invoice" ? "facture" : "devis",
+    documentLabel(document.label),
   ].some((value) => value.toLocaleLowerCase("fr-FR").includes(normalized));
 }
 
@@ -113,6 +116,7 @@ export function buildAdminDocuments(
     invoice_number: string;
     issued_at: string;
     total_cents: number;
+    document_label?: DocumentLabel;
   }>,
   orders: Array<{
     id: string;
@@ -145,6 +149,7 @@ export function buildAdminDocuments(
     created_at: string;
     paid_at: string | null;
     storage_path: string | null;
+    document_label?: DocumentLabel;
   }>,
   quoteLines: Array<{
     quote_id: string;
@@ -200,7 +205,7 @@ export function buildAdminDocuments(
     documents.push({
       id: invoice.id,
       type: "invoice",
-      label: "test",
+      label: invoice.document_label ?? "test",
       number: invoice.invoice_number,
       date: invoice.issued_at,
       customer: customerName({ ...profile, email: order.email }),
@@ -246,7 +251,7 @@ export function buildAdminDocuments(
     documents.push({
       id: quote.id,
       type: "quote",
-      label: "test",
+      label: quote.document_label ?? "test",
       number: quote.quote_number,
       date: quote.created_at,
       customer: customerName({
@@ -321,12 +326,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
     requestedStatus && ["issued", ...quoteStatuses].includes(requestedStatus)
       ? requestedStatus
       : "all";
+  const requestedLabel = url.searchParams.get("label") as DocumentLabel | null;
+  const label = requestedLabel && documentLabels.includes(requestedLabel)
+    ? requestedLabel
+    : "all";
   if (admin.demo)
     return {
       demo: true,
       query,
       type,
       status,
+      label,
       summary: {
         total: 0,
         invoices: 0,
@@ -345,13 +355,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     await Promise.all([
       client
         .from("invoices")
-        .select("id,order_id,invoice_number,issued_at,total_cents")
+        .select("id,order_id,invoice_number,issued_at,total_cents,document_label")
         .order("issued_at", { ascending: false })
         .limit(10_000),
       client
         .from("professional_quotes")
         .select(
-          "id,quote_number,email,profile_id,status,total_cents,total_weight_kg,subtotal_before_discount_cents,discount_cents,valid_until,created_at,paid_at,storage_path",
+          "id,quote_number,email,profile_id,status,total_cents,total_weight_kg,subtotal_before_discount_cents,discount_cents,valid_until,created_at,paid_at,storage_path,document_label",
         )
         .order("created_at", { ascending: false })
         .limit(10_000),
@@ -431,6 +441,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       created_at: string;
       paid_at: string | null;
       storage_path: string | null;
+      document_label?: DocumentLabel;
     }>,
     quoteLinesResult.data ?? [],
     profileResult.data ?? [],
@@ -440,6 +451,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     (document) =>
       (type === "all" || document.type === type) &&
       (status === "all" || document.status === status) &&
+      (label === "all" || document.label === label) &&
       includesSearch(document, query),
   );
   return {
@@ -447,6 +459,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     query,
     type,
     status,
+    label,
     summary: {
       total: 0,
       invoices: 0,
@@ -457,6 +470,30 @@ export async function loader({ request }: LoaderFunctionArgs) {
     },
     documents,
   };
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  await requireAdmin(request);
+  const form = await request.formData();
+  if (form.get("intent") !== "update_document_label")
+    return { ok: false, message: "Action documentaire inconnue." };
+  const type = form.get("documentType");
+  const id = String(form.get("documentId") ?? "");
+  const label = form.get("documentLabel");
+  if (
+    (type !== "invoice" && type !== "quote") ||
+    !/^[0-9a-f-]{36}$/i.test(id) ||
+    !documentLabels.includes(label as DocumentLabel)
+  )
+    return { ok: false, message: "Libellé documentaire invalide." };
+  const client = createServiceSupabase();
+  if (!client) return { ok: false, message: "Base de données indisponible." };
+  const { error } = await client
+    .from(type === "invoice" ? "invoices" : "professional_quotes")
+    .update({ document_label: label })
+    .eq("id", id);
+  if (error) return { ok: false, message: error.message };
+  return { ok: true, message: "Libellé mis à jour." };
 }
 
 export const meta: MetaFunction = () => [
@@ -477,6 +514,10 @@ function statusLabel(status: DocumentStatus) {
 
 function documentTypeLabel(type: DocumentType) {
   return type === "invoice" ? "Facture" : "Devis";
+}
+
+function documentLabel(label: DocumentLabel) {
+  return { test: "Test", client: "Client", client_pro: "Client pro" }[label];
 }
 
 type SimulationLine = {
@@ -842,7 +883,7 @@ function NewDocumentSimulator({
               <tbody>
                 {lines.map((line) => (
                   <tr key={line.id}>
-                    <td>{englishInvoice ? englishSimulationProductLabel(line.label) : line.label}</td>
+                    <td><span>{englishInvoice ? englishSimulationProductLabel(line.label) : line.label}</span><small>{englishInvoice ? "roasted coffee beans" : "grains de café torréfiés"}</small></td>
                     <td>{line.quantity}</td>
                     <td>{formatInvoicePreviewMoney(line.unitCents, englishInvoice)}</td>
                     <td>
@@ -1003,7 +1044,7 @@ function AdminDocumentPreview({
             <tbody>
               {preview.lines.map((line) => (
                 <tr key={line.label}>
-                  <td>{line.label}</td>
+                  <td><span>{line.label}</span><small>grains de café torréfiés</small></td>
                   <td>{line.quantity}</td>
                   <td>{formatMoney(line.unitCents, "fr-FR")}</td>
                   <td>{formatMoney(line.totalCents, "fr-FR")}</td>
@@ -1066,8 +1107,9 @@ function AdminDocumentPreview({
 }
 
 export default function AdminDocuments() {
-  const { demo, query, type, status, summary, documents } =
+  const { demo, query, type, status, label, summary, documents } =
     useLoaderData<typeof loader>();
+  const actionResult = useActionData<typeof action>();
   const [selectedDocument, setSelectedDocument] =
     useState<AdminDocument | null>(null);
   const [simulationType, setSimulationType] = useState<DocumentType | null>(
@@ -1108,6 +1150,7 @@ export default function AdminDocuments() {
           </Link>
         </div>
       </header>
+      {actionResult?.message ? <p className={actionResult.ok ? "form-message" : "form-message form-error"} role="status">{actionResult.message}</p> : null}
       {demo ? (
         <p className="admin-notice">
           Connectez Supabase pour consulter les factures et devis.
@@ -1184,6 +1227,13 @@ export default function AdminDocuments() {
           <option value="expired">Devis expirés</option>
           <option value="canceled">Devis annulés</option>
         </select>
+        <label className="sr-only" htmlFor="document-label">
+          Segment client
+        </label>
+        <select id="document-label" name="label" defaultValue={label}>
+          <option value="all">Tous les segments</option>
+          {documentLabels.map((item) => <option key={item} value={item}>{documentLabel(item)}</option>)}
+        </select>
         <button className="ui-button ui-button--default" type="submit">
           <Search aria-hidden="true" /> Rechercher
         </button>
@@ -1201,7 +1251,7 @@ export default function AdminDocuments() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Type</TableHead>
+                  <TableHead>Type et segment</TableHead>
                   <TableHead>Référence</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Date</TableHead>
@@ -1220,7 +1270,15 @@ export default function AdminDocuments() {
                         {documentTypeLabel(document.type)}
                       </Badge>
                       <br />
-                      <Badge>{document.label}</Badge>
+                      <Form method="post" className="admin-document-label-form">
+                        <input type="hidden" name="intent" value="update_document_label" />
+                        <input type="hidden" name="documentType" value={document.type} />
+                        <input type="hidden" name="documentId" value={document.id} />
+                        <select name="documentLabel" defaultValue={document.label} aria-label={`Segment de ${document.number}`}>
+                          {documentLabels.map((item) => <option key={item} value={item}>{documentLabel(item)}</option>)}
+                        </select>
+                        <button className="text-link" type="submit">Enregistrer</button>
+                      </Form>
                     </TableCell>
                     <TableCell>
                       <strong>{document.number}</strong>

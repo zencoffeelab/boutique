@@ -168,6 +168,7 @@ export type AccountDashboardData = {
     }> | null;
   } | null;
   setPassword: boolean;
+  accountActivated?: boolean;
   next: string;
   mfa: AccountMfaState | null;
 };
@@ -989,7 +990,7 @@ function AccountSections({
               <tbody>
                 {orders.map((order) => (
                   <tr key={order.id}>
-                    <td>
+                    <td data-label={english ? "Order" : "Commande"}>
                       <Link
                         className="account-order-link"
                         to={`${accountPath}/${english ? "orders" : "commandes"}/${order.id}`}
@@ -1001,18 +1002,18 @@ function AccountSections({
                         </span>
                       </Link>
                     </td>
-                    <td>
+                    <td data-label="Date">
                       {new Date(order.created_at).toLocaleDateString(locale)}
                     </td>
-                    <td>
+                    <td data-label={english ? "Status" : "Statut"}>
                       <span className="ui-badge account-order-status">
                         {orderStatusLabel(order.status, english)}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Total">
                       <strong>{formatMoney(order.total_cents, locale)}</strong>
                     </td>
-                    <td>
+                    <td data-label="Documents">
                       <div className="account-order-links">
                         {order.paid_at ? (
                           <a
@@ -1753,6 +1754,13 @@ export function AccountDashboard({
             ? "Your orders, addresses and preferences, all in one place."
             : "Vos commandes, vos adresses et vos préférences, réunies au même endroit."}
         </p>
+        {data.accountActivated ? (
+          <p className="account-activation-notice" role="status">
+            {english
+              ? "Welcome, your account has been activated."
+              : "Bienvenue, votre compte a été activé."}
+          </p>
+        ) : null}
       </header>
       <div className="page-shell account-page-shell">
         <aside className="account-sidebar">
