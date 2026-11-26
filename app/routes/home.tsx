@@ -87,7 +87,7 @@ export default function Home() {
 
       <section className="section page-shell">
         <div className="section-header">
-          <div><p className="eyebrow">{english ? "Current selection" : "Sélection du moment"}</p><h2>{english ? "Coffees in season" : "Cafés de saison"}</h2></div>
+          <div><p className="eyebrow">{english ? "Current selection" : "Sélection du moment"}</p><h2>{english ? "Seasonal coffees" : "Cafés de saison"}</h2></div>
           <Link className="text-link" to={english ? "/en/shop" : "/boutique"}>{english ? "View all coffees" : "Voir tous les cafés"}<ArrowRight aria-hidden="true" /></Link>
         </div>
         {products.length > 0
