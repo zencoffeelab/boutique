@@ -3,7 +3,6 @@ export const professionalVolumeDiscount = (weightGrams: number) => {
   if (weightGrams >= 30_000) return 25;
   if (weightGrams >= 15_000) return 20;
   if (weightGrams >= 5_000) return 15;
-  if (weightGrams >= 1_000) return 10;
   return 0;
 };
 

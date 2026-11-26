@@ -11,6 +11,7 @@ export type ChangelogEntry = Readonly<{
 
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
+  { id: "2026-11-26-professional-discount-starts-at-five-kilos", date: "2026-11-26", kind: "Correction", title: "Remise professionnelle à partir de 5 kg", description: "La remise professionnelle n’est plus appliquée entre 1 et 4,9 kg. Le premier palier débute désormais à 5 kg." },
   { id: "2026-11-26-promotion-code-messages-localized", date: "2026-11-26", kind: "Correction", title: "Messages des codes de réduction traduits", description: "La validation des codes affiche désormais Code appliqué / Code invalide en français et Code applied / Invalid code en anglais." },
   { id: "2026-11-26-promotion-code-validation-route", date: "2026-11-26", kind: "Correction", title: "Validation des codes de réduction rétablie", description: "Le bouton Appliquer interroge désormais sa route dédiée et reçoit une réponse de validation exploitable, au lieu d’une page HTML." },
   { id: "2026-11-26-promotion-code-apply-button", date: "2026-11-26", kind: "Design", title: "Validation des codes de réduction harmonisée", description: "Au paiement, le bouton Appliquer est désormais placé sous le champ de code et reprend les dimensions ainsi que la couleur de l’action de paiement sécurisé." },

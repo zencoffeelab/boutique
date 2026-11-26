@@ -53,7 +53,7 @@ export async function createCheckout(input: { cartId: string; shippingRateId: st
   const supabase = createServiceSupabase(); if (!supabase) throw new Error("Supabase service access is required for checkout.");
   const { data: order, error } = await supabase.rpc("create_checkout_order", { p_cart_id: quote.cartId, p_quote_id: quote.id, p_audience: quote.audience, p_locale: quote.locale, p_address: shippingAddress, p_lines: quote.lines, p_shipping_rate: rate, p_reservation_minutes: 30, p_profile_id: input.profileId ?? null });
   if (error || !order) throw new Response(error?.message ?? "Unable to reserve stock.", { status: 409 });
-  const { error: promotionError } = await supabase.from("orders").update({ promotion_code: promotion.code, promotion_discount_cents: promotion.discountCents, subtotal_cents: pricing.subtotalCents - promotion.discountCents, total_cents: pricing.subtotalCents - promotion.discountCents + rate.amountCents }).eq("id", order.id);
+  const { error: promotionError } = await supabase.from("orders").update({ promotion_code: promotion.code, promotion_discount_cents: promotion.discountCents, professional_discount_cents: pricing.discountCents, professional_discount_percent: pricing.percent, subtotal_cents: pricing.subtotalCents - promotion.discountCents, total_cents: pricing.subtotalCents - promotion.discountCents + rate.amountCents }).eq("id", order.id);
   if (promotionError) { await supabase.rpc("release_order_reservation", { p_order_id: order.id, p_reason: "promotion_update_failed" }); throw promotionError; }
   const stripe = createStripe(config.STRIPE_SECRET_KEY);
   try {
