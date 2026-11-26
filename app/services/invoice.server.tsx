@@ -237,7 +237,7 @@ export async function renderInvoicePdf(input: { invoice: InvoiceSnapshot; order:
   let totalTop = summaryTop + 30;
   if (order.shipping_charged_cents > 0) {
     drawSummaryLine(english ? "Shipping" : "Livraison", euros(order.shipping_charged_cents, documentLocale), totalTop);
-    totalTop += 28;
+    totalTop += 42;
   }
   if (professionalDiscountCents > 0) {
     drawSummaryLine(english ? "Professional offer" : "Offre professionnelle", `-${euros(professionalDiscountCents, documentLocale)}`, totalTop);
