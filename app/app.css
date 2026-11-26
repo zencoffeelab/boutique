@@ -4809,6 +4809,9 @@ body.advice-detail-overflow-hidden {
   padding: 8rem 1rem;
   text-align: center;
 }
+.archives-empty-space {
+  padding: 4rem 1rem;
+}
 .order-confirmation__details {
   display: grid;
   justify-items: center;

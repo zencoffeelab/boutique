@@ -11,6 +11,7 @@ export type ChangelogEntry = Readonly<{
 
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
+  { id: "2026-11-26-empty-coffee-archives-space-reduced", date: "2026-11-26", kind: "Design", title: "Espace des Archives vides réduit", description: "L’espace blanc réservé avant la première archive est réduit de moitié, tout en conservant l’absence de message d’attente." },
   { id: "2026-11-26-empty-coffee-archives-space", date: "2026-11-26", kind: "Design", title: "Espace réservé dans les Archives vides", description: "Avant la première archive, la page conserve désormais l’espace blanc de la zone de contenu, sans afficher de message d’attente." },
   { id: "2026-11-26-empty-coffee-archives", date: "2026-11-26", kind: "Design", title: "Archives discrètes avant le premier café", description: "Le message d’attente des Archives café n’est plus affiché tant qu’aucun café archivé n’est disponible. Les cartes apparaissent normalement dès qu’une archive existe." },
   { id: "2026-11-26-english-home-seasonal-coffees", date: "2026-11-26", kind: "Correction", title: "Titre saisonnier de l’accueil anglais ajusté", description: "Le titre Coffees in season de la sélection de l’accueil anglais est désormais présenté comme Seasonal coffees." },
