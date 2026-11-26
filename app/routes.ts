@@ -82,6 +82,7 @@ export default [
   route("api/shipping/pickup-points", "routes/api.pickup-points.ts"),
   route("api/shipping/quote", "routes/api.shipping-quote.ts"),
   route("api/checkout/payment-intent", "routes/api.checkout.ts"),
+  route("api/promotion/validate", "routes/api.promotion-validate.ts"),
   route("api/orders/:id", "routes/api.order.ts"),
   route("api/orders/:id/invoice", "routes/api.invoice.ts"),
   route("api/webhooks/stripe", "routes/api.webhook-stripe.ts"),

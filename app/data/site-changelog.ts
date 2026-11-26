@@ -11,6 +11,7 @@ export type ChangelogEntry = Readonly<{
 
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
+  { id: "2026-11-26-promotion-code-validation-route", date: "2026-11-26", kind: "Correction", title: "Validation des codes de réduction rétablie", description: "Le bouton Appliquer interroge désormais sa route dédiée et reçoit une réponse de validation exploitable, au lieu d’une page HTML." },
   { id: "2026-11-26-promotion-code-apply-button", date: "2026-11-26", kind: "Design", title: "Validation des codes de réduction harmonisée", description: "Au paiement, le bouton Appliquer est désormais placé sous le champ de code et reprend les dimensions ainsi que la couleur de l’action de paiement sécurisé." },
   { id: "2026-11-26-promotion-codes-checkout", date: "2026-11-26", kind: "Fonctionnalité", title: "Codes de réduction à la commande", description: "Le paiement accepte désormais un code de réduction validé côté serveur. Dans Expédition, les administrateurs peuvent créer et supprimer des codes en pourcentage ou en montant fixe." },
   { id: "2026-11-26-empty-coffee-archives-coming-soon-card", date: "2026-11-26", kind: "Design", title: "Annonce des Archives encadrée", description: "Le libellé Bientôt disponible / Coming soon est légèrement agrandi et présenté dans un encadré discret au centre des Archives vides." },
