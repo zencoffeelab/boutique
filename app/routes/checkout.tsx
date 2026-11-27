@@ -92,6 +92,18 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => pageMeta(
 type QuoteResponse = { ok: boolean; quoteId?: string; expiresAt?: string; rates?: ShippingRate[]; subtotalCents?: number; message?: string };
 type CheckoutResponse = { ok: boolean; checkoutUrl?: string; confirmationUrl?: string; message?: string };
 type PickupResponse = { ok: boolean; points?: PickupPoint[]; message?: string };
+type CheckoutDraft = { fields: Record<string, string>; countryCode: string; deliveryMethod: "home" | "pickup" | "on_site_pickup"; promotionCode: string; createAccount: boolean };
+
+const checkoutDraftKey = "zcl:checkout-draft:v1";
+const checkoutDraftFieldNames = ["firstName", "lastName", "email", "phone", "company", "line1", "line2", "postalCode", "city"] as const;
+
+function restoreCheckoutField(form: HTMLFormElement, name: string, value: string) {
+  const field = form.elements.namedItem(name);
+  if (!(field instanceof HTMLInputElement)) return;
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  descriptor?.set?.call(field, value);
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+}
 
 async function readApiResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
   const body = await response.text();
@@ -143,6 +155,23 @@ export default function Checkout() {
     const key = "zcl:cart-id:v1"; let id = window.localStorage.getItem(key);
     if (!id) { id = crypto.randomUUID(); window.localStorage.setItem(key, id); }
     setCartId(id);
+  }, []);
+
+  useEffect(() => {
+    const form = formRef.current; const stored = window.sessionStorage.getItem(checkoutDraftKey);
+    if (!form || !stored) return;
+    try {
+      const draft = JSON.parse(stored) as CheckoutDraft;
+      for (const name of checkoutDraftFieldNames) {
+        if (typeof draft.fields?.[name] === "string") restoreCheckoutField(form, name, draft.fields[name]);
+      }
+      if (typeof draft.countryCode === "string") setCountryCode(draft.countryCode);
+      if (["home", "pickup", "on_site_pickup"].includes(draft.deliveryMethod)) setDeliveryMethod(draft.deliveryMethod);
+      if (typeof draft.promotionCode === "string") setPromotionCode(draft.promotionCode);
+      setCreateAccount(Boolean(draft.createAccount));
+    } catch {
+      window.sessionStorage.removeItem(checkoutDraftKey);
+    }
   }, []);
 
   const validLines = useMemo(
@@ -217,6 +246,8 @@ export default function Checkout() {
       const data = await readApiResponse<CheckoutResponse>(response, english ? "The secure payment service returned an unexpected response. Please try again." : "Le service de paiement sécurisé a retourné une réponse inattendue. Réessayez.");
       if (!response.ok || !data.ok) throw new Error(data.message || "Checkout unavailable");
       const target = data.checkoutUrl ?? data.confirmationUrl; if (!target) throw new Error("Checkout response is incomplete.");
+      const draftFields = Object.fromEntries(checkoutDraftFieldNames.map((name) => [name, String(new FormData(formRef.current!).get(name) ?? "")]));
+      window.sessionStorage.setItem(checkoutDraftKey, JSON.stringify({ fields: draftFields, countryCode, deliveryMethod, promotionCode, createAccount } satisfies CheckoutDraft));
       window.location.assign(target);
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); setBusy(false); }
   };
