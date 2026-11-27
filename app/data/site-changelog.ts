@@ -11,6 +11,7 @@ export type ChangelogEntry = Readonly<{
 
 // Ajouter chaque nouvelle évolution en tête de liste. Les anciennes entrées ne doivent pas être réécrites.
 export const siteChangelog = [
+  { id: "2026-11-27-checkout-unexpected-api-response", date: "2026-11-27", kind: "Correction", title: "Erreur technique de commande clarifiée", description: "Lorsqu’un service de livraison, de promotion ou de paiement renvoie exceptionnellement une réponse non lisible, la commande affiche désormais un message clair et actionnable au lieu d’une erreur JSON technique." },
   { id: "2026-11-26-professional-discount-starts-at-five-kilos", date: "2026-11-26", kind: "Correction", title: "Remise professionnelle à partir de 5 kg", description: "La remise professionnelle n’est plus appliquée entre 1 et 4,9 kg. Le premier palier débute désormais à 5 kg." },
   { id: "2026-11-26-promotion-code-messages-localized", date: "2026-11-26", kind: "Correction", title: "Messages des codes de réduction traduits", description: "La validation des codes affiche désormais Code appliqué / Code invalide en français et Code applied / Invalid code en anglais." },
   { id: "2026-11-26-promotion-code-validation-route", date: "2026-11-26", kind: "Correction", title: "Validation des codes de réduction rétablie", description: "Le bouton Appliquer interroge désormais sa route dédiée et reçoit une réponse de validation exploitable, au lieu d’une page HTML." },

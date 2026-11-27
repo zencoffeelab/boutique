@@ -93,6 +93,18 @@ type QuoteResponse = { ok: boolean; quoteId?: string; expiresAt?: string; rates?
 type CheckoutResponse = { ok: boolean; checkoutUrl?: string; confirmationUrl?: string; message?: string };
 type PickupResponse = { ok: boolean; points?: PickupPoint[]; message?: string };
 
+async function readApiResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
+  const body = await response.text();
+  try {
+    return JSON.parse(body) as T;
+  } catch {
+    // A proxy, payment provider, or development server can occasionally return
+    // plain text or HTML instead of the API contract. Do not expose a JSON parser
+    // error to the customer in that case.
+    throw new Error(fallbackMessage);
+  }
+}
+
 function getAddress(form: HTMLFormElement) {
   const data = new FormData(form);
   return {
@@ -150,7 +162,7 @@ export default function Checkout() {
   const professionalPricing = professionalVolumePricing(resolved.map(({ line, variant, offer }) => ({ quantity: line.quantity, unitWeightGrams: variant.weightGrams, unitPriceCents: offer.price.amount })), audience === "professional");
   const estimatedShippingWeight = Math.min(30_000, resolved.reduce((sum, item) => sum + item.variant.weightGrams * item.line.quantity, 0) + 500);
   const selectedShippingRate = quote?.rates?.find((rate) => rate.id === selectedRate);
-  const applyPromotion = async () => { setPromotionMessage(""); try { const response = await fetch("/api/promotion/validate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: promotionCode, subtotalCents: professionalPricing.subtotalCents }) }); const data = await response.json() as { ok: boolean; discountCents?: number; message?: string }; if (!response.ok || !data.ok) throw new Error(english ? "Invalid code." : "Code invalide."); setPromotionDiscount(data.discountCents ?? 0); setPromotionMessage(english ? "Code applied." : "Code appliqué."); } catch (cause) { setPromotionDiscount(0); setPromotionMessage(cause instanceof Error ? cause.message : String(cause)); } };
+  const applyPromotion = async () => { setPromotionMessage(""); try { const response = await fetch("/api/promotion/validate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: promotionCode, subtotalCents: professionalPricing.subtotalCents }) }); const data = await readApiResponse<{ ok: boolean; discountCents?: number; message?: string }>(response, english ? "The promotion service returned an unexpected response. Please try again." : "Le service de promotion a retourné une réponse inattendue. Réessayez."); if (!response.ok || !data.ok) throw new Error(english ? "Invalid code." : "Code invalide."); setPromotionDiscount(data.discountCents ?? 0); setPromotionMessage(english ? "Code applied." : "Code appliqué."); } catch (cause) { setPromotionDiscount(0); setPromotionMessage(cause instanceof Error ? cause.message : String(cause)); } };
 
   const invalidateQuote = () => { setQuote(null); setSelectedRate(""); };
   const resetPickup = () => { setPickupPoints([]); setSelectedPickupPointId(""); setPickupError(""); };
@@ -165,7 +177,7 @@ export default function Checkout() {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ locale, address: { line1: address.line1, line2: address.line2, postalCode: address.postalCode, city: address.city, countryCode: address.countryCode }, weightGrams: estimatedShippingWeight }),
       });
-      const data = await response.json() as PickupResponse;
+      const data = await readApiResponse<PickupResponse>(response, english ? "The pickup-point service returned an unexpected response. Please try again." : "Le service de points relais a retourné une réponse inattendue. Réessayez.");
       if (!response.ok || !data.ok) throw new Error(data.message || (english ? "Pickup-point search is unavailable." : "La recherche de points relais est indisponible."));
       setPickupPoints(data.points ?? []);
       if (!data.points?.length) setPickupError(english ? "No pickup point was found near this address." : "Aucun point relais n’a été trouvé près de cette adresse.");
@@ -187,7 +199,7 @@ export default function Checkout() {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(event.currentTarget), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, onSitePickup: deliveryMethod === "on_site_pickup" }),
       });
-      const data = await response.json() as QuoteResponse;
+      const data = await readApiResponse<QuoteResponse>(response, english ? "The shipping service returned an unexpected response. Please try again." : "Le service de livraison a retourné une réponse inattendue. Réessayez.");
       if (!response.ok || !data.ok) throw new Error(data.message || (english ? "Unable to retrieve shipping rates." : "Impossible de récupérer les tarifs de livraison."));
       setQuote(data); setSelectedRate(data.rates?.[0]?.id ?? "");
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
@@ -202,7 +214,7 @@ export default function Checkout() {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ cartId, locale, lines: validLines, address: getAddress(formRef.current), pickupPointId: deliveryMethod === "pickup" ? selectedPickupPointId : undefined, onSitePickup: deliveryMethod === "on_site_pickup", shippingRateId: selectedRate, acceptTerms: true, promotionCode: String(new FormData(formRef.current).get("promotionCode") ?? ""), createAccount: !account && createAccount, accountPassword: !account && createAccount ? String(new FormData(formRef.current).get("accountPassword") ?? "") : undefined }),
       });
-      const data = await response.json() as CheckoutResponse;
+      const data = await readApiResponse<CheckoutResponse>(response, english ? "The secure payment service returned an unexpected response. Please try again." : "Le service de paiement sécurisé a retourné une réponse inattendue. Réessayez.");
       if (!response.ok || !data.ok) throw new Error(data.message || "Checkout unavailable");
       const target = data.checkoutUrl ?? data.confirmationUrl; if (!target) throw new Error("Checkout response is incomplete.");
       window.location.assign(target);
