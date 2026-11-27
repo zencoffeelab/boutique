@@ -158,6 +158,7 @@ export default function Checkout() {
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     const form = formRef.current; const stored = window.sessionStorage.getItem(checkoutDraftKey);
     if (!form || !stored) return;
     try {
@@ -172,7 +173,7 @@ export default function Checkout() {
     } catch {
       window.sessionStorage.removeItem(checkoutDraftKey);
     }
-  }, []);
+  }, [hydrated]);
 
   const validLines = useMemo(
     () => lines.filter((line) => line.audience === "retail" || audience === "professional"),
